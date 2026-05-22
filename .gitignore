@@ -79,13 +79,9 @@ test/
 # =============================================================================
 .coverage
 htmlcov/
-.pytest_cache/
 .mypy_cache/
-backend/pytest_output*.txt
 
 # =============================================================================
 # Local data & generated artifacts
 # =============================================================================
-backend/data/
-backend/uploads/
 certs/*.pem

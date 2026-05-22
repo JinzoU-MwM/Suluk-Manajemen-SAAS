@@ -1,17 +1,6 @@
-# Contributing to Jamaah.in
+# Contributing
 
-Thank you for your interest in contributing!
-
-## Development Setup
-
-### Backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
+## Development
 
 ### Frontend
 
@@ -20,58 +9,46 @@ cd frontend-svelte
 npm install
 ```
 
-### Pre-commit Hooks
+### Backend
 
 ```bash
-pip install pre-commit
-pre-commit install
-pre-commit run --all-files
+go mod download
 ```
 
-### Database
-
-Ensure `.env` is configured with `DATABASE_URL`.
-
-## Running Tests
+### Infrastructure
 
 ```bash
-# Backend
-cd backend
-pytest -v                    # Run all tests
-pytest --cov=.              # With coverage
-pytest tests/test_validators.py  # Specific file
+docker compose -f deployments/docker-compose.yml up -d
 ```
 
-## Code Style
+## Running checks
 
-- Python: Follow PEP 8, formatted with Black, linted with Ruff
-- Svelte: Use Svelte 5 Runes, follow existing patterns
-- Run local hooks before push using root `.pre-commit-config.yaml`
+### Go
 
-## CI Workflow
-
-- `Deploy to VPS` runs on push to `main` and includes verify + deploy.
-- `CI` runs on `pull_request` to `main` and push to non-`main` branches (verify only, no deploy).
-
-## Adding New Features
-
-1. Write tests first (TDD)
-2. Implement feature
-3. Ensure tests pass
-4. Update documentation
-5. Commit with conventional commits
-
-## Commit Message Format
-
+```bash
+go test ./...
 ```
-type(scope): description
 
-Types:
-- feat: New feature
-- fix: Bug fix
-- docs: Documentation
-- test: Tests
-- refactor: Code refactoring
-- chore: Maintenance
-- perf: Performance improvement
+### Frontend
+
+```bash
+cd frontend-svelte
+npm test
+npm run check
 ```
+
+## Code style
+
+- Go: format with `gofmt`
+- Svelte/JS: follow existing frontend conventions
+
+## Commit messages
+
+Use conventional commit style when practical:
+
+- `feat:`
+- `fix:`
+- `refactor:`
+- `docs:`
+- `test:`
+- `chore:`

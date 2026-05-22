@@ -1,44 +1,30 @@
 # Observability
 
-## Request ID Tracing
+This repository now uses the standalone Go service stack only.
 
-- Every HTTP request gets a `request_id`.
-- If the client sends `X-Request-ID`, the backend reuses it.
-- If missing, backend generates one and returns it in `X-Request-ID` response header.
+## Scope
 
-## Structured Request Logs
+- Gateway and service health endpoints
+- Structured application logs
+- Service-level metrics
 
-Backend emits structured logs for each request with these fields:
+## Current expectations
 
-- `request_id`
-- `method`
-- `path`
-- `status_code`
-- `duration_ms`
+- Every service exposes `/health`
+- The API gateway is the main entry point for frontend traffic
+- Logs should include request path, method, status, and duration when applicable
 
-On unhandled exceptions, the `http_request_failed` log includes stack trace plus `request_id`.
+## Local infrastructure
 
-## Metrics Endpoint
+Use:
 
-- Backend exposes Prometheus-style metrics at `GET /metrics`.
-- Core metrics:
-  - `http_requests_total`
-  - `http_errors_total`
-  - `http_request_duration_seconds` (histogram)
-  - `gemini_calls_total`
-  - `gemini_cache_requests_total` (`result=hit|miss`, `cache_mode=default|refresh|bypass`)
-
-## Example
-
-```json
-{
-  "event": "http_request",
-  "request_id": "7a9408f893904b57900ccf1fd8a39f8a",
-  "method": "GET",
-  "path": "/health",
-  "status_code": 200,
-  "duration_ms": 4.21,
-  "level": "info",
-  "timestamp": "2026-03-05T04:41:52.292736Z"
-}
+```bash
+docker compose -f deployments/docker-compose.yml up -d
 ```
+
+This starts the supporting infrastructure for the Go services:
+
+- PostgreSQL
+- Redis
+- NATS
+- MinIO
