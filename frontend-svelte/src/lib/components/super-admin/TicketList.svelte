@@ -1,0 +1,199 @@
+﻿<script>
+    import { onMount } from 'svelte';
+    import { SuperAdminApi } from '../../services/superAdminApi.js';
+
+    export let onSelect = (_ticket) => {};
+    export let onRefresh = () => {};
+
+    let tickets = [];
+    let loading = false;
+    let error = null;
+
+    // Filters
+    let statusFilter = 'all'; // 'all', 'open', 'in_progress', 'resolved', 'closed'
+    let priorityFilter = 'all'; // 'all', 'low', 'medium', 'high', 'urgent'
+    let page = 1;
+    const limit = 20;
+
+    onMount(() => {
+        loadTickets();
+    });
+
+    async function loadTickets() {
+        try {
+            loading = true;
+            error = null;
+            const filters = {
+                skip: (page - 1) * limit,
+                limit,
+            };
+            if (statusFilter !== 'all') filters.status = statusFilter;
+            if (priorityFilter !== 'all') filters.priority = priorityFilter;
+            tickets = await SuperAdminApi.listTickets(filters);
+            onRefresh();
+        } catch (err) {
+            error = err.message;
+            console.error('Failed to load tickets:', err);
+        } finally {
+            loading = false;
+        }
+    }
+
+    function selectTicket(ticket) {
+        onSelect(ticket);
+    }
+
+    function formatDate(dateStr) {
+        return new Date(dateStr).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function getStatusBadge(status) {
+        const badges = {
+            open: '<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">Open</span>',
+            in_progress: '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded">In Progress</span>',
+            resolved: '<span class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded">Resolved</span>',
+            closed: '<span class="px-2 py-1 bg-slate-100 text-slate-800 text-xs font-semibold rounded">Closed</span>',
+        };
+        return badges[status] || badges.open;
+    }
+
+    function getPriorityBadge(priority) {
+        const badges = {
+            low: '<span class="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded">Low</span>',
+            medium: '<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Medium</span>',
+            high: '<span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">High</span>',
+            urgent: '<span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded">Urgent</span>',
+        };
+        return badges[priority] || badges.medium;
+    }
+
+    $: filteredTickets = tickets.filter(ticket => {
+        if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
+        if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
+        return true;
+    });
+</script>
+
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100">
+    <!-- Header -->
+    <div class="p-6 border-b border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <h2 class="text-xl font-semibold text-slate-900">Support Tickets</h2>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <!-- Status Filter -->
+                <select
+                    bind:value={statusFilter}
+                    class="px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                    <option value="all">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="closed">Closed</option>
+                </select>
+
+                <!-- Priority Filter -->
+                <select
+                    bind:value={priorityFilter}
+                    class="px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                    <option value="all">All Priorities</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+        {#if loading}
+            <div class="p-8 text-center text-slate-500">Loading...</div>
+        {:else if error}
+            <div class="p-8 text-center text-red-500">{error}</div>
+        {:else if filteredTickets.length === 0}
+            <div class="p-8 text-center text-slate-500">No tickets found</div>
+        {:else}
+            <table class="w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Subject</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">User</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Priority</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Last Activity</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Messages</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {#each filteredTickets as ticket}
+                        <tr
+                            class="hover:bg-slate-50 cursor-pointer transition-colors"
+                            on:click={() => selectTicket(ticket)}
+                        >
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-slate-900 flex items-center gap-2">
+                                    <span>{ticket.subject}</span>
+                                    {#if !ticket.is_read && ticket.unread_user_messages > 0}
+                                        <span class="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-semibold rounded-full">
+                                            NEW {ticket.unread_user_messages}
+                                        </span>
+                                    {/if}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm">
+                                    <div class="font-medium text-slate-700">{ticket.user_name}</div>
+                                    <div class="text-slate-500">{ticket.user_email}</div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                {@html getStatusBadge(ticket.status)}
+                            </td>
+                            <td class="px-6 py-4">
+                                {@html getPriorityBadge(ticket.priority)}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-500">
+                                {formatDate(ticket.last_message_at)}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-slate-500">
+                                {ticket.message_count}
+                            </td>
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
+        {/if}
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+        <div class="text-sm text-slate-500">
+            Showing {Math.min(filteredTickets.length, limit * page)} of {filteredTickets.length} tickets
+        </div>
+        <div class="flex space-x-2">
+            <button
+                on:click={() => page > 1 && (page -= 1, loadTickets())}
+                disabled={page === 1}
+                class="px-4 py-2 border border-slate-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+                Previous
+            </button>
+            <button
+                on:click={() => filteredTickets.length === limit * page && (page += 1, loadTickets())}
+                disabled={filteredTickets.length < limit * page}
+                class="px-4 py-2 border border-slate-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+                Next
+            </button>
+        </div>
+    </div>
+</div>

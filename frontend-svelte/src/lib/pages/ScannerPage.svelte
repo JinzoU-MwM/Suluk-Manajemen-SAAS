@@ -1,0 +1,701 @@
+﻿<script>
+  import { onMount, onDestroy } from "svelte";
+  import {
+    Crown,
+    X,
+    Loader2,
+    CheckCircle,
+    ExternalLink,
+    ScanLine,
+  } from "lucide-svelte";
+  import TableResult from "../components/TableResult.svelte";
+  import FileUpload from "../components/FileUpload.svelte";
+  import SubscriptionBanner from "../components/SubscriptionBanner.svelte";
+  import GroupSelector from "../components/GroupSelector.svelte";
+  import { ApiService } from "../services/api";
+
+  let {
+    onLogout,
+    user = null,
+    subscription = null,
+    onSubscriptionChange = null,
+  } = $props();
+
+  // State
+  let files = $state([]);
+  let isProcessing = $state(false);
+  let errorMessage = $state("");
+  let progress = $state(null);
+  let ocrStatus = $state(null);
+  // subscription comes from props, but we may need local state for it
+  let localSubscription = $state(null);
+
+  // Use prop if provided, otherwise use local state
+  $effect(() => {
+    if (subscription) {
+      localSubscription = subscription;
+    }
+  });
+
+  // Preview Modal State
+  let showModal = $state(false);
+  let previewData = $state([]);
+  let isGenerating = $state(false);
+  let validationWarnings = $state([]);
+  let fileResults = $state([]);
+  let processingCacheMode = $state("default");
+  const cacheModeLabels = {
+    default: "Default (hemat biaya, read/write cache)",
+    refresh: "Refresh (skip read, tulis hasil terbaru)",
+    bypass: "Bypass (tanpa read/write cache)",
+  };
+  const cacheModeHint = $derived(cacheModeLabels[processingCacheMode] || cacheModeLabels.default);
+  const bypassQuota = $derived(ocrStatus?.cache_quota?.bypass || null);
+  const canUseBypassCacheMode = $derived(
+    (() => {
+      const isProActive = localSubscription?.plan === "pro" && localSubscription?.status === "active";
+      if (!isProActive) return false;
+      const backendAllowed = ocrStatus?.providers?.gemini?.bypass_allowed_now;
+      if (typeof backendAllowed === "boolean") return backendAllowed;
+      if (!bypassQuota) return true;
+      return Boolean(bypassQuota.unlimited || (bypassQuota.remaining_files ?? 0) > 0);
+    })(),
+  );
+  const cacheModeNotice = $derived(
+    (() => {
+      const isProActive = localSubscription?.plan === "pro" && localSubscription?.status === "active";
+      if (canUseBypassCacheMode) {
+        return bypassQuota?.unlimited
+          ? "Bypass aktif tanpa limit per jam. Tetap gunakan seperlunya untuk kontrol biaya."
+          : `Sisa bypass 1 jam: ${bypassQuota?.remaining_files ?? "-"} dari ${bypassQuota?.limit_files ?? "-"} file.`;
+      }
+      if (isProActive) {
+        return "Kuota bypass per jam sedang habis. Gunakan default/refresh atau tunggu quota reset.";
+      }
+      return "Mode bypass khusus Pro aktif untuk mencegah lonjakan biaya API.";
+    })(),
+  );
+
+  $effect(() => {
+    if (!canUseBypassCacheMode && processingCacheMode === "bypass") {
+      processingCacheMode = "default";
+    }
+  });
+
+  // Track failed files for retry
+  let failedFileNames = $state([]);
+
+  // Group State
+  let selectedGroup = $state(null);
+  let isSavingToGroup = $state(false);
+  let groupSaveSuccess = $state("");
+
+  // Upgrade modal
+  let showUpgradeModal = $state(false);
+  let paymentLoading = $state(false);
+  let paymentOrderId = $state("");
+  let paymentStatus = $state(""); // pending | paid | error
+  let paymentError = $state("");
+  let paymentPollInterval = null;
+  let selectedPlan = $state("monthly"); // monthly | annual
+
+  async function startPayment() {
+    paymentLoading = true;
+    paymentError = "";
+    try {
+      const result = await ApiService.createPaymentOrder(selectedPlan);
+      paymentOrderId = result.order_id;
+      paymentStatus = "pending";
+      window.open(result.payment_url, "_blank");
+      // Start polling for payment status
+      paymentPollInterval = setInterval(async () => {
+        try {
+          const status = await ApiService.checkPaymentStatus(paymentOrderId);
+          if (status.status === "paid") {
+            paymentStatus = "paid";
+            clearInterval(paymentPollInterval);
+            localSubscription = await ApiService.getSubscriptionStatus();
+          }
+        } catch (e) {
+          /* keep polling */
+        }
+      }, 5000);
+    } catch (err) {
+      paymentError = err.message;
+      paymentStatus = "error";
+    } finally {
+      paymentLoading = false;
+    }
+  }
+
+  function closeUpgradeModal() {
+    showUpgradeModal = false;
+    if (paymentPollInterval) clearInterval(paymentPollInterval);
+    paymentStatus = "";
+    paymentOrderId = "";
+    paymentError = "";
+  }
+
+  onDestroy(() => {
+    if (paymentPollInterval) clearInterval(paymentPollInterval);
+  });
+
+  // Fetch subscription status if not passed
+  onMount(async () => {
+    if (!localSubscription) {
+      try {
+        localSubscription = await ApiService.getSubscriptionStatus();
+      } catch (e) {
+        console.error("Failed to fetch subscription:", e);
+      }
+    }
+    try {
+      ocrStatus = await ApiService.getOcrStatus();
+    } catch (e) {
+      console.warn("Failed to fetch OCR status:", e);
+    }
+  });
+
+  function generateSessionId() {
+    return Math.random().toString(36).substring(2, 10);
+  }
+
+  async function processDocuments(filesToProcess = null) {
+    const uploadFiles = filesToProcess || files;
+    if (uploadFiles.length === 0) return;
+
+    isProcessing = true;
+    errorMessage = "";
+    failedFileNames = [];
+    groupSaveSuccess = "";
+    progress = {
+      current: 0,
+      total: uploadFiles.length,
+      status: "starting",
+      current_file: "",
+      completed_files: [],
+      failed_files: [],
+    };
+
+    const sessionId = generateSessionId();
+
+    let eventSource = null;
+    try {
+      eventSource = ApiService.streamProgress(sessionId, (data) => {
+        progress = { ...data };
+      });
+    } catch (e) {
+      console.warn("SSE connection failed:", e);
+    }
+
+    try {
+      const result = await ApiService.uploadDocuments(uploadFiles, sessionId, {
+        cacheMode: processingCacheMode,
+      });
+      if (eventSource) eventSource.close();
+
+      previewData = result.data;
+      validationWarnings = result.validation_warnings || [];
+      fileResults = result.file_results || [];
+      if (result.cache_quota?.bypass) {
+        ocrStatus = {
+          ...(ocrStatus || {}),
+          cache_quota: {
+            ...(ocrStatus?.cache_quota || {}),
+            bypass: result.cache_quota.bypass,
+          },
+        };
+      }
+      failedFileNames = (result.file_results || [])
+        .filter((fr) => fr.status === "failed")
+        .map((fr) => fr.filename);
+      showModal = true;
+
+      // Refresh subscription (usage count changed)
+      try {
+        localSubscription = await ApiService.getSubscriptionStatus();
+      } catch {}
+    } catch (err) {
+      if (eventSource) eventSource.close();
+      if (
+        processingCacheMode === "bypass" &&
+        String(err?.message || "").toLowerCase().includes("bypass")
+      ) {
+        processingCacheMode = "default";
+        try {
+          ocrStatus = await ApiService.getOcrStatus();
+        } catch {
+          // ignore refresh errors
+        }
+      }
+      errorMessage = err.message;
+    } finally {
+      isProcessing = false;
+      progress = null;
+    }
+  }
+
+  function retryFailed() {
+    const retryFiles = files.filter((f) => failedFileNames.includes(f.name));
+    if (retryFiles.length > 0) processDocuments(retryFiles);
+  }
+
+  async function generateExcel() {
+    isGenerating = true;
+    errorMessage = "";
+    try {
+      const blob = await ApiService.generateExcel(previewData);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = selectedGroup
+        ? `${selectedGroup.name.replace(/\s+/g, "_")}.xlsx`
+        : "jamaah_data.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showModal = false;
+      files = [];
+      previewData = [];
+      validationWarnings = [];
+      fileResults = [];
+      failedFileNames = [];
+    } catch (err) {
+      errorMessage = err.message;
+    } finally {
+      isGenerating = false;
+    }
+  }
+
+  async function saveToGroup() {
+    if (!selectedGroup || previewData.length === 0) return;
+    isSavingToGroup = true;
+    errorMessage = "";
+    try {
+      const result = await ApiService.addGroupMembers(selectedGroup.id, previewData);
+      const addedCount = result?.added_count ?? previewData.length;
+      const updatedCount = result?.updated_count ?? 0;
+
+      groupSaveSuccess = `${addedCount} data baru dan ${updatedCount} data update berhasil diproses ke grup "${selectedGroup.name}"`;
+      // Update the group's member count in the selector
+      selectedGroup = {
+        ...selectedGroup,
+        member_count: (selectedGroup.member_count || 0) + addedCount,
+      };
+      showModal = false;
+      files = [];
+      previewData = [];
+      validationWarnings = [];
+      fileResults = [];
+      failedFileNames = [];
+      // Auto-dismiss success after 5 seconds
+      setTimeout(() => (groupSaveSuccess = ""), 5000);
+      onSubscriptionChange?.();
+    } catch (err) {
+      errorMessage = err.message;
+    } finally {
+      isSavingToGroup = false;
+    }
+  }
+
+  async function viewGroupData(group) {
+    errorMessage = "";
+    try {
+      const fullGroup = await ApiService.getGroup(group.id);
+      previewData = fullGroup.members || [];
+      validationWarnings = [];
+      fileResults = [];
+      showModal = true;
+    } catch (err) {
+      errorMessage = err.message;
+    }
+  }
+
+  function closeModal() {
+    showModal = false;
+    errorMessage = "";
+  }
+
+  let isBlocked = $derived(localSubscription && !localSubscription.allowed);
+</script>
+
+<div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+  <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900">AI Scanner</h1>
+      <p class="text-sm text-slate-500">
+        Upload KTP, KK, paspor, dan visa untuk diekstrak menjadi data jamaah.
+      </p>
+    </div>
+    {#if localSubscription?.plan === "pro"}
+      <div class="inline-flex w-fit items-center gap-2 rounded-full border border-primary-100 bg-white px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm">
+        <Crown class="h-4 w-4 text-amber-500" />
+        Pro Active
+      </div>
+    {/if}
+  </header>
+
+  <div class="mb-6 grid gap-4 lg:grid-cols-3">
+    <div class="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm lg:col-span-2">
+      <div class="flex items-start gap-4">
+        <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+          <ScanLine class="h-6 w-6" />
+        </div>
+        <div>
+          <h2 class="text-sm font-bold text-slate-900">Alur Scan Dokumen</h2>
+          <p class="mt-1 text-sm leading-relaxed text-slate-500">
+            Pilih grup, upload dokumen, review hasil AI, lalu simpan ke grup atau export Excel.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+      <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Mode AI</p>
+      <p class="mt-2 text-sm font-semibold text-slate-900">{cacheModeLabels[processingCacheMode]}</p>
+      <p class="mt-1 text-xs text-slate-500">{canUseBypassCacheMode ? "Bypass tersedia untuk Pro." : "Default aman untuk pemrosesan rutin."}</p>
+    </div>
+  </div>
+  <!-- Mobile Navbar (simplified - sidebar handles desktop nav) -->
+  <nav
+    class="hidden border-b border-slate-200 bg-white/80 backdrop-blur-sm px-3 sm:px-6 py-3 sm:py-4 justify-between items-center sticky top-0 z-10 lg:hidden"
+  >
+    <div class="text-sm font-semibold text-slate-800">Dashboard</div>
+    <div class="text-xs text-slate-400">OCR Ekstrak Data</div>
+  </nav>
+
+  <!-- Welcome Header -->
+  <div
+    class="hidden"
+  >
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-lg sm:text-2xl font-bold mb-1">
+            Selamat datang{user?.full_name ? `, ${user.full_name}` : ""} 👋
+          </h1>
+          <p class="text-emerald-100 text-sm sm:text-base">
+            Upload dan ekstrak data jamaah dengan AI
+          </p>
+        </div>
+        {#if localSubscription?.plan === "pro"}
+          <div
+            class="hidden sm:flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full"
+          >
+            <Crown class="h-4 w-4 text-yellow-300" />
+            <span class="text-sm font-medium">Pro</span>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
+
+  <!-- Subscription Banner -->
+  <div class="mb-6">
+    <SubscriptionBanner
+      subscription={localSubscription}
+      onUpgrade={() => (showUpgradeModal = true)}
+    />
+  </div>
+
+  <!-- Main Content -->
+  {#if isBlocked}
+    <div class="py-8 text-center">
+      <div
+        class="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm sm:p-12"
+      >
+        <div class="text-5xl sm:text-6xl mb-4">🔒</div>
+        <h2 class="text-lg sm:text-xl font-bold text-slate-800 mb-2">
+          Akses Terbatas
+        </h2>
+        <p class="text-slate-500 mb-6 text-sm sm:text-base">
+          Batas penggunaan gratis telah tercapai. Upgrade ke Pro untuk
+          melanjutkan.
+        </p>
+        <button
+          onclick={() => (showUpgradeModal = true)}
+          class="mx-auto flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-6 py-3 font-semibold text-white shadow-lg shadow-primary-500/20 transition-all hover:-translate-y-0.5"
+        >
+          <Crown class="h-5 w-5" />
+          Upgrade ke Pro - Rp80.000/bulan
+        </button>
+      </div>
+    </div>
+  {:else}
+    <!-- Group Selector -->
+    <div class="mb-6 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+      <GroupSelector
+        bind:selectedGroup
+        onGroupSelect={(g) => (selectedGroup = g)}
+        onViewGroup={viewGroupData}
+        isPro={localSubscription?.plan === "pro" &&
+          localSubscription?.status === "active"}
+      />
+    </div>
+
+    <!-- Success Banner -->
+    {#if groupSaveSuccess}
+      <div class="mb-5">
+        <div
+          class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
+        >
+          <CheckCircle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
+          <span class="text-sm text-emerald-700">{groupSaveSuccess}</span>
+        </div>
+      </div>
+    {/if}
+
+    <div class="mb-6">
+      <details class="rounded-3xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
+        <summary class="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+          Advanced OCR Settings
+        </summary>
+        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <label class="text-sm text-slate-600" for="cache-mode">Mode cache AI (Gemini)</label>
+          <select
+            id="cache-mode"
+            bind:value={processingCacheMode}
+            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white"
+          >
+            <option value="default">default</option>
+            <option value="refresh">refresh</option>
+            <option value="bypass" disabled={!canUseBypassCacheMode}>bypass (Pro)</option>
+          </select>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">{cacheModeHint}</p>
+        <p class="mt-1 text-xs text-slate-500">{cacheModeNotice}</p>
+      </details>
+    </div>
+
+    <FileUpload
+      bind:files
+      {isProcessing}
+      {errorMessage}
+      onProcess={() => processDocuments()}
+      {progress}
+    />
+  {/if}
+
+  <!-- Retry Banner -->
+  {#if failedFileNames.length > 0 && !isProcessing && !showModal}
+    <div class="mt-5">
+      <div
+        class="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 p-4"
+      >
+        <div class="flex items-center gap-2">
+          <span class="text-red-500 text-lg">!</span>
+          <span class="text-sm text-red-700">
+            <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(
+              ", ",
+            )}
+          </span>
+        </div>
+        <button
+          onclick={retryFailed}
+          class="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600"
+        >
+          Coba Lagi
+        </button>
+      </div>
+    </div>
+  {/if}
+</div>
+
+<!-- Preview Modal -->
+<TableResult
+  isOpen={showModal}
+  bind:data={previewData}
+  {isGenerating}
+  onClose={closeModal}
+  onSave={generateExcel}
+  onSaveToGroup={selectedGroup ? saveToGroup : null}
+  {isSavingToGroup}
+  groupName={selectedGroup?.name || ""}
+  onUpgrade={() => {
+    showModal = false;
+    showUpgradeModal = true;
+  }}
+  readOnly={localSubscription?.plan !== "pro"}
+  {validationWarnings}
+  {fileResults}
+  {errorMessage}
+/>
+
+<!-- Upgrade Modal -->
+{#if showUpgradeModal}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    onclick={closeUpgradeModal}
+    role="button"
+    tabindex="-1"
+    aria-label="Tutup modal"
+  >
+    <div
+      class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upgrade-title"
+      tabindex="-1"
+    >
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-2">
+          <Crown class="h-5 w-5 text-emerald-500" />
+          <h3 class="font-bold text-lg text-slate-800">Upgrade ke Pro</h3>
+        </div>
+        <button
+          onclick={closeUpgradeModal}
+          class="text-slate-400 hover:text-slate-600"
+          aria-label="Close"
+        >
+          <X class="h-5 w-5" />
+        </button>
+      </div>
+
+      {#if paymentStatus === "paid"}
+        <div class="text-center py-6">
+          <div
+            class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <CheckCircle class="h-8 w-8 text-emerald-500" />
+          </div>
+          <h4 class="text-lg font-bold text-slate-800 mb-1">
+            Pembayaran Berhasil!
+          </h4>
+          <p class="text-sm text-slate-500">
+            Langganan Pro aktif selama 30 hari.
+          </p>
+          <button
+            onclick={closeUpgradeModal}
+            class="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 rounded-xl transition-all"
+          >
+            Mulai Menggunakan Pro
+          </button>
+        </div>
+      {:else}
+        <!-- Plan Toggle -->
+        <div class="flex bg-slate-100 rounded-xl p-1 mb-4">
+          <button
+            type="button"
+            onclick={() => (selectedPlan = "monthly")}
+            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all {selectedPlan ===
+            'monthly'
+              ? 'bg-white shadow text-slate-800'
+              : 'text-slate-500 hover:text-slate-700'}">Bulanan</button
+          >
+          <button
+            type="button"
+            onclick={() => (selectedPlan = "annual")}
+            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all relative {selectedPlan ===
+            'annual'
+              ? 'bg-white shadow text-slate-800'
+              : 'text-slate-500 hover:text-slate-700'}"
+          >
+            Tahunan
+            <span
+              class="absolute -top-2 -right-1 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold"
+              >HEMAT</span
+            >
+          </button>
+        </div>
+
+        <div
+          class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4"
+        >
+          {#if selectedPlan === "annual"}
+            <p class="text-2xl font-bold text-emerald-700">
+               Rp 880.000<span class="text-sm font-normal text-emerald-500">
+                / tahun</span
+              >
+            </p>
+            <p class="text-sm text-emerald-600 mt-1">
+              Hemat Rp 80.000 - setara Rp 73.300/bulan
+            </p>
+          {:else}
+            <p class="text-2xl font-bold text-emerald-700">
+               Rp 80.000<span class="text-sm font-normal text-emerald-500">
+                / bulan</span
+              >
+            </p>
+            <p class="text-sm text-emerald-600 mt-1">
+              Unlimited scan dokumen, prioritas support
+            </p>
+          {/if}
+        </div>
+
+        <div class="space-y-2 mb-5">
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Unlimited
+            scan dokumen
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Unlimited
+            grup jamaah
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Export
+            Excel
+          </div>
+          <div class="flex items-center gap-2 text-sm text-slate-600">
+            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Prioritas
+            support
+          </div>
+        </div>
+
+        {#if paymentError}
+          <div
+            class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm text-center border border-red-100"
+          >
+            {paymentError}
+          </div>
+        {/if}
+
+        {#if paymentStatus === "pending"}
+          <div
+            class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-center"
+          >
+            <Loader2 class="h-5 w-5 animate-spin text-amber-500 mx-auto mb-2" />
+            <p class="text-sm font-medium text-amber-700">
+              Menunggu pembayaran...
+            </p>
+            <p class="text-xs text-amber-500 mt-1">
+              Selesaikan pembayaran di tab yang terbuka
+            </p>
+          </div>
+          <button
+            onclick={async () => {
+              try {
+                const s = await ApiService.checkPaymentStatus(paymentOrderId);
+                if (s.status === "paid") {
+                  paymentStatus = "paid";
+                  clearInterval(paymentPollInterval);
+                  localSubscription = await ApiService.getSubscriptionStatus();
+                }
+              } catch (e) {}
+            }}
+            class="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            Cek Status Pembayaran
+          </button>
+        {:else}
+          <button
+            onclick={startPayment}
+            disabled={paymentLoading}
+            class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            {#if paymentLoading}
+              <Loader2 class="h-5 w-5 animate-spin" /> Memproses...
+            {:else}
+              <ExternalLink class="h-5 w-5" /> Bayar Sekarang
+            {/if}
+          </button>
+        {/if}
+
+        <p class="text-xs text-slate-400 text-center mt-3">
+          Pembayaran diproses oleh Pakasir (QRIS / VA / PayPal)
+        </p>
+      {/if}
+    </div>
+  </div>
+{/if}

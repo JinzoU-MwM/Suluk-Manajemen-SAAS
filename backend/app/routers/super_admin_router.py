@@ -1,0 +1,596 @@
+"""
+Super Admin Router — /super-admin/*
+Provides super admin-only endpoints for managing the entire application.
+Super admin is the app owner, separate from regular admins.
+"""
+import csv
+from datetime import datetime, timedelta, time
+from io import StringIO
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
+from app.database import get_db
+from app.auth import require_super_admin
+from app.models.ai_result_cache import AIResultCache
+from app.models.user import (
+    User,
+    Subscription,
+    UsageLog,
+    PlanType,
+    SubscriptionStatus,
+    Payment,
+    PaymentStatus,
+    utc_now,
+)
+from app.models.support_ticket import SupportTicket, TicketMessage, TicketStatus, TicketPriority, SenderType
+from app.services.ai_result_cache_repo import (
+    delete_ai_cache_by_key,
+    get_ai_cache_stats,
+    purge_expired_ai_cache,
+)
+
+router = APIRouter(prefix="/super-admin", tags=["Super Admin"])
+
+
+# --- Schemas ---
+
+class SuperAdminStatsResponse(BaseModel):
+    total_users: int
+    active_users: int
+    pro_users: int
+    free_users: int
+    total_tickets: int
+    open_tickets: int
+    resolved_tickets: int
+    total_revenue: int
+
+
+class UserActivityPoint(BaseModel):
+    date: str
+    count: int
+
+
+class RevenueMonthlyPoint(BaseModel):
+    month: str
+    amount: int
+
+
+class SuperAdminChartsResponse(BaseModel):
+    user_activity: List[UserActivityPoint]
+    revenue_monthly: List[RevenueMonthlyPoint]
+
+
+class TicketListItem(BaseModel):
+    id: int
+    user_id: int
+    user_email: str
+    user_name: str
+    subject: str
+    status: str
+    priority: str
+    created_at: str
+    last_message_at: str
+    message_count: int
+    is_read: bool
+    unread_user_messages: int
+
+
+class TicketMessageResponse(BaseModel):
+    id: int
+    sender_type: str
+    content: str
+    created_at: str
+
+
+class TicketDetailResponse(BaseModel):
+    id: int
+    user_id: int
+    user_email: str
+    user_name: str
+    subject: str
+    status: str
+    priority: str
+    created_at: str
+    messages: List[TicketMessageResponse]
+
+
+class TicketReplyRequest(BaseModel):
+    content: str
+
+
+class TicketStatusRequest(BaseModel):
+    status: str  # "open", "in_progress", "resolved", "closed"
+
+
+class UnreadCountResponse(BaseModel):
+    unread_tickets: int
+    unread_messages: int
+
+
+class AICacheStatsResponse(BaseModel):
+    total: int
+    active: int
+    expired: int
+
+
+class AICachePurgeResponse(BaseModel):
+    deleted: int
+    before: AICacheStatsResponse
+    after: AICacheStatsResponse
+
+
+class AICacheDeleteResponse(BaseModel):
+    cache_key: str
+    deleted: bool
+
+
+class AICacheRecentItem(BaseModel):
+    cache_key: str
+    task_type: str
+    model: str
+    prompt_version: str
+    hits: int
+    created_at: str
+    last_accessed_at: str
+    expires_at: str
+    is_expired: bool
+
+
+class AICacheRecentResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: List[AICacheRecentItem]
+
+
+# --- Endpoints ---
+
+
+def _month_start(dt: datetime) -> datetime:
+    return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    month_index = (dt.month - 1) + months
+    year = dt.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    return dt.replace(year=year, month=month, day=1)
+
+@router.get("/stats", response_model=SuperAdminStatsResponse)
+async def super_admin_stats(
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Get super admin dashboard statistics."""
+    total = db.query(User).count()
+    active = db.query(User).filter(User.is_active == True).count()
+    pro = db.query(Subscription).filter(Subscription.plan == PlanType.PRO).count()
+    free = total - pro
+
+    total_tickets = db.query(SupportTicket).count()
+    open_tickets = db.query(SupportTicket).filter(SupportTicket.status == TicketStatus.OPEN).count()
+    resolved_tickets = db.query(SupportTicket).filter(SupportTicket.status == TicketStatus.RESOLVED).count()
+
+    revenue = db.query(func.sum(Payment.amount)).filter(
+        Payment.status == PaymentStatus.PAID
+    ).scalar() or 0
+
+    return SuperAdminStatsResponse(
+        total_users=total,
+        active_users=active,
+        pro_users=pro,
+        free_users=free,
+        total_tickets=total_tickets,
+        open_tickets=open_tickets,
+        resolved_tickets=resolved_tickets,
+        total_revenue=revenue,
+    )
+
+
+@router.get("/charts", response_model=SuperAdminChartsResponse)
+async def super_admin_charts(
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Get real chart series for super admin dashboard."""
+    del admin
+
+    now = utc_now()
+    today = now.date()
+
+    # 30-day usage series (includes today)
+    start_day = today - timedelta(days=29)
+    start_dt = datetime.combine(start_day, time.min)
+    end_dt = datetime.combine(today, time.max)
+
+    daily_counts = {
+        start_day + timedelta(days=offset): 0
+        for offset in range(30)
+    }
+    usage_rows = (
+        db.query(UsageLog.created_at, UsageLog.count)
+        .filter(
+            UsageLog.created_at >= start_dt,
+            UsageLog.created_at <= end_dt,
+        )
+        .all()
+    )
+    for created_at, count in usage_rows:
+        if not created_at:
+            continue
+        day = created_at.date()
+        if day in daily_counts:
+            daily_counts[day] += int(count or 0)
+
+    user_activity = [
+        UserActivityPoint(date=day.isoformat(), count=daily_counts[day])
+        for day in sorted(daily_counts.keys())
+    ]
+
+    # 12-month paid revenue series (includes current month)
+    current_month = _month_start(now)
+    month_starts = [_add_months(current_month, -11 + idx) for idx in range(12)]
+    month_amounts = {month.strftime("%Y-%m"): 0 for month in month_starts}
+
+    revenue_rows = (
+        db.query(Payment.amount, Payment.paid_at, Payment.created_at)
+        .filter(
+            Payment.status == PaymentStatus.PAID,
+            func.coalesce(Payment.paid_at, Payment.created_at) >= month_starts[0],
+        )
+        .all()
+    )
+    for amount, paid_at, created_at in revenue_rows:
+        anchor = paid_at or created_at
+        if not anchor:
+            continue
+        month_key = anchor.strftime("%Y-%m")
+        if month_key in month_amounts:
+            month_amounts[month_key] += int(amount or 0)
+
+    revenue_monthly = [
+        RevenueMonthlyPoint(month=month.strftime("%Y-%m"), amount=month_amounts[month.strftime("%Y-%m")])
+        for month in month_starts
+    ]
+
+    return SuperAdminChartsResponse(
+        user_activity=user_activity,
+        revenue_monthly=revenue_monthly,
+    )
+
+
+@router.get("/tickets", response_model=List[TicketListItem])
+async def list_tickets(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """List all support tickets with filters."""
+    query = db.query(SupportTicket)
+
+    if status:
+        try:
+            status_enum = TicketStatus(status)
+            query = query.filter(SupportTicket.status == status_enum)
+        except ValueError:
+            pass
+
+    if priority:
+        try:
+            priority_enum = TicketPriority(priority)
+            query = query.filter(SupportTicket.priority == priority_enum)
+        except ValueError:
+            pass
+
+    tickets = query.order_by(SupportTicket.updated_at.desc()).offset(skip).limit(limit).all()
+
+    items = []
+    for ticket in tickets:
+        message_count = db.query(func.count(TicketMessage.id)).filter(
+            TicketMessage.ticket_id == ticket.id
+        ).scalar() or 0
+
+        last_message = db.query(TicketMessage).filter(
+            TicketMessage.ticket_id == ticket.id
+        ).order_by(TicketMessage.created_at.desc()).first()
+
+        unread_user_messages = db.query(func.count(TicketMessage.id)).filter(
+            TicketMessage.ticket_id == ticket.id,
+            TicketMessage.sender_type == SenderType.USER,
+            TicketMessage.is_read == False
+        ).scalar() or 0
+
+        items.append(TicketListItem(
+            id=ticket.id,
+            user_id=ticket.user_id,
+            user_email=ticket.user.email,
+            user_name=ticket.user.name,
+            subject=ticket.subject,
+            status=ticket.status.value,
+            priority=ticket.priority.value,
+            created_at=ticket.created_at.isoformat(),
+            last_message_at=last_message.created_at.isoformat() if last_message else ticket.created_at.isoformat(),
+            message_count=message_count,
+            is_read=(unread_user_messages == 0),
+            unread_user_messages=unread_user_messages,
+        ))
+
+    return items
+
+
+@router.get("/tickets/unread-count", response_model=UnreadCountResponse)
+async def get_unread_ticket_count(
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Get unread counts for admin (user messages not yet opened by admin)."""
+    unread_messages = db.query(func.count(TicketMessage.id)).filter(
+        TicketMessage.sender_type == SenderType.USER,
+        TicketMessage.is_read == False
+    ).scalar() or 0
+
+    unread_tickets = db.query(func.count(func.distinct(TicketMessage.ticket_id))).filter(
+        TicketMessage.sender_type == SenderType.USER,
+        TicketMessage.is_read == False
+    ).scalar() or 0
+
+    return UnreadCountResponse(
+        unread_tickets=unread_tickets,
+        unread_messages=unread_messages,
+    )
+
+
+@router.get("/tickets/{ticket_id}", response_model=TicketDetailResponse)
+async def get_ticket_detail(
+    ticket_id: int,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Get ticket detail with all messages."""
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket tidak ditemukan")
+
+    # Mark admin messages as read
+    db.query(TicketMessage).filter(
+        TicketMessage.ticket_id == ticket_id,
+        TicketMessage.sender_type == "user",
+        TicketMessage.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+
+    messages = db.query(TicketMessage).filter(
+        TicketMessage.ticket_id == ticket_id
+    ).order_by(TicketMessage.created_at.asc()).all()
+
+    return TicketDetailResponse(
+        id=ticket.id,
+        user_id=ticket.user_id,
+        user_email=ticket.user.email,
+        user_name=ticket.user.name,
+        subject=ticket.subject,
+        status=ticket.status.value,
+        priority=ticket.priority.value,
+        created_at=ticket.created_at.isoformat(),
+        messages=[
+            TicketMessageResponse(
+                id=msg.id,
+                sender_type=msg.sender_type.value,
+                content=msg.content,
+                created_at=msg.created_at.isoformat(),
+            )
+            for msg in messages
+        ],
+    )
+
+
+@router.post("/tickets/{ticket_id}/reply")
+async def reply_to_ticket(
+    ticket_id: int,
+    req: TicketReplyRequest,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin reply to a support ticket."""
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket tidak ditemukan")
+
+    message = TicketMessage(
+        ticket_id=ticket_id,
+        sender_type="admin",
+        content=req.content,
+        is_read=False,
+    )
+    db.add(message)
+
+    # Update ticket status to in_progress if it was open
+    if ticket.status == TicketStatus.OPEN:
+        ticket.status = TicketStatus.IN_PROGRESS
+        ticket.updated_at = datetime.utcnow()
+
+    db.commit()
+    return {"success": True, "message_id": message.id}
+
+
+@router.patch("/tickets/{ticket_id}/status")
+async def update_ticket_status(
+    ticket_id: int,
+    req: TicketStatusRequest,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Update ticket status."""
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket tidak ditemukan")
+
+    try:
+        ticket.status = TicketStatus(req.status)
+        ticket.updated_at = datetime.utcnow()
+        db.commit()
+        return {"success": True, "status": ticket.status.value}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Status tidak valid")
+
+
+@router.delete("/tickets/{ticket_id}")
+async def delete_ticket(
+    ticket_id: int,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Delete a support ticket and all its messages."""
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket tidak ditemukan")
+
+    db.query(TicketMessage).filter(TicketMessage.ticket_id == ticket_id).delete()
+    db.query(SupportTicket).filter(SupportTicket.id == ticket_id).delete()
+    db.commit()
+    return {"success": True, "deleted_ticket_id": ticket_id}
+
+
+@router.get("/ai-cache/stats", response_model=AICacheStatsResponse)
+async def ai_cache_stats(
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Get persistent AI cache statistics."""
+    del admin
+    stats = get_ai_cache_stats(db)
+    return AICacheStatsResponse(**stats)
+
+
+@router.post("/ai-cache/purge-expired", response_model=AICachePurgeResponse)
+async def purge_expired_ai_cache_endpoint(
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Purge expired persistent AI cache rows."""
+    del admin
+    before = get_ai_cache_stats(db)
+    deleted = purge_expired_ai_cache(db)
+    after = get_ai_cache_stats(db)
+    return AICachePurgeResponse(
+        deleted=deleted,
+        before=AICacheStatsResponse(**before),
+        after=AICacheStatsResponse(**after),
+    )
+
+
+@router.get("/ai-cache/recent", response_model=AICacheRecentResponse)
+async def ai_cache_recent(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    expired_only: bool = False,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """List recent persistent AI cache entries for debugging/ops."""
+    del admin
+    now = utc_now()
+    query = db.query(AIResultCache)
+    if expired_only:
+        query = query.filter(AIResultCache.expires_at <= now)
+
+    total = query.count()
+    rows = (
+        query.order_by(AIResultCache.last_accessed_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    items = [
+        AICacheRecentItem(
+            cache_key=row.cache_key,
+            task_type=row.task_type,
+            model=row.model,
+            prompt_version=row.prompt_version,
+            hits=row.hits,
+            created_at=row.created_at.isoformat(),
+            last_accessed_at=row.last_accessed_at.isoformat(),
+            expires_at=row.expires_at.isoformat(),
+            is_expired=row.expires_at <= now,
+        )
+        for row in rows
+    ]
+    return AICacheRecentResponse(total=total, limit=limit, offset=offset, items=items)
+
+
+@router.get("/ai-cache/recent/export")
+async def ai_cache_recent_export(
+    expired_only: bool = False,
+    limit: int = Query(5000, ge=1, le=50000),
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Export recent persistent AI cache rows as CSV."""
+    del admin
+    now = utc_now()
+    query = db.query(AIResultCache)
+    if expired_only:
+        query = query.filter(AIResultCache.expires_at <= now)
+
+    rows = query.order_by(AIResultCache.last_accessed_at.desc()).limit(limit).all()
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "cache_key",
+            "task_type",
+            "model",
+            "prompt_version",
+            "hits",
+            "created_at",
+            "last_accessed_at",
+            "expires_at",
+            "is_expired",
+        ]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                row.cache_key,
+                row.task_type,
+                row.model,
+                row.prompt_version,
+                row.hits,
+                row.created_at.isoformat(),
+                row.last_accessed_at.isoformat(),
+                row.expires_at.isoformat(),
+                str(row.expires_at <= now).lower(),
+            ]
+        )
+
+    filename = f"ai-cache-recent-{now.strftime('%Y%m%d-%H%M%S')}.csv"
+    headers = {"Content-Disposition": f'attachment; filename=\"{filename}\"'}
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
+
+
+@router.delete("/ai-cache/{cache_key}", response_model=AICacheDeleteResponse)
+async def ai_cache_delete_key(
+    cache_key: str,
+    admin: User = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Delete a specific persistent AI cache row by cache key."""
+    del admin
+    deleted = delete_ai_cache_by_key(db, cache_key=cache_key)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="AI cache key not found")
+    return AICacheDeleteResponse(cache_key=cache_key, deleted=True)
