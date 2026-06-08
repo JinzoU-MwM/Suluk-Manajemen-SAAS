@@ -340,7 +340,7 @@
     {:else if profile}
         <header class="sticky top-16 z-20 flex min-h-[72px] items-center justify-between gap-4 border-b border-slate-200/80 bg-white/80 px-4 backdrop-blur-xl lg:top-0 lg:px-8">
             <div class="min-w-0">
-                <h1 class="text-lg font-bold text-slate-900">Profil</h1>
+                <h1 class="font-serif text-lg font-bold text-slate-900">Profil</h1>
                 <p class="hidden text-xs text-slate-400 sm:block">
                     Pengaturan akun, paket, keamanan, dan preferensi.
                 </p>

@@ -166,7 +166,7 @@
     <!-- Header -->
     <div class="mb-6">
         <div>
-            <h1 class="text-xl font-bold text-slate-900">Tim</h1>
+            <h1 class="font-serif text-xl font-bold text-slate-900">Tim</h1>
             <p class="text-sm text-slate-500">Kelola organisasi, anggota tim, dan akses operasional.</p>
         </div>
     </div>

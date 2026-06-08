@@ -69,7 +69,7 @@
 
 <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
   <div class="mb-6">
-    <h1 class="text-xl font-bold text-slate-900">Manifest Digital</h1>
+    <h1 class="font-serif text-xl font-bold text-slate-900">Manifest Digital</h1>
     <p class="text-sm text-slate-500">Buat link manifest ber-PIN untuk mutawwif dan tim lapangan.</p>
   </div>
 

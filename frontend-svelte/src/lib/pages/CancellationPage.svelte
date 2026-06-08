@@ -139,7 +139,7 @@
 <div class="flex flex-col gap-6 p-4 lg:p-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
     <div>
-      <h1 class="text-xl font-bold text-slate-900">Pembatalan & Refund</h1>
+      <h1 class="font-serif text-xl font-bold text-slate-900">Pembatalan & Refund</h1>
       <p class="text-sm text-slate-500">Kelola pengembalian dana dan kebijakan refund.</p>
     </div>
     <div class="flex gap-2">

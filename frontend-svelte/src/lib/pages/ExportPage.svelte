@@ -51,7 +51,7 @@
 
 <div class="flex flex-col gap-6 p-4 lg:p-8">
   <header>
-    <h1 class="text-xl font-bold text-slate-900">Export Laporan</h1>
+    <h1 class="font-serif text-xl font-bold text-slate-900">Export Laporan</h1>
     <p class="text-sm text-slate-500">Unduh laporan dalam format Excel dan PDF.</p>
   </header>
 

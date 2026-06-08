@@ -408,7 +408,7 @@
       <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-4 py-1.5 text-xs font-semibold text-primary-700">
         <Sparkles class="h-3.5 w-3.5" /> v2.1 — Travel Admin System
       </div>
-      <h1 class="mb-6 text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+      <h1 class="font-serif mb-6 text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
         Satu Dashboard untuk<br /><span class="gradient-text">Seluruh Operasional Travel</span><br />Umroh & Haji Anda
       </h1>
       <p class="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-500">

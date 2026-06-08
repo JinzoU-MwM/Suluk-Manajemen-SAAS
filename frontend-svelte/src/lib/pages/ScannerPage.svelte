@@ -323,7 +323,7 @@
 <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
   <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
     <div>
-      <h1 class="text-xl font-bold text-slate-900">AI Scanner</h1>
+      <h1 class="font-serif text-xl font-bold text-slate-900">AI Scanner</h1>
       <p class="text-sm text-slate-500">
         Upload KTP, KK, paspor, dan visa untuk diekstrak menjadi data jamaah.
       </p>
@@ -371,7 +371,7 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-lg sm:text-2xl font-bold mb-1">
+          <h1 class="font-serif text-lg sm:text-2xl font-bold mb-1">
             Selamat datang{user?.full_name ? `, ${user.full_name}` : ""} 👋
           </h1>
           <p class="text-emerald-100 text-sm sm:text-base">

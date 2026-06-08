@@ -80,7 +80,7 @@
     {:else if error || !pkg}
       <div class="flex min-h-[50vh] flex-col items-center justify-center gap-3 rounded-3xl border border-red-100 bg-white p-10 text-center shadow-sm">
         <AlertCircle class="h-10 w-10 text-red-500" />
-        <h1 class="text-xl font-bold">Paket tidak tersedia</h1>
+        <h1 class="font-serif text-xl font-bold">Paket tidak tersedia</h1>
         <p class="max-w-md text-sm text-slate-500">{error || "Link paket tidak valid atau sudah tidak aktif."}</p>
       </div>
     {:else}

@@ -178,7 +178,7 @@
     <!-- Header -->
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h1 class="text-xl font-bold text-slate-900">Itinerary</h1>
+            <h1 class="font-serif text-xl font-bold text-slate-900">Itinerary</h1>
             <p class="text-sm text-slate-500">Kelola jadwal perjalanan per grup keberangkatan.</p>
         </div>
         <div class="flex items-center gap-3">

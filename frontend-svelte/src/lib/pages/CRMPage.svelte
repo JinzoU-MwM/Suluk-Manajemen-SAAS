@@ -157,7 +157,7 @@
   <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-bold text-slate-800">CRM & Jamaah</h1>
+        <h1 class="font-serif text-xl font-bold text-slate-800">CRM & Jamaah</h1>
         <p class="mt-0.5 text-sm text-slate-500">{total} jamaah</p>
       </div>
       <div class="flex items-center gap-2">

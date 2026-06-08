@@ -12,6 +12,7 @@
   import { mapError } from "../services/toast.svelte.js";
   import EmptyState from "../components/EmptyState.svelte";
   import Pager from "../components/Pager.svelte";
+  import PageHeader from "../components/PageHeader.svelte";
 
   let { onNavigate = () => {} } = $props();
 
@@ -90,20 +91,22 @@
 </script>
 
 <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
-  <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h1 class="text-xl font-bold text-slate-900">Data Jamaah</h1>
-      <p class="text-sm text-slate-500">Kelola seluruh data calon jamaah dari setiap grup keberangkatan.</p>
-    </div>
-    <button
-      type="button"
-      onclick={() => onNavigate("scanner")}
-      class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-all hover:-translate-y-0.5"
-    >
-      <UserPlus class="h-4 w-4" />
-      Tambah via Scanner
-    </button>
-  </div>
+  <PageHeader
+    kicker="CRM & Jamaah"
+    title="Data Jamaah"
+    subtitle="Kelola seluruh data calon jamaah dari setiap grup keberangkatan."
+  >
+    {#snippet actions()}
+      <button
+        type="button"
+        onclick={() => onNavigate("scanner")}
+        class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-colors hover:bg-primary-700"
+      >
+        <UserPlus class="h-4 w-4" />
+        Tambah via Scanner
+      </button>
+    {/snippet}
+  </PageHeader>
 
   {#if error}
     <div class="mb-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">

@@ -80,7 +80,7 @@
 
 <div class="flex flex-col gap-6 p-4 lg:p-8">
   <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div><h1 class="text-xl font-bold text-slate-900">Komisi Agen</h1><p class="text-sm text-slate-500">Kelola jaringan agen dan komisi referral.</p></div>
+    <div><h1 class="font-serif text-xl font-bold text-slate-900">Komisi Agen</h1><p class="text-sm text-slate-500">Kelola jaringan agen dan komisi referral.</p></div>
   </header>
 
   {#if loading}
