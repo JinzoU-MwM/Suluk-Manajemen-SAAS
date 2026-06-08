@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { TrendingUp, TrendingDown, DollarSign, AlertCircle, Download } from 'lucide-svelte';
   import { showToast } from '../services/toast.svelte.js';
+  import { formatRupiah as formatIDR } from '../utils/formatting.js';
 
   let { onNavigate, user = null } = $props();
 
@@ -43,10 +44,6 @@
     } finally {
       isLoading = false;
     }
-  }
-
-  function formatIDR(num) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num || 0);
   }
 
   function pct(a, b) {
@@ -230,13 +227,13 @@
 
     {:else if activeTab === 'aging'}
       <!-- Piutang Aging -->
-      <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/60 overflow-hidden">
-        <table class="w-full min-w-[600px]">
+      <div class="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/60">
+        <table class="w-full">
           <thead class="bg-slate-50">
             <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
               <th class="px-5 py-3">Jamaah</th>
-              <th class="px-4 py-3">Paket</th>
-              <th class="px-4 py-3 text-right">Total</th>
+              <th class="hidden px-4 py-3 md:table-cell">Paket</th>
+              <th class="hidden px-4 py-3 text-right lg:table-cell">Total</th>
               <th class="px-4 py-3 text-right">Sisa</th>
               <th class="px-4 py-3">Overdue</th>
             </tr>
@@ -245,8 +242,8 @@
             {#each agingData as row}
               <tr class="hover:bg-slate-50">
                 <td class="px-5 py-3 text-sm font-semibold text-slate-800">{row.jamaah}</td>
-                <td class="px-4 py-3 text-sm text-slate-500">{row.paket}</td>
-                <td class="px-4 py-3 text-right text-sm text-slate-600">{formatIDR(row.total)}</td>
+                <td class="hidden px-4 py-3 text-sm text-slate-500 md:table-cell">{row.paket}</td>
+                <td class="hidden px-4 py-3 text-right text-sm text-slate-600 lg:table-cell">{formatIDR(row.total)}</td>
                 <td class="px-4 py-3 text-right text-sm font-bold text-red-600">{formatIDR(row.remaining)}</td>
                 <td class="px-4 py-3 text-sm">
                   {#if row.days_overdue > 0}

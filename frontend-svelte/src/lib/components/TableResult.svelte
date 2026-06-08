@@ -22,6 +22,7 @@
     Replace,
     Trash2,
     CheckSquare,
+    ArrowLeftRight,
   } from "lucide-svelte";
 
   let {
@@ -532,6 +533,11 @@
             <SkeletonLoader count={10} type="row" />
           </div>
         {:else}
+        {#if data.length > 0}
+          <p class="mb-2 flex items-center gap-1.5 text-xs text-slate-400 lg:hidden">
+            <ArrowLeftRight class="h-3.5 w-3.5" /> Geser tabel ke samping untuk melihat semua kolom
+          </p>
+        {/if}
         <div class="rounded-lg border border-slate-200">
           <table class="w-full border-collapse text-sm">
             <thead>

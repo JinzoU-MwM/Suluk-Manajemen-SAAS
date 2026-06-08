@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { formatRupiah as formatIDR, formatDate } from '../utils/formatting.js';
   import {
     CalendarDays,
     ChevronRight,
@@ -168,28 +169,11 @@
     }
   }
 
-  function formatDate(dateStr) {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-
   function toDateInput(dateStr) {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     if (Number.isNaN(date.getTime())) return '';
     return date.toISOString().slice(0, 10);
-  }
-
-  function formatIDR(num) {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(num || 0);
   }
 
   function getLowestPrice(pkg) {

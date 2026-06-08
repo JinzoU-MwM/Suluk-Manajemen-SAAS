@@ -24,6 +24,7 @@
     Users,
   } from "lucide-svelte";
   import { ApiService } from "../services/api";
+  import { formatRupiah, formatDate, formatPct } from "../utils/formatting.js";
 
   let { user = null, subscription = null, onNavigate = null } = $props();
 
@@ -209,30 +210,6 @@
       color: "amber",
     },
   ]);
-
-  function formatRupiah(value) {
-    if (value == null) return "Rp0";
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
-
-  function formatDate(value) {
-    if (!value) return "-";
-    return new Date(value).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }
-
-  function formatPct(value) {
-    if (value == null) return 0;
-    return Math.round(Math.min(100, Math.max(0, value)));
-  }
 
   function alertTone(type) {
     const tones = {

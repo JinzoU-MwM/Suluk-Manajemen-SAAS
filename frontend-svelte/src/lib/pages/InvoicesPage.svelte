@@ -7,7 +7,10 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import IDRInput from '../components/IDRInput.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
+  import Pager from '../components/Pager.svelte';
   import { showToast } from '../services/toast.svelte.js';
+  import { formatRupiah as formatIDR, formatDate } from '../utils/formatting.js';
   import { invoiceApi } from '../services/apiDomains/invoiceApi.js';
   import { ApiService, authHeaders } from '../services/api.js';
 
@@ -51,6 +54,16 @@
       return matchStatus && matchSearch;
     })
   );
+
+  // Pagination (client-side over the filtered list)
+  const PAGE_SIZE = 25;
+  let page = $state(1);
+  let paged = $derived(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
+  // Reset to first page whenever the filter or search changes.
+  $effect(() => {
+    filterStatus; searchQuery;
+    page = 1;
+  });
 
   // Summary stats
   let summaryStats = $derived({
@@ -98,15 +111,6 @@
     selectedInvoice = inv;
     drawerOpen = true;
     showPaymentModal = false;
-  }
-
-  function formatIDR(num) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num || 0);
-  }
-
-  function formatDate(d) {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   async function submitPayment() {
@@ -230,28 +234,29 @@
         {/each}
       </div>
     {:else if filtered.length === 0}
-      <div class="flex flex-col items-center justify-center py-24 text-slate-400">
-        <Receipt class="mb-3 h-12 w-12 opacity-30" />
-        <p class="font-medium">Belum ada invoice</p>
-      </div>
+      <EmptyState
+        icon={Receipt}
+        title={searchQuery || filterStatus !== 'all' ? 'Tidak ada invoice yang cocok' : 'Belum ada invoice'}
+        text={searchQuery || filterStatus !== 'all' ? 'Coba ubah kata kunci atau filter status.' : 'Invoice akan muncul di sini setelah dibuat dari paket jamaah.'}
+      />
     {:else}
-      <table class="w-full min-w-[750px]">
+      <table class="w-full">
         <thead class="sticky top-0 bg-slate-50">
           <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-            <th class="px-6 py-3">No. Invoice</th>
-            <th class="px-4 py-3">Jamaah</th>
-            <th class="px-4 py-3 text-right">Total</th>
-            <th class="px-4 py-3 text-right">Terbayar</th>
+            <th class="hidden px-6 py-3 md:table-cell">No. Invoice</th>
+            <th class="px-4 py-3 sm:px-6">Jamaah</th>
+            <th class="hidden px-4 py-3 text-right lg:table-cell">Total</th>
+            <th class="hidden px-4 py-3 text-right lg:table-cell">Terbayar</th>
             <th class="px-4 py-3 text-right">Sisa</th>
             <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3">Jatuh Tempo</th>
+            <th class="hidden px-4 py-3 md:table-cell">Jatuh Tempo</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
-          {#each filtered as inv}
+          {#each paged as inv}
             <tr class="group bg-white transition-colors hover:bg-primary-50/30 {inv.is_overdue ? 'bg-red-50/30' : ''}">
-              <td class="px-6 py-3.5">
+              <td class="hidden px-6 py-3.5 md:table-cell">
                 <div class="flex items-center gap-2">
                   {#if inv.is_overdue}
                     <AlertCircle class="h-4 w-4 flex-shrink-0 text-red-500" />
@@ -259,28 +264,35 @@
                   <span class="text-sm font-mono font-semibold text-slate-700">{inv.invoice_no}</span>
                 </div>
               </td>
-              <td class="px-4 py-3.5">
-                <p class="text-sm font-semibold text-slate-800">{inv.jamaah_name}</p>
-                <p class="text-xs text-slate-400">{inv.package_name} · {inv.room_type}</p>
+              <td class="px-4 py-3.5 sm:px-6">
+                <div class="flex items-center gap-2">
+                  {#if inv.is_overdue}
+                    <AlertCircle class="h-4 w-4 flex-shrink-0 text-red-500 md:hidden" />
+                  {/if}
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-slate-800">{inv.jamaah_name}</p>
+                    <p class="truncate text-xs text-slate-400">{inv.package_name} · {inv.room_type}</p>
+                  </div>
+                </div>
               </td>
-              <td class="px-4 py-3.5 text-right text-sm font-medium text-slate-600">{formatIDR(inv.total)}</td>
-              <td class="px-4 py-3.5 text-right text-sm font-medium text-emerald-600">{formatIDR(inv.paid)}</td>
+              <td class="hidden px-4 py-3.5 text-right text-sm font-medium text-slate-600 lg:table-cell">{formatIDR(inv.total)}</td>
+              <td class="hidden px-4 py-3.5 text-right text-sm font-medium text-emerald-600 lg:table-cell">{formatIDR(inv.paid)}</td>
               <td class="px-4 py-3.5 text-right text-sm font-bold {inv.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}">
                 {inv.remaining > 0 ? formatIDR(inv.remaining) : 'Lunas'}
               </td>
               <td class="px-4 py-3.5">
                 <StatusBadge status={inv.status} size="xs" />
               </td>
-              <td class="px-4 py-3.5">
+              <td class="hidden px-4 py-3.5 md:table-cell">
                 <span class="text-xs {inv.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'}">
                   {formatDate(inv.due_date)}
                 </span>
               </td>
-              <td class="px-4 py-3.5">
+              <td class="px-4 py-3.5 text-right">
                 <button
                   type="button"
                   onclick={() => openDetail(inv)}
-                  class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
+                  class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
                 >
                   Detail <ChevronRight class="h-3 w-3" />
                 </button>
@@ -289,6 +301,9 @@
           {/each}
         </tbody>
       </table>
+      <div class="px-6">
+        <Pager {page} pageSize={PAGE_SIZE} total={filtered.length} onchange={(p) => (page = p)} />
+      </div>
     {/if}
   </div>
 </div>

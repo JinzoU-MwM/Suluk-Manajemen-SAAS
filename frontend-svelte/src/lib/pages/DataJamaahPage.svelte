@@ -9,6 +9,9 @@
     UsersRound,
   } from "lucide-svelte";
   import { ApiService } from "../services/api.js";
+  import { mapError } from "../services/toast.svelte.js";
+  import EmptyState from "../components/EmptyState.svelte";
+  import Pager from "../components/Pager.svelte";
 
   let { onNavigate = () => {} } = $props();
 
@@ -39,6 +42,15 @@
         .some((value) => String(value).toLowerCase().includes(needle));
     }),
   );
+
+  // Pagination (client-side over the filtered members)
+  const PAGE_SIZE = 25;
+  let page = $state(1);
+  let pagedMembers = $derived(filteredMembers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
+  $effect(() => {
+    search; selectedGroupId;
+    page = 1;
+  });
 
   onMount(loadGroups);
 
@@ -96,7 +108,7 @@
   {#if error}
     <div class="mb-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
       <AlertCircle class="mt-0.5 h-5 w-5 flex-shrink-0" />
-      <span>{error}</span>
+      <span>{mapError(error)}</span>
     </div>
   {/if}
 
@@ -152,35 +164,34 @@
         Memuat data jamaah...
       </div>
     {:else if filteredMembers.length === 0}
-      <div class="p-12 text-center">
-        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
-          <UsersRound class="h-7 w-7 text-slate-400" />
-        </div>
-        <h3 class="text-sm font-bold text-slate-900">Belum ada data jamaah</h3>
-        <p class="mt-1 text-sm text-slate-500">Pilih grup lain atau tambah data dari AI Scanner.</p>
-      </div>
+      <EmptyState
+        icon={UsersRound}
+        title={search ? "Tidak ada jamaah yang cocok" : "Belum ada data jamaah"}
+        text={search ? "Coba kata kunci lain." : "Pilih grup lain atau tambah data dari AI Scanner."}
+      />
     {:else}
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
             <tr>
               <th class="px-5 py-3 font-bold">Nama</th>
-              <th class="px-5 py-3 font-bold">Paspor</th>
-              <th class="px-5 py-3 font-bold">Identitas</th>
-              <th class="px-5 py-3 font-bold">Visa</th>
+              <th class="hidden px-5 py-3 font-bold md:table-cell">Paspor</th>
+              <th class="hidden px-5 py-3 font-bold lg:table-cell">Identitas</th>
+              <th class="hidden px-5 py-3 font-bold lg:table-cell">Visa</th>
               <th class="px-5 py-3 font-bold">Dokumen</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            {#each filteredMembers as member}
+            {#each pagedMembers as member}
               <tr class="hover:bg-slate-50/70">
                 <td class="px-5 py-4">
                   <p class="font-semibold text-slate-900">{displayName(member)}</p>
-                  <p class="text-xs text-slate-400">{member.title || "-"} {member.tanggal_lahir || ""}</p>
+                  <p class="text-xs text-slate-400 md:hidden">{member.no_paspor || member.no_identitas || "-"}</p>
+                  <p class="hidden text-xs text-slate-400 md:block">{member.title || "-"} {member.tanggal_lahir || ""}</p>
                 </td>
-                <td class="px-5 py-4 text-slate-600">{member.no_paspor || "-"}</td>
-                <td class="px-5 py-4 text-slate-600">{member.no_identitas || "-"}</td>
-                <td class="px-5 py-4 text-slate-600">{member.no_visa || "-"}</td>
+                <td class="hidden px-5 py-4 text-slate-600 md:table-cell">{member.no_paspor || "-"}</td>
+                <td class="hidden px-5 py-4 text-slate-600 lg:table-cell">{member.no_identitas || "-"}</td>
+                <td class="hidden px-5 py-4 text-slate-600 lg:table-cell">{member.no_visa || "-"}</td>
                 <td class="px-5 py-4">
                   <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                     <FileText class="h-3.5 w-3.5" />
@@ -191,6 +202,9 @@
             {/each}
           </tbody>
         </table>
+        <div class="px-5">
+          <Pager {page} pageSize={PAGE_SIZE} total={filteredMembers.length} onchange={(p) => (page = p)} />
+        </div>
       </div>
     {/if}
   </div>
