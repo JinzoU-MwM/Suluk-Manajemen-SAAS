@@ -26,6 +26,34 @@
   --color-accent: #C99A2E;
   --color-accent-light: #e0bb5e;
 
+  /* Suluk design-system tokens (used by landing + design-matched components) */
+  --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --c-ink: #10211c;
+  --c-ink-soft: #3f5650;
+  --c-muted: #6b7d77;
+  --c-faint: #97a6a1;
+  --c-line: #e6ebe8;
+  --c-line-soft: #eef2f0;
+  --c-surface: #ffffff;
+  --c-bg: #f6f8f7;
+  --c-bg-2: #eef2f0;
+  --c-primary: #1B7F5A;
+  --c-primary-deep: #0F3D2E;
+  --c-primary-soft: #E8F4EF;
+  --c-primary-tint: #F2F8F5;
+  --c-accent: #C99A2E;
+  --c-accent-soft: #F7EFD6;
+  --c-sidebar-bg: #0F3D2E;
+  --c-success: #1B7F5A;
+  --c-success-soft: #E8F4EF;
+  --c-warning: #b87708;
+  --c-warning-soft: #fbf0d8;
+  --c-danger: #c0392b;
+  --c-danger-soft: #fbe9e7;
+  --c-info: #2563a8;
+  --c-info-soft: #e6eef8;
+
   /* Neutrals */
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;
