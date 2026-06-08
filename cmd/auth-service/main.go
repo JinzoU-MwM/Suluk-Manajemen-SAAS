@@ -92,7 +92,18 @@ func main() {
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
 	// Rate limit unauthenticated auth endpoints to slow brute-force/abuse.
-	authLimiter := limiter.New(limiter.Config{Max: 10, Expiration: time.Minute})
+	// Key on the real client IP (X-Forwarded-For from the gateway) so the limit is
+	// per-client, not collapsed onto the gateway's IP.
+	authLimiter := limiter.New(limiter.Config{
+		Max:        20,
+		Expiration: time.Minute,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			if xff := c.Get("X-Forwarded-For"); xff != "" {
+				return xff
+			}
+			return c.IP()
+		},
+	})
 
 	authPublic := app.Group("/api/v1/auth", authLimiter)
 	authPublic.Post("/register", authHandler.Register)
