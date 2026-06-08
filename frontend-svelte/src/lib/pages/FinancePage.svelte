@@ -3,6 +3,7 @@
   import { TrendingUp, TrendingDown, DollarSign, AlertCircle, Download } from 'lucide-svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR } from '../utils/formatting.js';
+  import StatCard from '../components/StatCard.svelte';
 
   let { onNavigate, user = null } = $props();
 
@@ -129,10 +130,12 @@
       </div>
     {:else if stats}
       <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {@render SummaryCard("Total Pemasukan", formatIDR(stats.pemasukan), stats.pemasukan_change, "blue")}
-        {@render SummaryCard("Total Pengeluaran", formatIDR(stats.pengeluaran), undefined, "slate")}
-        {@render SummaryCard("Gross Profit", formatIDR(stats.gross_profit), stats.profit_change, "emerald")}
-        {@render SummaryCard("Total Piutang", formatIDR(stats.piutang), undefined, "red")}
+        <StatCard icon={TrendingUp} label="Total Pemasukan" value={formatIDR(stats.pemasukan)} accent="#1B7F5A"
+          delta={stats.pemasukan_change != null ? `${Math.abs(stats.pemasukan_change)}%` : null} deltaUp={(stats.pemasukan_change ?? 0) >= 0} />
+        <StatCard icon={TrendingDown} label="Total Pengeluaran" value={formatIDR(stats.pengeluaran)} accent="#b87708" />
+        <StatCard icon={DollarSign} label="Gross Profit" value={formatIDR(stats.gross_profit)} accent="#2563a8"
+          delta={stats.profit_change != null ? `${Math.abs(stats.profit_change)}%` : null} deltaUp={(stats.profit_change ?? 0) >= 0} />
+        <StatCard icon={AlertCircle} label="Total Piutang" value={formatIDR(stats.piutang)} accent="#c0392b" />
       </div>
     {/if}
 
@@ -298,23 +301,6 @@
   </div>
 </div>
 
-{#snippet SummaryCard(label, value, change, color)}
-  {@const colors = {
-    blue: 'bg-blue-50 text-blue-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-    red: 'bg-red-50 text-red-600',
-    slate: 'bg-slate-100 text-slate-700',
-  }}
-  <div class="rounded-xl {colors[color] || colors.slate} p-4">
-    <p class="text-[11px] font-semibold opacity-70">{label}</p>
-    <p class="mt-1 text-base font-bold">{value}</p>
-    {#if change !== undefined}
-      <p class="mt-0.5 text-[11px] font-medium {change >= 0 ? 'text-emerald-600' : 'text-red-500'}">
-        {change >= 0 ? '▲' : '▼'} {Math.abs(change)}% vs bulan lalu
-      </p>
-    {/if}
-  </div>
-{/snippet}
 
 {#snippet PLRow(label, value, isNegative, bold)}
   <div class="flex items-center justify-between">

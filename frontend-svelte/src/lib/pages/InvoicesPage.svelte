@@ -9,6 +9,7 @@
   import IDRInput from '../components/IDRInput.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Pager from '../components/Pager.svelte';
+  import StatCard from '../components/StatCard.svelte';
   import { showToast, mapError } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR, formatDate } from '../utils/formatting.js';
   import { invoiceApi } from '../services/apiDomains/invoiceApi.js';
@@ -152,9 +153,10 @@
 
   // Summary stats
   let summaryStats = $derived({
-    totalActive: invoices.filter(i => i.status !== 'lunas').reduce((s, i) => s + i.remaining, 0),
+    totalTagih: invoices.reduce((s, i) => s + (i.total || 0), 0),
+    totalBayar: invoices.reduce((s, i) => s + (i.paid || 0), 0),
+    outstanding: invoices.reduce((s, i) => s + (i.remaining || 0), 0),
     overdueCount: invoices.filter(i => i.is_overdue).length,
-    cashToday: invoices.reduce((s, i) => s + i.payments.filter(p => p.date === new Date().toISOString().slice(0,10)).reduce((a, p) => a + p.amount, 0), 0),
   });
 
   onMount(loadInvoices);
@@ -271,20 +273,12 @@
       </button>
     </div>
 
-    <!-- Summary cards -->
-    <div class="mt-4 grid grid-cols-3 gap-3">
-      <div class="rounded-xl bg-red-50 p-3">
-        <p class="text-[11px] font-semibold text-red-400">Total Piutang Aktif</p>
-        <p class="mt-0.5 text-base font-bold text-red-700">{formatIDR(summaryStats.totalActive)}</p>
-      </div>
-      <div class="rounded-xl bg-amber-50 p-3">
-        <p class="text-[11px] font-semibold text-amber-400">Overdue</p>
-        <p class="mt-0.5 text-base font-bold text-amber-700">{summaryStats.overdueCount} jamaah</p>
-      </div>
-      <div class="rounded-xl bg-emerald-50 p-3">
-        <p class="text-[11px] font-semibold text-emerald-400">Kas Hari Ini</p>
-        <p class="mt-0.5 text-base font-bold text-emerald-700">{formatIDR(summaryStats.cashToday)}</p>
-      </div>
+    <!-- Summary cards (Suluk design) -->
+    <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard icon={Receipt} label="Total Tagihan" value={formatIDR(summaryStats.totalTagih)} accent="#1B7F5A" />
+      <StatCard icon={CheckCircle} label="Sudah Diterima" value={formatIDR(summaryStats.totalBayar)} accent="#1B7F5A" />
+      <StatCard icon={Clock} label="Outstanding" value={formatIDR(summaryStats.outstanding)} accent="#C99A2E" />
+      <StatCard icon={AlertCircle} label="Jatuh Tempo" value={`${summaryStats.overdueCount}`} accent="#c0392b" sub="perlu ditindaklanjuti" />
     </div>
 
     <!-- Search + filter -->
