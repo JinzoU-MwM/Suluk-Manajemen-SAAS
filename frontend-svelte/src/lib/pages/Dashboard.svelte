@@ -198,27 +198,15 @@
   let operationCards = $derived([
     {
       label: "Dokumen selesai",
-      value: stats?.total_jamaah ? Math.min(98, Math.max(0, stats.equipment_rate || 0)) : 0,
+      value: formatPct(stats?.document_rate ?? 0),
       icon: FileText,
       color: "primary",
     },
     {
-      label: "Rooming siap",
-      value: stats?.rooming_pct ?? 0,
-      icon: Hotel,
-      color: "emerald",
-    },
-    {
-      label: "Inventory",
-      value: stats?.equipment_rate ?? 0,
+      label: "Perlengkapan terpenuhi",
+      value: formatPct(stats?.equipment_rate ?? 0),
       icon: Package,
       color: "amber",
-    },
-    {
-      label: "Manifest lapangan",
-      value: stats?.manifest_pct ?? 0,
-      icon: ClipboardCheck,
-      color: "violet",
     },
   ]);
 

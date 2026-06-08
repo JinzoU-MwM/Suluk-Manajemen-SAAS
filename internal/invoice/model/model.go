@@ -155,6 +155,14 @@ type InvoiceSummary struct {
 	OverdueCount    int64 `json:"overdue_count"`
 }
 
+// MonthlyRevenuePoint is one bar of the owner dashboard revenue trend chart.
+// Total is the sum of payments received in that calendar month.
+type MonthlyRevenuePoint struct {
+	Month string `json:"month"`
+	Year  int    `json:"year"`
+	Total int64  `json:"total"`
+}
+
 type PackageRevenueSummary struct {
 	PackageID       uuid.UUID `json:"package_id"`
 	TotalInvoices   int       `json:"total_invoices"`

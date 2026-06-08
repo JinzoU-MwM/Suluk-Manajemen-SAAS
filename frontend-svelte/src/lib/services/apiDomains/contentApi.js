@@ -82,6 +82,11 @@ export function createContentApi({ cacheGet, cacheSet }) {
             return unwrapData(await response.json());
         },
 
+        async getUnreadNotificationCount() {
+            const data = await this.getNotifications();
+            return data?.count ?? 0;
+        },
+
         async markNotificationRead(id) {
             const response = await apiFetch(`${API_URL}/notifications/${id}/read`, {
                 method: 'PUT',

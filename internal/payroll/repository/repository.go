@@ -187,11 +187,21 @@ func (r *PayrollRepo) GetAdvance(ctx context.Context, id, orgID string) (*model.
 
 func (r *PayrollRepo) GetPayrollSummary(ctx context.Context, orgID string) (*model.PayrollSummary, error) {
 	s := &model.PayrollSummary{}
-	_ = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM employees WHERE org_id = $1`, orgID).Scan(&s.TotalEmployees)
-	_ = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM employees WHERE org_id = $1 AND is_active = TRUE`, orgID).Scan(&s.ActiveEmployees)
-	_ = r.pool.QueryRow(ctx, `SELECT COALESCE(SUM(amount),0) FROM advances WHERE org_id = $1`, orgID).Scan(&s.TotalAdvances)
-	_ = r.pool.QueryRow(ctx, `SELECT COALESCE(SUM(remaining),0) FROM advances WHERE org_id = $1 AND status = 'active'`, orgID).Scan(&s.OutstandingAdvances)
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*), COUNT(*) FILTER (WHERE is_active = TRUE)
+		FROM employees WHERE org_id = $1`, orgID).Scan(&s.TotalEmployees, &s.ActiveEmployees); err != nil {
+		return nil, err
+	}
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount), 0), COALESCE(SUM(remaining) FILTER (WHERE status = 'active'), 0)
+		FROM advances WHERE org_id = $1`, orgID).Scan(&s.TotalAdvances, &s.OutstandingAdvances); err != nil {
+		return nil, err
+	}
 	currentPeriod := time.Now().Format("2006-01")
-	_ = r.pool.QueryRow(ctx, `SELECT COALESCE(SUM(net_salary),0) FROM salary_slips WHERE org_id = $1 AND period = $2`, orgID, currentPeriod).Scan(&s.MonthlyPayroll)
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(net_salary), 0)
+		FROM salary_slips WHERE org_id = $1 AND period = $2`, orgID, currentPeriod).Scan(&s.MonthlyPayroll); err != nil {
+		return nil, err
+	}
 	return s, nil
 }

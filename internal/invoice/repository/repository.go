@@ -253,6 +253,49 @@ func (r *InvoiceRepo) GetSummary(ctx context.Context, orgID uuid.UUID) (*model.I
 	return s, nil
 }
 
+var idMonthAbbr = [12]string{"Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"}
+
+// GetMonthlyRevenue returns payments received per calendar month for the last
+// `months` months (oldest first), zero-filling months with no payments so the
+// owner dashboard revenue chart always renders a consistent window.
+func (r *InvoiceRepo) GetMonthlyRevenue(ctx context.Context, orgID uuid.UUID, months int) ([]model.MonthlyRevenuePoint, error) {
+	if months <= 0 {
+		months = 6
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT TO_CHAR(DATE_TRUNC('month', paid_at), 'YYYY-MM') AS ym, COALESCE(SUM(amount), 0)
+		FROM payments
+		WHERE org_id = $1 AND paid_at >= DATE_TRUNC('month', NOW()) - make_interval(months => $2 - 1)
+		GROUP BY 1`, orgID, months)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	totals := map[string]int64{}
+	for rows.Next() {
+		var ym string
+		var total int64
+		if scanErr := rows.Scan(&ym, &total); scanErr == nil {
+			totals[ym] = total
+		}
+	}
+
+	now := time.Now()
+	firstOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	points := make([]model.MonthlyRevenuePoint, 0, months)
+	for i := months - 1; i >= 0; i-- {
+		m := firstOfMonth.AddDate(0, -i, 0)
+		key := m.Format("2006-01")
+		points = append(points, model.MonthlyRevenuePoint{
+			Month: fmt.Sprintf("%s %d", idMonthAbbr[int(m.Month())-1], m.Year()),
+			Year:  m.Year(),
+			Total: totals[key],
+		})
+	}
+	return points, nil
+}
+
 func (r *InvoiceRepo) GetPackageRevenue(ctx context.Context, orgID, packageID uuid.UUID) (*model.PackageRevenueSummary, error) {
 	s := &model.PackageRevenueSummary{PackageID: packageID}
 	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FILTER (WHERE status != 'batal'),

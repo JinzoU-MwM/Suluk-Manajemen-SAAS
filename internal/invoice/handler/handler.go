@@ -253,6 +253,19 @@ func (h *InvoiceHandler) GetPackageRevenue(c *fiber.Ctx) error {
 	return response.OK(c, summary)
 }
 
+func (h *InvoiceHandler) GetMonthlyRevenue(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	months := c.QueryInt("months", 6)
+	if months <= 0 || months > 24 {
+		months = 6
+	}
+	data, err := h.svc.GetMonthlyRevenue(c.Context(), claims.OrgID, months)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, data)
+}
+
 func (h *InvoiceHandler) ListByPackage(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	packageID, err := uuid.Parse(c.Params("pkgId"))

@@ -7,9 +7,13 @@ import (
 )
 
 func (s *JamaahService) GetAnalyticsData(ctx context.Context, orgID string,
-	totalJamaah, jamaahThisMonth, maleCount, femaleCount, unknownCount *int, equipmentRate *float64) {
+	totalJamaah, jamaahThisMonth, maleCount, femaleCount, unknownCount *int, equipmentRate *float64) error {
 
-	s.repo.GetAnalyticsStats(ctx, orgID, totalJamaah, jamaahThisMonth, maleCount, femaleCount, unknownCount, equipmentRate)
+	return s.repo.GetAnalyticsStats(ctx, orgID, totalJamaah, jamaahThisMonth, maleCount, femaleCount, unknownCount, equipmentRate)
+}
+
+func (s *JamaahService) GetDocumentRate(ctx context.Context, orgID string) float64 {
+	return s.repo.GetDocumentRate(ctx, orgID)
 }
 
 func (s *JamaahService) GetPassportExpiringSoon(ctx context.Context, orgID string) int {
