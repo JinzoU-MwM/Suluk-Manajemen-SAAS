@@ -346,6 +346,24 @@ func (s *AuthService) AcceptInvite(ctx context.Context, token string, userID uui
 	return member, nil
 }
 
+func (s *AuthService) CancelInvite(ctx context.Context, inviteID, orgID uuid.UUID) error {
+	return s.repo.CancelInvite(ctx, inviteID, orgID)
+}
+
+// ── Notifications ──────────────────────────────────────────
+
+func (s *AuthService) GetNotifications(ctx context.Context, orgID, userID uuid.UUID) ([]model.Notification, int, error) {
+	return s.repo.GetUserNotifications(ctx, orgID, userID, 50)
+}
+
+func (s *AuthService) MarkNotificationRead(ctx context.Context, id, userID uuid.UUID) error {
+	return s.repo.MarkNotificationRead(ctx, id, userID)
+}
+
+func (s *AuthService) MarkAllNotificationsRead(ctx context.Context, orgID, userID uuid.UUID) error {
+	return s.repo.MarkAllNotificationsRead(ctx, orgID, userID)
+}
+
 func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*sharedAuth.Claims, error) {
 	claims, err := s.jwt.ValidateToken(tokenStr)
 	if err != nil {
@@ -362,6 +380,118 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*shar
 	}
 
 	return claims, nil
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
+	if len(newPassword) < 8 {
+		return fmt.Errorf("new password must be at least 8 characters")
+	}
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+		return fmt.Errorf("current password is incorrect")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	return s.repo.UpdatePassword(ctx, userID, string(hashed))
+}
+
+func (s *AuthService) GetActivity(ctx context.Context, userID uuid.UUID) ([]model.AuditLog, error) {
+	return s.repo.GetAuditLogsByUser(ctx, userID, 50)
+}
+
+func (s *AuthService) DeleteAccount(ctx context.Context, userID uuid.UUID, password string) error {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return fmt.Errorf("password is incorrect")
+	}
+	_ = s.repo.DeleteRefreshToken(ctx, hashToken(""))
+	return s.repo.DeleteUser(ctx, userID)
+}
+
+func (s *AuthService) VerifyEmail(ctx context.Context, email, otp string) error {
+	user, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+	if user.EmailVerified {
+		return nil
+	}
+	valid, err := s.repo.ConsumeOtp(ctx, email, otp)
+	if err != nil {
+		return fmt.Errorf("verify otp: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid or expired OTP")
+	}
+	return s.repo.UpdateEmailVerified(ctx, user.ID, true)
+}
+
+func (s *AuthService) ResendOtp(ctx context.Context, email string) error {
+	user, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+	if user.EmailVerified {
+		return nil
+	}
+	code := generateNumericCode(6)
+	if err := s.repo.StoreOtp(ctx, email, code, 15*time.Minute); err != nil {
+		return fmt.Errorf("store otp: %w", err)
+	}
+	// TODO: send OTP via email service
+	return nil
+}
+
+func (s *AuthService) ForgotPassword(ctx context.Context, email string) error {
+	user, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		// Don't reveal whether the email exists
+		return nil
+	}
+	code := generateToken(32)
+	if err := s.repo.StorePasswordResetCode(ctx, user.Email, code, 15*time.Minute); err != nil {
+		return fmt.Errorf("store reset code: %w", err)
+	}
+	// TODO: send reset code via email service
+	return nil
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPassword string) error {
+	if len(newPassword) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+	valid, err := s.repo.ConsumePasswordResetCode(ctx, email, code)
+	if err != nil {
+		return fmt.Errorf("validate reset code: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid or expired reset code")
+	}
+	user, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	return s.repo.UpdatePassword(ctx, user.ID, string(hashed))
+}
+
+func (s *AuthService) SendPhoneOtp(ctx context.Context, phoneNumber string) error {
+	return nil
+}
+
+func (s *AuthService) VerifyPhone(ctx context.Context, phoneNumber, otp string) error {
+	return nil
 }
 
 func (s *AuthService) getUserOrgAndRole(ctx context.Context, userID uuid.UUID) (*model.Organization, *model.TeamMember, error) {
@@ -396,4 +526,13 @@ func generateToken(length int) string {
 	b := make([]byte, length)
 	rand.Read(b)
 	return hex.EncodeToString(b)[:length]
+}
+
+func generateNumericCode(digits int) string {
+	b := make([]byte, digits)
+	rand.Read(b)
+	for i := range b {
+		b[i] = b[i]%10 + '0'
+	}
+	return string(b)
 }

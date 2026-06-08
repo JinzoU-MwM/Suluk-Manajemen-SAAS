@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS email_otps (
+    email VARCHAR(255) PRIMARY KEY,
+    code VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    email VARCHAR(255) PRIMARY KEY,
+    code VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
+);

@@ -45,10 +45,10 @@ func (r *AuthRepo) CreateUser(ctx context.Context, user *model.User) error {
 
 func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, phone, phone_verified, role, is_active, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, created_at, updated_at FROM users WHERE id = $1`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&u.ID, &u.Email, &u.Name, &u.PasswordHash,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive,
+		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
+		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -62,10 +62,10 @@ func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, 
 
 func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, phone, phone_verified, role, is_active, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, created_at, updated_at FROM users WHERE email = $1`
 	err := r.pool.QueryRow(ctx, query, email).Scan(
-		&u.ID, &u.Email, &u.Name, &u.PasswordHash,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive,
+		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
+		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -272,10 +272,86 @@ func (r *AuthRepo) UpdateInviteStatus(ctx context.Context, token string, status 
 	return err
 }
 
+func (r *AuthRepo) CancelInvite(ctx context.Context, inviteID, orgID uuid.UUID) error {
+	result, err := r.pool.Exec(ctx, `DELETE FROM team_invites WHERE id = $1 AND org_id = $2 AND status = 'pending'`, inviteID, orgID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrInviteNotFound
+	}
+	return nil
+}
+
 func (r *AuthRepo) CreateAuditLog(ctx context.Context, log *model.AuditLog) error {
 	query := `INSERT INTO audit_logs (id, org_id, user_id, action, entity, entity_id, old_value, new_value, ip_address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 	_, err := r.pool.Exec(ctx, query, log.ID, log.OrgID, log.UserID, log.Action, log.Entity, log.EntityID, log.OldValue, log.NewValue, log.IPAddress)
 	return err
+}
+
+// ── Notifications ──────────────────────────────────────────
+
+func (r *AuthRepo) GetUserNotifications(ctx context.Context, orgID, userID uuid.UUID, limit int) ([]model.Notification, int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM notifications WHERE org_id = $1 AND (user_id IS NULL OR user_id = $2) AND is_read = FALSE`,
+		orgID, userID,
+	).Scan(&count)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count notifications: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, org_id, user_id, severity, title, message, group_id, is_read, created_at
+		FROM notifications
+		WHERE org_id = $1 AND (user_id IS NULL OR user_id = $2)
+		ORDER BY created_at DESC LIMIT $3`,
+		orgID, userID, limit,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list notifications: %w", err)
+	}
+	defer rows.Close()
+
+	notifications := []model.Notification{}
+	for rows.Next() {
+		var n model.Notification
+		if err := rows.Scan(&n.ID, &n.OrgID, &n.UserID, &n.Severity, &n.Title, &n.Message, &n.GroupID, &n.IsRead, &n.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		notifications = append(notifications, n)
+	}
+	return notifications, count, nil
+}
+
+func (r *AuthRepo) MarkNotificationRead(ctx context.Context, id, userID uuid.UUID) error {
+	result, err := r.pool.Exec(ctx,
+		`UPDATE notifications SET is_read = TRUE WHERE id = $1 AND (user_id IS NULL OR user_id = $2)`,
+		id, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("mark notification read: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("notification not found")
+	}
+	return nil
+}
+
+func (r *AuthRepo) MarkAllNotificationsRead(ctx context.Context, orgID, userID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE notifications SET is_read = TRUE WHERE org_id = $1 AND (user_id IS NULL OR user_id = $2) AND is_read = FALSE`,
+		orgID, userID,
+	)
+	return err
+}
+
+func (r *AuthRepo) CreateNotification(ctx context.Context, n *model.Notification) error {
+	return r.pool.QueryRow(ctx,
+		`INSERT INTO notifications (id, org_id, user_id, severity, title, message, group_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING created_at`,
+		n.ID, n.OrgID, n.UserID, n.Severity, n.Title, n.Message, n.GroupID,
+	).Scan(&n.CreatedAt)
 }
 
 // Repository-level errors
@@ -362,7 +438,7 @@ func (r *AuthRepo) CountTeamMembers(ctx context.Context, orgID uuid.UUID) (int, 
 // Get users by org
 func (r *AuthRepo) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]model.User, error) {
 	query := `
-		SELECT u.id, u.email, u.name, u.phone, u.phone_verified, u.role, u.is_active, u.created_at, u.updated_at
+		SELECT u.id, u.email, u.name, u.email_verified, u.phone, u.phone_verified, u.role, u.is_active, u.created_at, u.updated_at
 		FROM users u
 		JOIN team_members tm ON u.id = tm.user_id
 		WHERE tm.org_id = $1 AND tm.status = 'active'
@@ -376,12 +452,97 @@ func (r *AuthRepo) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]model
 	users := []model.User{}
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.EmailVerified, &u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
 	}
 	return users, nil
+}
+
+func (r *AuthRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, hash string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1`, userID, hash)
+	return err
+}
+
+func (r *AuthRepo) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	return err
+}
+
+func (r *AuthRepo) GetAuditLogsByUser(ctx context.Context, userID uuid.UUID, limit int) ([]model.AuditLog, error) {
+	if limit < 1 {
+		limit = 50
+	}
+	query := `SELECT id, org_id, user_id, action, entity, entity_id, old_value, new_value, ip_address, created_at FROM audit_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`
+	rows, err := r.pool.Query(ctx, query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var logs []model.AuditLog
+	for rows.Next() {
+		var l model.AuditLog
+		if err := rows.Scan(&l.ID, &l.OrgID, &l.UserID, &l.Action, &l.Entity, &l.EntityID, &l.OldValue, &l.NewValue, &l.IPAddress, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, nil
+}
+
+func (r *AuthRepo) UpdateEmailVerified(ctx context.Context, userID uuid.UUID, verified bool) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET email_verified = $2, updated_at = NOW() WHERE id = $1`, userID, verified)
+	return err
+}
+
+func (r *AuthRepo) UpdatePhoneVerified(ctx context.Context, userID uuid.UUID, verified bool) error {
+	_, err := r.pool.Exec(ctx, `UPDATE users SET phone_verified = $2, updated_at = NOW() WHERE id = $1`, userID, verified)
+	return err
+}
+
+// StoreOtp saves an OTP code with a TTL in PostgreSQL.
+func (r *AuthRepo) StoreOtp(ctx context.Context, email, code string, ttl time.Duration) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO email_otps (email, code, expires_at) VALUES ($1, $2, NOW() + $3::interval)
+		 ON CONFLICT (email) DO UPDATE SET code = EXCLUDED.code, expires_at = EXCLUDED.expires_at`,
+		email, code, fmt.Sprintf("%d seconds", int(ttl.Seconds())),
+	)
+	return err
+}
+
+// ConsumeOtp validates an OTP and deletes it if valid.
+func (r *AuthRepo) ConsumeOtp(ctx context.Context, email, code string) (bool, error) {
+	result, err := r.pool.Exec(ctx,
+		`DELETE FROM email_otps WHERE email = $1 AND code = $2 AND expires_at > NOW()`,
+		email, code,
+	)
+	if err != nil {
+		return false, err
+	}
+	return result.RowsAffected() > 0, nil
+}
+
+// StorePasswordResetCode saves a reset code with a 15-min TTL.
+func (r *AuthRepo) StorePasswordResetCode(ctx context.Context, email, code string, ttl time.Duration) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO password_resets (email, code, expires_at) VALUES ($1, $2, NOW() + $3::interval)
+		 ON CONFLICT (email) DO UPDATE SET code = EXCLUDED.code, expires_at = EXCLUDED.expires_at`,
+		email, code, fmt.Sprintf("%d seconds", int(ttl.Seconds())),
+	)
+	return err
+}
+
+// ConsumePasswordResetCode validates a reset code and deletes it if valid.
+func (r *AuthRepo) ConsumePasswordResetCode(ctx context.Context, email, code string) (bool, error) {
+	result, err := r.pool.Exec(ctx,
+		`DELETE FROM password_resets WHERE email = $1 AND code = $2 AND expires_at > NOW()`,
+		email, code,
+	)
+	if err != nil {
+		return false, err
+	}
+	return result.RowsAffected() > 0, nil
 }
 
 // Startup cleanup

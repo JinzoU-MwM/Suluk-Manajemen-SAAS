@@ -35,10 +35,12 @@ type User struct {
 	Email         string     `json:"email" db:"email"`
 	Name          string     `json:"name" db:"name"`
 	PasswordHash  string     `json:"-" db:"password_hash"`
+	EmailVerified bool       `json:"email_verified" db:"email_verified"`
 	Phone         *string    `json:"phone,omitempty" db:"phone"`
 	PhoneVerified bool       `json:"phone_verified" db:"phone_verified"`
 	Role          string     `json:"role" db:"role"`
 	IsActive      bool       `json:"is_active" db:"is_active"`
+	IsSuperAdmin  bool       `json:"is_super_admin" db:"is_super_admin"`
 	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
@@ -103,6 +105,58 @@ type AuditLog struct {
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
 
+type Notification struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	OrgID     uuid.UUID `json:"org_id" db:"org_id"`
+	UserID    *uuid.UUID `json:"user_id,omitempty" db:"user_id"`
+	Severity  string     `json:"severity" db:"severity"`
+	Title     string     `json:"title" db:"title"`
+	Message   string     `json:"message" db:"message"`
+	GroupID   *string    `json:"group_id,omitempty" db:"group_id"`
+	IsRead    bool       `json:"is_read" db:"is_read"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+}
+
+type Ticket struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	OrgID     uuid.UUID `json:"org_id" db:"org_id"`
+	UserID    uuid.UUID `json:"user_id" db:"user_id"`
+	Subject   string    `json:"subject" db:"subject"`
+	Message   string    `json:"message" db:"message"`
+	Priority  string    `json:"priority" db:"priority"`
+	Status    string    `json:"status" db:"status"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type TicketMessage struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	TicketID  uuid.UUID `json:"ticket_id" db:"ticket_id"`
+	UserID    uuid.UUID `json:"user_id" db:"user_id"`
+	Content   string    `json:"content" db:"content"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+type CreateTicketRequest struct {
+	Subject  string `json:"subject" validate:"required"`
+	Message  string `json:"message" validate:"required"`
+	Priority string `json:"priority,omitempty"`
+}
+
+type AddTicketMessageRequest struct {
+	Content string `json:"content" validate:"required"`
+}
+
+type TicketWithMessages struct {
+	Ticket   Ticket           `json:"ticket"`
+	Messages []TicketMessage `json:"messages"`
+}
+
+type NotificationsResponse struct {
+	Notifications []Notification `json:"notifications"`
+	Count         int            `json:"count"`
+}
+
 type RegisterRequest struct {
 	Name     string `json:"name" validate:"required,min=2,max=255"`
 	Email    string `json:"email" validate:"required,email"`
@@ -115,6 +169,33 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required"`
 }
 
+type Subscription struct {
+	ID        uuid.UUID  `json:"id" db:"id"`
+	OrgID     uuid.UUID  `json:"org_id" db:"org_id"`
+	Plan      string     `json:"plan" db:"plan"`
+	Status    string     `json:"status" db:"status"`
+	StartsAt  time.Time  `json:"starts_at" db:"starts_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty" db:"expires_at"`
+	TrialUsed bool       `json:"trial_used" db:"trial_used"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+type SubscriptionStatusResponse struct {
+	Plan      string     `json:"plan"`
+	Status    string     `json:"status"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+type TrialStatusResponse struct {
+	TrialAvailable bool `json:"trial_available"`
+	TrialDays      int  `json:"trial_days"`
+}
+
+type UpgradeRequest struct {
+	PaymentRef *string `json:"payment_ref,omitempty"`
+}
+
 type CreateOrgRequest struct {
 	Name        string  `json:"name" validate:"required,min=2,max=255"`
 	Address     *string `json:"address,omitempty"`
@@ -123,6 +204,18 @@ type CreateOrgRequest struct {
 	BankName    *string `json:"bank_name,omitempty"`
 	BankAccount *string `json:"bank_account,omitempty"`
 	BankHolder  *string `json:"bank_holder,omitempty"`
+}
+
+type OtpRecord struct {
+	Email     string    `json:"email"`
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type PasswordResetRecord struct {
+	Email     string    `json:"email"`
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type AddTeamMemberRequest struct {
