@@ -1,41 +1,33 @@
+<!--
+  BrandLogo.svelte — Suluk brand lockup (real double-S mark + "ERP for Travel").
+  variant: 'default' (dark text, for light surfaces) | 'light' (white mark + text, for dark/green surfaces)
+-->
 <script>
-  import { ArrowRightToLine, UsersRound } from 'lucide-svelte';
-  
   let { size = 'default', iconOnly = false, variant = 'default' } = $props();
-  
-  const sizeClasses = {
-    small: 'text-xl',
-    default: 'text-2xl',
-    large: 'text-3xl'
+
+  const markSizes = {
+    small: 'h-7',
+    default: 'h-9',
+    large: 'h-11',
   };
-  
-  const iconSizes = {
-    small: 'h-5 w-5',
-    default: 'h-6 w-6',
-    large: 'h-8 w-8'
+  const titleSizes = {
+    small: 'text-lg',
+    default: 'text-xl',
+    large: 'text-3xl',
   };
 
-  const textColor = $derived(variant === 'light' ? 'text-white' : 'text-slate-950');
-  const dotColor = $derived(variant === 'light' ? 'text-emerald-400' : 'text-emerald-500');
-  const peopleColor = $derived(variant === 'light' ? 'text-emerald-400' : 'text-emerald-500');
-  const arrowColor = $derived(variant === 'light' ? 'text-emerald-300' : 'text-emerald-600');
+  const mark = $derived(variant === 'light' ? '/brand/suluk-mark-white.png' : '/brand/suluk-mark.png');
+  const titleColor = $derived(variant === 'light' ? 'text-white' : 'text-primary-800');
 </script>
 
 {#if iconOnly}
-  <div class="flex items-center justify-center">
-    <div class="flex items-center {peopleColor}">
-      <UsersRound class={iconSizes[size]} strokeWidth={2.35} />
-    </div>
-  </div>
+  <img src="/brand/suluk-icon.png" alt="Suluk" class="{markSizes[size]} w-auto" />
 {:else}
-  <div class="flex items-center gap-2">
-    <div class="flex items-center -space-x-1 {peopleColor}">
-      <UsersRound class={iconSizes[size]} strokeWidth={2.25} />
-      <ArrowRightToLine class="{iconSizes[size]} {arrowColor}" strokeWidth={2.35} />
+  <div class="flex items-center gap-2.5">
+    <img src={mark} alt="Suluk" class="{markSizes[size]} w-auto" />
+    <div class="flex flex-col leading-none">
+      <span class="font-serif font-bold {titleSizes[size]} {titleColor}">Suluk</span>
+      <span class="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-gold-500">ERP for Travel</span>
     </div>
-
-    <span class="{sizeClasses[size]} font-black tracking-normal {textColor}">
-      Jamaah<span class={dotColor}>.in</span>
-    </span>
   </div>
 {/if}

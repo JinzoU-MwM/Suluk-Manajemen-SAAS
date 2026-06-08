@@ -149,14 +149,14 @@
 {/if}
 
 <aside
-  class="fixed left-0 top-0 z-50 flex h-full w-[272px] flex-col border-r border-slate-200/80 bg-white transition-transform duration-300 lg:translate-x-0
+  class="fixed left-0 top-0 z-50 flex h-full w-[272px] flex-col border-r border-black/20 bg-primary-800 transition-transform duration-300 lg:translate-x-0
     {mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}"
 >
-  <div class="flex h-[72px] items-center justify-between border-b border-slate-100 px-6">
-    <BrandLogo size="small" />
+  <div class="flex h-[72px] items-center justify-between border-b border-white/10 px-6">
+    <BrandLogo size="small" variant="light" />
     <button
       type="button"
-      class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 lg:hidden"
+      class="flex h-9 w-9 items-center justify-center rounded-xl text-white/60 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
       onclick={() => (mobileMenuOpen = false)}
       aria-label="Tutup"
     >
@@ -168,10 +168,10 @@
     {#each navGroups as group}
       {#if showGroup(group)}
         <div>
-          <p class="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <p class="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-white/40">
             {group.label}
             {#if group.proOnly && !isPro}
-              <span class="ml-1 rounded-sm bg-amber-100 px-1 py-0.5 text-[9px] font-bold text-amber-600">PRO</span>
+              <span class="ml-1 rounded-sm bg-gold-500/20 px-1 py-0.5 text-[9px] font-bold text-gold-400">PRO</span>
             {/if}
           </p>
           <div class="space-y-0.5">
@@ -185,10 +185,10 @@
                 <ItemIcon class="h-[18px] w-[18px] flex-shrink-0" />
                 <span>{item.label}</span>
                 {#if item.isCRM && jamaahCount > 0}
-                  <span class="ml-auto rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-bold text-primary-600">{jamaahCount}</span>
+                  <span class="ml-auto rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white">{jamaahCount}</span>
                 {/if}
                 {#if item.pulse}
-                  <span class="ml-auto h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span class="ml-auto h-2 w-2 rounded-full bg-gold-400 animate-pulse"></span>
                 {/if}
               </button>
             {/each}
@@ -198,20 +198,20 @@
     {/each}
   </nav>
 
-  <div class="border-t border-slate-100 px-4 py-4">
+  <div class="border-t border-white/10 px-4 py-4">
     {#if !isPro}
-      <div class="mb-3 rounded-2xl bg-gradient-to-br from-primary-600 to-primary-700 p-4 text-white">
-        <div class="mb-2 flex items-center gap-2">
-          <Crown class="h-4 w-4 text-primary-200" />
+      <div class="mb-3 rounded-2xl border border-gold-500/30 bg-white/5 p-4">
+        <div class="mb-2 flex items-center gap-2 text-white">
+          <Crown class="h-4 w-4 text-gold-400" />
           <span class="text-xs font-bold">Upgrade ke Pro</span>
         </div>
-        <p class="mb-3 text-[11px] leading-relaxed text-primary-200">
+        <p class="mb-3 text-[11px] leading-relaxed text-white/60">
           Invoice, laporan keuangan, e-kontrak, dan semua modul bisnis.
         </p>
         <button
           type="button"
           onclick={() => handleNavClick(trialAvailable ? "trial:activate" : "profile:upgrade")}
-          class="w-full rounded-xl bg-white py-2 text-[11px] font-bold text-primary-700 transition-colors hover:bg-primary-50"
+          class="w-full rounded-xl bg-gold-500 py-2 text-[11px] font-bold text-primary-900 transition-colors hover:bg-gold-400"
         >
           {trialAvailable ? "Coba 14 Hari Gratis" : "Lihat Paket"}
         </button>
@@ -221,7 +221,7 @@
     <button
       type="button"
       onclick={onLogout}
-      class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+      class="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
     >
       <LogOut class="h-5 w-5" />
       Keluar
@@ -239,7 +239,7 @@
     width: 100%;
     border-radius: 10px;
     padding: 9px 14px;
-    color: #64748b;
+    color: #cfe0d9;
     font-size: 13.5px;
     font-weight: 500;
     transition: all 0.15s;
@@ -247,13 +247,13 @@
   }
 
   .sidebar-link:hover {
-    background: #f1f5f9;
-    color: #334155;
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
   }
 
   .sidebar-link.active {
-    background: linear-gradient(135deg, #2563eb, #3b82f6);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    box-shadow: inset 3px 0 0 #c99a2e;
   }
 </style>

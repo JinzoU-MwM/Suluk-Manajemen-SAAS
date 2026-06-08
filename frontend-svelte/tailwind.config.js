@@ -8,17 +8,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Suluk brand — Primary Green #1B7F5A (interactive), deep #0F3D2E, mint #E8F4EF
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          50: '#E8F4EF',
+          100: '#d3ebe1',
+          200: '#a7d6c2',
+          300: '#74bb9f',
+          400: '#3f9d79',
+          500: '#22865f',
+          600: '#1B7F5A',
+          700: '#155f44',
+          800: '#0F3D2E',
+          900: '#0a2a1f',
         },
         emerald: {
           50: '#ecfdf5',
@@ -30,15 +31,17 @@ export default {
           600: '#059669',
           700: '#047857',
         },
+        // Suluk Golden #C99A2E
         gold: {
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
+          400: '#e0bb5e',
+          500: '#C99A2E',
+          600: '#a87f22',
         },
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
-        serif: ['"Playfair Display"', 'serif'],
+        sans: ['Inter', '-apple-system', 'system-ui', 'sans-serif'],
+        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
       },
       animation: {
         float: 'float 6s ease-in-out infinite',

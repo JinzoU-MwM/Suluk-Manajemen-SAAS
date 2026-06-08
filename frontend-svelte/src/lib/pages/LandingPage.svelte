@@ -825,28 +825,29 @@
 
 <style>
   .landing {
-    font-family: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-    background: #f8fafc;
-    color: #0f172a;
+    font-family: "Inter", system-ui, sans-serif;
+    background: #f6f8f7;
+    color: #10211c;
     min-height: 100vh;
     overflow-x: hidden;
     scroll-behavior: smooth;
   }
 
+  /* Suluk brand gradient: deep green -> green -> gold */
   .gradient-text {
-    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #10b981 100%);
+    background: linear-gradient(135deg, #0f3d2e 0%, #1b7f5a 55%, #c99a2e 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .hero-pattern {
-    background-image: radial-gradient(circle at 1px 1px, rgba(37, 99, 235, 0.06) 1px, transparent 0);
+    background-image: radial-gradient(circle at 1px 1px, rgba(27, 127, 90, 0.07) 1px, transparent 0);
     background-size: 40px 40px;
   }
 
   .animated-gradient {
-    background: linear-gradient(-45deg, #eff6ff, #ffffff, #ecfdf5, #ffffff);
+    background: linear-gradient(-45deg, #e8f4ef, #ffffff, #f2f8f5, #ffffff);
     background-size: 400% 400%;
     animation: gradientShift 15s ease infinite;
   }
