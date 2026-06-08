@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import {
+    CheckCircle,
+    Clock,
     Copy,
     Eye,
     FileSignature,
@@ -16,6 +18,8 @@
     Trash2,
   } from 'lucide-svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
   import { ApiService } from '../services/api';
   import { showToast } from '../services/toast.svelte.js';
 
@@ -92,6 +96,13 @@
       ? templates.filter((tpl) => (tpl.package_type || '') === selectedType)
       : templates
   );
+
+  let summaryStats = $derived({
+    totalKontrak: contracts.length,
+    ditandatangani: contracts.filter((c) => c.status === 'ditandatangani').length,
+    menungguTtd: contracts.filter((c) => c.status === 'terkirim').length,
+    expired: contracts.filter((c) => c.status === 'expired').length,
+  });
 
   onMount(async () => {
     await Promise.all([loadTemplates(), loadContracts()]);
@@ -354,13 +365,13 @@
 </script>
 
 <div class="flex h-screen flex-col bg-slate-50">
-  <div class="border-b border-slate-100 bg-white px-6 py-5">
-    <div class="flex items-center justify-between gap-4">
-      <div>
-        <h1 class="font-serif text-xl font-bold text-slate-800">E-Kontrak</h1>
-        <p class="mt-0.5 text-sm text-slate-500">Kelola template, generate kontrak per jamaah, dan bagikan link tanda tangan 7 hari.</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
+  <div class="flex-1 overflow-y-auto px-6 py-6">
+    <PageHeader
+      kicker="E-Kontrak"
+      title="Kontrak & Akad"
+      subtitle="Kelola template, generate kontrak per jamaah, dan bagikan link tanda tangan 7 hari."
+    >
+      {#snippet actions()}
         {#if canEditContracts}
           <button
             type="button"
@@ -373,16 +384,23 @@
           <button
             type="button"
             onclick={openCreateDrawer}
-            class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
+            class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-colors hover:bg-primary-700"
           >
             <Plus class="h-4 w-4" />
             Template Baru
           </button>
         {/if}
-      </div>
+      {/snippet}
+    </PageHeader>
+
+    <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard icon={FileSignature} label="Total Kontrak" value={String(summaryStats.totalKontrak)} accent="#1B7F5A" />
+      <StatCard icon={CheckCircle} label="Ditandatangani" value={String(summaryStats.ditandatangani)} accent="#1B7F5A" />
+      <StatCard icon={Clock} label="Menunggu TTD" value={String(summaryStats.menungguTtd)} accent="#C99A2E" />
+      <StatCard icon={ShieldCheck} label="Expired" value={String(summaryStats.expired)} accent="#c0392b" />
     </div>
 
-    <div class="mt-4 flex flex-wrap items-center gap-3">
+    <div class="mb-6 flex flex-wrap items-center gap-3">
       <select
         bind:value={selectedType}
         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
@@ -405,11 +423,10 @@
         Phase 3.1: generate + public signing
       </div>
     </div>
-  </div>
 
-  <div class="grid flex-1 gap-6 overflow-y-auto p-6 xl:grid-cols-[1.1fr_0.9fr]">
+    <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
     <section class="space-y-4">
-      <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
         <div class="mb-4 flex items-center gap-2">
           <FileText class="h-5 w-5 text-primary-600" />
           <h2 class="text-lg font-bold text-slate-800">Template Kontrak</h2>
@@ -496,7 +513,7 @@
     </section>
 
     <aside class="space-y-4">
-      <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
         <div class="mb-4 flex items-center gap-2">
           <Link2 class="h-5 w-5 text-primary-600" />
           <h2 class="text-lg font-bold text-slate-800">Kontrak Terkirim</h2>
@@ -549,7 +566,7 @@
         {/if}
       </div>
 
-      <div class="rounded-3xl border border-amber-200 bg-[linear-gradient(180deg,#fff8eb_0%,#ffffff_100%)] p-5 shadow-sm">
+      <div class="rounded-2xl border border-amber-200 bg-[linear-gradient(180deg,#fff8eb_0%,#ffffff_100%)] p-5 shadow-sm">
         <div class="mb-4 flex items-center gap-2">
           <Sparkles class="h-5 w-5 text-amber-600" />
           <h2 class="text-lg font-bold text-slate-800">Variabel Otomatis</h2>
@@ -572,6 +589,7 @@
         </div>
       </div>
     </aside>
+    </div>
   </div>
 </div>
 

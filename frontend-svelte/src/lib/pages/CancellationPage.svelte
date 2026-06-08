@@ -1,11 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import {
-    RotateCcw, ShieldAlert, CheckCheck, Clock, Ban, Plus,
-    Pencil, Trash2, ChevronRight,
+    RotateCcw, ShieldAlert, CheckCheck, Wallet, Ban, Plus,
+    Pencil, Trash2, XCircle, CheckCircle,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
+  import Avatar from '../components/Avatar.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService } from '../services/api.js';
 
@@ -136,45 +139,33 @@
   }
 </script>
 
-<div class="flex flex-col gap-6 p-4 lg:p-8">
-  <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h1 class="font-serif text-xl font-bold text-slate-900">Pembatalan & Refund</h1>
-      <p class="text-sm text-slate-500">Kelola pengembalian dana dan kebijakan refund.</p>
-    </div>
-    <div class="flex gap-2">
+<div class="p-4 lg:p-8">
+  <PageHeader
+    kicker="Pembatalan"
+    title="Pembatalan & Refund"
+    subtitle="Kelola pengembalian dana dan kebijakan refund."
+  >
+    {#snippet actions()}
       <button type="button" onclick={openNewPolicy} class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
         <Plus class="h-4 w-4" /> Kebijakan
       </button>
-    </div>
-  </header>
+    {/snippet}
+  </PageHeader>
 
   {#if loading}
     <div class="flex items-center justify-center py-16"><div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div></div>
   {:else}
     <!-- Summary -->
     {@const s = summary()}
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-        <p class="text-2xl font-bold text-slate-800">{formatIDR(s.totalAmount)}</p>
-        <p class="text-xs text-slate-500">Total Refund</p>
-      </div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-        <p class="text-2xl font-bold text-amber-600">{s.pending}</p>
-        <p class="text-xs text-slate-500">Menunggu Approval</p>
-      </div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-        <p class="text-2xl font-bold text-blue-600">{s.approved}</p>
-        <p class="text-xs text-slate-500">Disetujui</p>
-      </div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-        <p class="text-2xl font-bold text-emerald-600">{s.completed}</p>
-        <p class="text-xs text-slate-500">Selesai</p>
-      </div>
+    <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard icon={Wallet} label="Total Refund" value={formatIDR(s.totalAmount)} accent="#c0392b" />
+      <StatCard icon={XCircle} label="Menunggu Approval" value={String(s.pending)} accent="#C99A2E" />
+      <StatCard icon={CheckCheck} label="Disetujui" value={String(s.approved)} accent="#2563a8" />
+      <StatCard icon={CheckCircle} label="Selesai" value={String(s.completed)} accent="#1B7F5A" />
     </div>
 
     <!-- Policies bar -->
-    <div class="flex flex-wrap gap-2">
+    <div class="mb-4 flex flex-wrap gap-2">
       {#each policies as p}
         <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
           {p.name}: {p.refund_pct}% @ {p.days_before}h
@@ -184,8 +175,8 @@
     </div>
 
     <!-- Filter -->
-    <div class="flex items-center gap-2">
-      <select bind:value={statusFilter} onchange={loadData} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none">
+    <div class="mb-4 flex items-center gap-2">
+      <select bind:value={statusFilter} onchange={loadData} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-primary-400">
         <option value="all">Semua Status</option>
         <option value="pending">Pending</option>
         <option value="approved">Disetujui</option>
@@ -196,7 +187,7 @@
     </div>
 
     <!-- Refund Table -->
-    <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+    <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
       {#if refunds.length === 0}
         <div class="flex flex-col items-center justify-center py-16 text-slate-400">
           <ShieldAlert class="h-10 w-10 mb-2" />
@@ -204,27 +195,35 @@
         </div>
       {:else}
         <table class="w-full text-sm">
-          <thead class="border-b border-slate-100 bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Invoice</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Jumlah</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">%</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Alasan</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Tanggal</th>
-              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Aksi</th>
+          <thead>
+            <tr class="text-left">
+              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Invoice</th>
+              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jumlah</th>
+              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">%</th>
+              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Alasan</th>
+              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
+              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Tanggal</th>
+              <th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Aksi</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-50">
+          <tbody>
             {#each refunds as r}
-              <tr class="hover:bg-slate-50 cursor-pointer" onclick={() => openRefundDetail(r)}>
-                <td class="px-4 py-3 font-mono text-xs text-slate-500">{r.invoice_id?.substring(0, 8)}...</td>
-                <td class="px-4 py-3 font-semibold text-slate-800">{formatIDR(r.amount)}</td>
-                <td class="px-4 py-3 text-slate-600">{r.refund_pct}%</td>
-                <td class="px-4 py-3 max-w-[150px] truncate text-xs text-slate-500">{r.reason || '-'}</td>
-                <td class="px-4 py-3"><StatusBadge status={r.status} size="xs" /></td>
-                <td class="px-4 py-3 text-xs text-slate-500">{formatDate(r.created_at)}</td>
-                <td class="px-4 py-3 text-right">
+              <tr class="cursor-pointer transition-colors hover:bg-primary-50/30" onclick={() => openRefundDetail(r)}>
+                <td class="border-b border-slate-100 px-4 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <Avatar name={r.jamaah_name || r.invoice_id || '?'} size={36} />
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-semibold text-[#10211c]">{r.jamaah_name || 'Jamaah'}</p>
+                      <p class="truncate font-mono text-xs text-slate-400">{r.invoice_id?.substring(0, 8)}...</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="border-b border-slate-100 px-4 py-3.5 font-semibold text-slate-800" style="font-variant-numeric:tabular-nums">{formatIDR(r.amount)}</td>
+                <td class="border-b border-slate-100 px-4 py-3.5 text-slate-600">{r.refund_pct}%</td>
+                <td class="border-b border-slate-100 px-4 py-3.5 max-w-[150px] truncate text-xs text-slate-500">{r.reason || '-'}</td>
+                <td class="border-b border-slate-100 px-4 py-3.5"><StatusBadge status={r.status} size="xs" /></td>
+                <td class="border-b border-slate-100 px-4 py-3.5 text-xs text-slate-500">{formatDate(r.created_at)}</td>
+                <td class="border-b border-slate-100 px-4 py-3.5 text-right">
                   <div role="presentation" class="flex items-center justify-end gap-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
                     {#if r.status === 'pending'}
                       <button type="button" onclick={() => refundAction(r.id, 'approve')} class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"><CheckCheck class="h-3 w-3 inline mr-1" />Setuju</button>

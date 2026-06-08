@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   ItineraryPage.svelte - Trip schedule/itinerary manager.
   Timeline view grouped by date with color-coded categories.
 -->
@@ -21,6 +21,7 @@
         Save,
     } from "lucide-svelte";
     import { ApiService } from "../services/api";
+    import PageHeader from "../components/PageHeader.svelte";
 
     let { groups = [], isPro = false } = $props();
 
@@ -176,23 +177,23 @@
 
 <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
     <!-- Header -->
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h1 class="font-serif text-xl font-bold text-slate-900">Itinerary</h1>
-            <p class="text-sm text-slate-500">Kelola jadwal perjalanan per grup keberangkatan.</p>
-        </div>
-        <div class="flex items-center gap-3">
+    <PageHeader
+        kicker="Operasional"
+        title="Itinerary"
+        subtitle="Kelola jadwal perjalanan per grup keberangkatan."
+    >
+        {#snippet actions()}
             {#if selectedGroupId}
-            <button
-                type="button"
-                onclick={openAddForm}
-                class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition hover:bg-primary-700"
-            >
-                <Plus class="w-4 h-4" /> Tambah
-            </button>
+                <button
+                    type="button"
+                    onclick={openAddForm}
+                    class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition hover:bg-primary-700"
+                >
+                    <Plus class="w-4 h-4" /> Tambah
+                </button>
             {/if}
-        </div>
-    </div>
+        {/snippet}
+    </PageHeader>
 
     <!-- Error -->
     {#if error}
@@ -208,15 +209,17 @@
     {/if}
 
     <!-- Group Selector -->
-    <div class="mb-6 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+    <div
+        class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
+    >
         <label
             for="itinerary-group"
-            class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400"
+            class="mb-2 block text-xs font-bold uppercase tracking-[0.08em] text-primary-600"
             >Pilih Grup</label
         >
         <select
             id="itinerary-group"
-            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white"
+            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100"
             onchange={(e) => {
                 selectedGroupId = parseInt(
                     /** @type {HTMLSelectElement} */ (e.target).value,
@@ -232,18 +235,24 @@
     </div>
 
     {#if !selectedGroupId}
-        <div class="text-center py-16 text-slate-400">
+        <div
+            class="rounded-2xl border border-slate-200/70 bg-white py-16 text-center text-slate-400 shadow-sm"
+        >
             <CalendarDays class="w-12 h-12 mx-auto mb-3 text-slate-300" />
             <p class="text-sm">
                 Pilih grup terlebih dahulu untuk melihat jadwal
             </p>
         </div>
     {:else if isLoading}
-        <div class="flex items-center justify-center py-16 text-slate-400">
+        <div
+            class="flex items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-16 text-slate-400 shadow-sm"
+        >
             <Loader2 class="w-6 h-6 animate-spin mr-2" /> Memuat jadwal...
         </div>
     {:else if items.length === 0}
-        <div class="text-center py-16 text-slate-400">
+        <div
+            class="rounded-2xl border border-slate-200/70 bg-white py-16 text-center text-slate-400 shadow-sm"
+        >
             <CalendarDays class="w-12 h-12 mx-auto mb-3 text-slate-300" />
             <p class="font-medium text-slate-500">Belum ada jadwal</p>
             <p class="text-sm mt-1">
@@ -252,95 +261,123 @@
         </div>
     {:else}
         <!-- Timeline -->
-        <div class="space-y-6">
-            {#each groupedItems() as [date, dateItems]}
-                <div>
-                    <!-- Date Header -->
-                    <div class="flex items-center gap-2 mb-3">
-                        <div
-                            class="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0"
-                        ></div>
-                        <h3 class="text-sm font-semibold text-slate-700">
-                            {formatDate(date)}
-                        </h3>
-                    </div>
-
-                    <!-- Items -->
+        <div
+            class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm lg:p-6"
+        >
+            <div class="relative pl-1">
+                {#each groupedItems() as [date, dateItems], dayIdx}
                     <div
-                        class="ml-3 border-l-2 border-slate-100 pl-4 space-y-2"
+                        class="relative flex gap-4 sm:gap-5 {dayIdx <
+                        groupedItems().length - 1
+                            ? 'pb-7'
+                            : ''}"
                     >
-                        {#each dateItems as item}
-                            {@const cat =
-                                categoryConfig[item.category] ||
-                                categoryConfig.other}
+                        <!-- Connector line -->
+                        {#if dayIdx < groupedItems().length - 1}
                             <div
-                                class="bg-white rounded-xl border border-slate-200 p-3.5 hover:shadow-sm transition-shadow group"
+                                class="absolute left-[21px] top-12 bottom-0 w-0.5 bg-slate-200"
+                            ></div>
+                        {/if}
+
+                        <!-- Day marker -->
+                        <div
+                            class="z-10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-[3px] border-white bg-primary-50 text-primary-800 shadow-sm"
+                        >
+                            <CalendarDays class="h-5 w-5" />
+                        </div>
+
+                        <!-- Day content -->
+                        <div class="min-w-0 flex-1 pt-1">
+                            <p
+                                class="text-[11.5px] font-bold uppercase tracking-[0.05em] text-[#C99A2E]"
                             >
-                                <div class="flex items-start justify-between">
+                                {formatDate(date)}
+                            </p>
+
+                            <!-- Items -->
+                            <div class="mt-3 space-y-2.5">
+                                {#each dateItems as item}
+                                    {@const cat =
+                                        categoryConfig[item.category] ||
+                                        categoryConfig.other}
                                     <div
-                                        class="flex items-start gap-3 flex-1 min-w-0"
+                                        class="group rounded-xl border border-slate-200/70 bg-white p-3.5 transition-shadow hover:shadow-sm"
                                     >
                                         <div
-                                            class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 border {cat.color}"
+                                            class="flex items-start justify-between"
                                         >
-                                            <cat.icon class="w-4 h-4" />
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p
-                                                class="text-sm font-medium text-slate-800"
+                                            <div
+                                                class="flex min-w-0 flex-1 items-start gap-3"
                                             >
-                                                {item.activity}
-                                            </p>
-                                            {#if item.location}
-                                                <p
-                                                    class="text-xs text-slate-500 mt-0.5"
+                                                <div
+                                                    class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border {cat.color}"
                                                 >
-                                                    📍 {item.location}
-                                                </p>
-                                            {/if}
-                                            {#if item.time_start}
-                                                <p
-                                                    class="text-xs text-slate-400 mt-0.5 flex items-center gap-1"
+                                                    <cat.icon class="w-4 h-4" />
+                                                </div>
+                                                <div class="min-w-0 flex-1">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-800"
+                                                    >
+                                                        {item.activity}
+                                                    </p>
+                                                    {#if item.location}
+                                                        <p
+                                                            class="mt-0.5 text-xs text-slate-500"
+                                                        >
+                                                            ?? {item.location}
+                                                        </p>
+                                                    {/if}
+                                                    {#if item.time_start}
+                                                        <p
+                                                            class="mt-0.5 flex items-center gap-1 text-xs text-slate-400"
+                                                        >
+                                                            <Clock
+                                                                class="w-3 h-3"
+                                                            />
+                                                            {item.time_start}{item.time_end
+                                                                ? ` - ${item.time_end}`
+                                                                : ""}
+                                                        </p>
+                                                    {/if}
+                                                    {#if item.notes}
+                                                        <p
+                                                            class="mt-1 text-xs italic text-slate-400"
+                                                        >
+                                                            {item.notes}
+                                                        </p>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onclick={() =>
+                                                        openEditForm(item)}
+                                                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-primary-50 hover:text-primary-600"
                                                 >
-                                                    <Clock class="w-3 h-3" />
-                                                    {item.time_start}{item.time_end
-                                                        ? ` - ${item.time_end}`
-                                                        : ""}
-                                                </p>
-                                            {/if}
-                                            {#if item.notes}
-                                                <p
-                                                    class="text-xs text-slate-400 mt-1 italic"
+                                                    <Edit3 class="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onclick={() =>
+                                                        deleteItem(item.id)}
+                                                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                                                 >
-                                                    {item.notes}
-                                                </p>
-                                            {/if}
+                                                    <Trash2
+                                                        class="w-3.5 h-3.5"
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div
-                                        class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <button
-                                            type="button"
-                                            onclick={() => openEditForm(item)}
-                                            class="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors"
-                                        >
-                                            <Edit3 class="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onclick={() => deleteItem(item.id)}
-                                            class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 class="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
+                                {/each}
                             </div>
-                        {/each}
+                        </div>
                     </div>
-                </div>
-            {/each}
+                {/each}
+            </div>
         </div>
     {/if}
 </div>
@@ -376,13 +413,13 @@
                     <select
                         id="itinerary-category"
                         bind:value={formCategory}
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                     >
-                        <option value="flight">✈️ Penerbangan</option>
-                        <option value="hotel">🏨 Hotel</option>
-                        <option value="transport">🚌 Transportasi</option>
-                        <option value="activity">📍 Aktivitas</option>
-                        <option value="other">📝 Lainnya</option>
+                        <option value="flight">?? Penerbangan</option>
+                        <option value="hotel">?? Hotel</option>
+                        <option value="transport">?? Transportasi</option>
+                        <option value="activity">?? Aktivitas</option>
+                        <option value="other">?? Lainnya</option>
                     </select>
                 </div>
 
@@ -397,7 +434,7 @@
                         id="itinerary-date"
                         type="date"
                         bind:value={formDate}
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                     />
                 </div>
 
@@ -413,7 +450,7 @@
                             id="itinerary-time-start"
                             type="time"
                             bind:value={formTimeStart}
-                            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                         />
                     </div>
                     <div>
@@ -426,7 +463,7 @@
                             id="itinerary-time-end"
                             type="time"
                             bind:value={formTimeEnd}
-                            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                         />
                     </div>
                 </div>
@@ -443,7 +480,7 @@
                         type="text"
                         bind:value={formActivity}
                         placeholder="e.g. Check-in Hotel Al Safwah"
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                     />
                 </div>
 
@@ -459,7 +496,7 @@
                         type="text"
                         bind:value={formLocation}
                         placeholder="e.g. Makkah"
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                     />
                 </div>
 
@@ -475,7 +512,7 @@
                         bind:value={formNotes}
                         rows="2"
                         placeholder="Catatan tambahan..."
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
                     ></textarea>
                 </div>
             </div>
@@ -494,7 +531,7 @@
                     disabled={isSaving ||
                         !formActivity.trim() ||
                         !formDate.trim()}
-                    class="flex-1 px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    class="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                     {#if isSaving}
                         <Loader2 class="w-4 h-4 animate-spin" />

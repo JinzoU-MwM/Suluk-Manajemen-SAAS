@@ -15,12 +15,16 @@
     Trash2,
     Sparkles,
     Users,
+    TrendingUp,
     X,
     Plus,
     FileDown,
     MessageCircle,
   } from "lucide-svelte";
   import { ApiService } from "../services/api.js";
+  import PageHeader from "../components/PageHeader.svelte";
+  import StatCard from "../components/StatCard.svelte";
+  import Avatar from "../components/Avatar.svelte";
   import WhatsAppBlast from "../components/WhatsAppBlast.svelte";
 
   let { isOpen = false, onClose, groups = [], isPro = false } = $props();
@@ -117,6 +121,11 @@
 
   // Derived
   let unassignedCount = $derived(summary?.unassigned_count || 0);
+  let occupancyPct = $derived(
+    summary && summary.total_members > 0
+      ? Math.round(((summary.assigned_count || 0) / summary.total_members) * 100)
+      : 0,
+  );
 
   async function loadData() {
     if (!selectedGroupId) {
@@ -320,18 +329,6 @@
     }
   }
 
-  function getGenderColor(genderType) {
-    if (genderType === "male") return "border-blue-200 bg-blue-50";
-    if (genderType === "female") return "border-pink-200 bg-pink-50";
-    return "border-purple-200 bg-purple-50";
-  }
-
-  function getGenderBadge(gender) {
-    if (gender === "male") return "bg-blue-100 text-blue-700";
-    if (gender === "female") return "bg-pink-100 text-pink-700";
-    return "bg-slate-100 text-slate-600";
-  }
-
   async function addRoom() {
     if (!selectedGroupId || !newRoomNumber.trim()) return;
 
@@ -396,77 +393,82 @@
 
 {#if isOpen}
   <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
-    <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="font-serif text-xl font-bold text-slate-900">Auto-Rooming</h1>
-        <p class="text-sm text-slate-500">Alokasi kamar hotel otomatis, tetap bisa disesuaikan manual.</p>
-      </div>
-    </header>
-
-    <div class="mb-5 flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm lg:flex-row lg:items-center">
-      <select
-        id="room-group-select"
-        bind:value={selectedGroupId}
-        onchange={loadData}
-        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white lg:max-w-xs"
-      >
-        <option value="">Pilih Grup</option>
-        {#each groups as group}
-          <option value={group.id}>{group.name} ({group.member_count})</option>
-        {/each}
-      </select>
-
-      {#if selectedGroupId}
-        <button
-          type="button"
-          onclick={loadData}
-          disabled={isLoading}
-          class="flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
-        >
-          <RefreshCw class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" />
-        </button>
-      {/if}
-
-      <div class="flex flex-wrap items-center gap-2 lg:ml-auto">
+    <PageHeader
+      kicker="Operasional"
+      title="Auto-Rooming"
+      subtitle="Alokasi kamar hotel otomatis, tetap bisa disesuaikan manual."
+    >
+      {#snippet actions()}
+        {#if selectedGroupId}
+          <button
+            type="button"
+            onclick={loadData}
+            disabled={isLoading}
+            class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            title="Muat ulang"
+          >
+            <RefreshCw class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" />
+          </button>
+        {/if}
         <button
           type="button"
           onclick={runAutoRooming}
           disabled={isAutoRooming || unassignedCount === 0}
-          class="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition hover:bg-primary-700 disabled:opacity-50"
         >
           {#if isAutoRooming}<Loader2
-              class="w-3 h-3 animate-spin"
-            />{:else}<Sparkles class="w-3 h-3" />{/if}
+              class="w-4 h-4 animate-spin"
+            />{:else}<Sparkles class="w-4 h-4" />{/if}
           Auto-Generate
         </button>
         {#if summary?.total_rooms > 0}
           <button
             type="button"
             onclick={exportRoomingPDF}
-            class="inline-flex items-center gap-1.5 rounded-xl border border-primary-200 px-3 py-2 text-xs font-semibold text-primary-600 transition hover:bg-primary-50"
+            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
           >
-            <FileDown class="w-3 h-3" />
+            <FileDown class="w-4 h-4" />
             PDF
           </button>
           <button
             type="button"
             onclick={() => (waBlastOpen = true)}
-            class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50"
+            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-600 shadow-sm transition hover:bg-emerald-50"
           >
-            <MessageCircle class="w-3 h-3" />
+            <MessageCircle class="w-4 h-4" />
             WA
           </button>
           <button
             type="button"
             onclick={clearRooms}
             disabled={isLoading}
-            class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:opacity-50"
           >
-            <Trash2 class="w-3 h-3" />
+            <Trash2 class="w-4 h-4" />
             Reset
           </button>
         {/if}
-      </div>
+      {/snippet}
+    </PageHeader>
+
+    <!-- Group selector -->
+    <div class="mb-5 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+      <label
+        for="room-group-select"
+        class="mb-2 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400"
+        >Grup Keberangkatan</label
+      >
+      <select
+        id="room-group-select"
+        bind:value={selectedGroupId}
+        onchange={loadData}
+        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100 lg:max-w-sm"
+      >
+        <option value="">Pilih Grup</option>
+        {#each groups as group}
+          <option value={group.id}>{group.name} ({group.member_count})</option>
+        {/each}
+      </select>
     </div>
 
     <!-- Messages -->
@@ -499,54 +501,72 @@
     {/if}
 
     <!-- Content -->
-    <div class="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
-      {#if isLoading}
-        <div class="flex items-center justify-center py-16">
-          <Loader2 class="w-6 h-6 animate-spin text-indigo-500" />
-        </div>
-      {:else if !selectedGroupId}
-        <div
-          class="flex flex-col items-center justify-center py-16 text-slate-400"
-        >
-          <Hotel class="w-10 h-10 mb-2" />
-          <p class="text-sm">Pilih grup untuk memulai</p>
-        </div>
-      {:else if summary}
-        <!-- Stats - Ultra Compact -->
-        <div class="grid grid-cols-2 gap-4 p-4 lg:grid-cols-4">
-          <div class="stat-card">
-            <span class="stat-value text-slate-800"
-              >{summary.total_members}</span
-            >
-            <span class="stat-label">Total</span>
+    {#if isLoading}
+      <div
+        class="flex items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-16 shadow-sm"
+      >
+        <Loader2 class="w-6 h-6 animate-spin text-primary-600" />
+      </div>
+    {:else if !selectedGroupId}
+      <div
+        class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-16 text-slate-400 shadow-sm"
+      >
+        <Hotel class="w-10 h-10 mb-2" />
+        <p class="text-sm">Pilih grup untuk memulai</p>
+      </div>
+    {:else if summary}
+      <!-- Stats -->
+      <div class="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          icon={Users}
+          label="Total Jamaah"
+          value={String(summary.total_members)}
+          accent="#1B7F5A"
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Sudah Ditempatkan"
+          value={String(summary.assigned_count)}
+          accent="#1B7F5A"
+        />
+        <StatCard
+          icon={Users}
+          label="Belum Ditempatkan"
+          value={String(unassignedCount)}
+          accent="#C99A2E"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Okupansi"
+          value={`${occupancyPct}%`}
+          accent="#2563a8"
+          sub={`${summary.total_rooms} kamar`}
+        />
+      </div>
+
+      <div
+        class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm"
+      >
+        <!-- Unassigned Notice -->
+        {#if unassignedCount > 0}
+          <div
+            class="m-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
+          >
+            <Users class="w-4 h-4 text-amber-600" />
+            <span class="text-amber-700">
+              <strong>{unassignedCount}</strong> jamaah belum ditempatkan
+            </span>
           </div>
-          <div class="stat-card">
-            <span class="stat-value text-emerald-600"
-              >{summary.assigned_count}</span
-            >
-            <span class="stat-label">Ditempat</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-value text-amber-600">{unassignedCount}</span>
-            <span class="stat-label">Belum</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-value text-indigo-600">{summary.total_rooms}</span
-            >
-            <span class="stat-label">Kamar</span>
-          </div>
-        </div>
+        {/if}
 
         <!-- Rooms Grid -->
         {#if rooms.length > 0}
           <div
-            class="grid grid-cols-1 gap-3 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-4"
+            class="grid grid-cols-1 gap-3.5 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
           >
             {#each rooms as room}
               <article
-                class="rounded-lg border-2 {getGenderColor(
-                  room.gender_type,
-                )} p-2.5 text-xs"
+                class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:shadow-md"
                 ondragover={handleDragOver}
                 ondrop={(e) => {
                   e.preventDefault();
@@ -556,100 +576,112 @@
                 aria-label="Kamar {room.room_number}"
               >
                 <!-- Room Header -->
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-1">
-                    <Bed class="w-3.5 h-3.5 text-slate-500" />
-                    <span class="font-bold text-slate-800"
-                      >{room.room_number}</span
+                <div class="mb-3 flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <div
+                      class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-700"
                     >
+                      <Bed class="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p class="text-sm font-bold text-[#10211c]">
+                        {room.room_number}
+                      </p>
+                      <span
+                        class="text-[11.5px] font-medium {room.gender_type ===
+                        'male'
+                          ? 'text-blue-600'
+                          : room.gender_type === 'female'
+                            ? 'text-pink-600'
+                            : 'text-purple-600'}"
+                      >
+                        {room.gender_type === "male"
+                          ? "Laki-laki"
+                          : room.gender_type === "female"
+                            ? "Perempuan"
+                            : "Keluarga"}
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-1">
-                    <span
-                      class="px-1 py-0.5 rounded text-[10px] font-medium {getGenderBadge(
-                        room.gender_type,
-                      )}"
-                    >
-                      {room.gender_type === "male"
-                        ? "L"
-                        : room.gender_type === "female"
-                          ? "P"
-                          : "M"}
-                    </span>
+                  <div class="flex items-center gap-1.5">
                     {#if room.is_auto_assigned}
                       <span
-                        class="px-1 py-0.5 rounded text-[10px] bg-indigo-100 text-indigo-600"
-                        >A</span
+                        class="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-bold text-primary-700"
+                        >Auto</span
                       >
                     {/if}
+                    <span
+                      class="rounded-full px-2.5 py-0.5 text-[11.5px] font-bold {room.is_full
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'bg-slate-100 text-slate-500'}"
+                    >
+                      {room.occupied}/{room.capacity}
+                    </span>
                     <button
                       type="button"
                       onclick={() => deleteRoom(room.id)}
-                      class="p-0.5 text-slate-300 hover:text-red-500 transition-colors"
+                      class="p-1 text-slate-300 transition-colors hover:text-red-500"
                       title="Hapus kamar"
                     >
-                      <Trash2 class="w-3 h-3" />
+                      <Trash2 class="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
 
                 <!-- Capacity Bar -->
-                <div class="h-1 bg-slate-200 rounded-full mb-2 overflow-hidden">
+                <div class="mb-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
                   <div
-                    class="h-full {room.is_full
-                      ? 'bg-red-400'
-                      : 'bg-emerald-400'} transition-all"
+                    class="h-full rounded-full transition-all {room.is_full
+                      ? 'bg-primary-600'
+                      : 'bg-gold-500'}"
                     style="width: {(room.occupied / room.capacity) * 100}%"
                   ></div>
                 </div>
-                <div class="text-[10px] text-slate-500 mb-1.5">
-                  {room.occupied}/{room.capacity}
-                  {room.is_full ? "(Penuh)" : ""}
-                </div>
 
                 <!-- Members -->
-                <div class="space-y-1">
+                <div class="flex flex-col gap-2">
                   {#each room.members as member}
                     <div
-                      class="bg-white rounded px-2 py-1 flex items-center justify-between border border-slate-100 cursor-move"
+                      class="flex cursor-move items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white px-2.5 py-2 shadow-sm"
                       draggable="true"
                       role="listitem"
                       ondragstart={(e) =>
                         handleDragStart(e, { id: member.id }, room.id)}
                     >
-                      <span class="truncate text-slate-700"
+                      <Avatar name={member.nama || "Tanpa Nama"} size={28} />
+                      <span
+                        class="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#10211c]"
                         >{member.nama || "Tanpa Nama"}</span
                       >
                       <button
                         type="button"
                         onclick={() => removeFromRoom(member.id)}
-                        class="text-slate-300 hover:text-red-500 ml-1"
+                        class="text-slate-300 transition-colors hover:text-red-500"
                       >
-                        <X class="w-3 h-3" />
+                        <X class="h-3.5 w-3.5" />
                       </button>
                     </div>
                   {/each}
-                </div>
 
-                <!-- Drop Zone -->
-                {#if !room.is_full}
-                  <div
-                    class="mt-1.5 border border-dashed border-slate-300 rounded p-2 text-center text-slate-400 text-[10px]"
-                  >
-                    Drop di sini
-                  </div>
-                {/if}
+                  <!-- Empty Slots -->
+                  {#each Array(Math.max(0, room.capacity - room.occupied)) as _, i}
+                    <div
+                      class="flex h-11 items-center justify-center rounded-xl border border-dashed border-slate-200 text-[11.5px] text-slate-400"
+                    >
+                      Kosong
+                    </div>
+                  {/each}
+                </div>
               </article>
             {/each}
 
             <!-- Add Room Card -->
             {#if showAddRoom}
               <article
-                class="rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50/50 p-2.5 text-xs"
+                class="rounded-2xl border border-dashed border-primary-300 bg-primary-50/50 p-4"
               >
-                <div class="flex items-center justify-between mb-2">
-                  <span class="font-bold text-indigo-700 text-xs"
-                    >Kamar Baru</span
-                  >
+                <div class="mb-3 flex items-center justify-between">
+                  <span class="text-sm font-bold text-primary-700">Kamar Baru</span>
                   <button
                     type="button"
                     onclick={() => {
@@ -657,19 +689,19 @@
                     }}
                     class="text-slate-400 hover:text-red-500"
                   >
-                    <X class="w-3.5 h-3.5" />
+                    <X class="h-4 w-4" />
                   </button>
                 </div>
-                <div class="space-y-1.5">
+                <div class="space-y-2">
                   <input
                     type="text"
                     bind:value={newRoomNumber}
                     placeholder="No. kamar (cth: 301)"
-                    class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
                   />
                   <select
                     bind:value={newRoomGender}
-                    class="w-full px-2 py-1.5 text-xs border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-400"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
                   >
                     <option value="male">Laki-laki</option>
                     <option value="female">Perempuan</option>
@@ -679,11 +711,11 @@
                     type="button"
                     onclick={addRoom}
                     disabled={isAddingRoom || !newRoomNumber.trim()}
-                    class="w-full px-2 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                    class="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
                   >
                     {#if isAddingRoom}<Loader2
-                        class="w-3 h-3 animate-spin"
-                      />{:else}<Plus class="w-3 h-3" />{/if}
+                        class="h-4 w-4 animate-spin"
+                      />{:else}<Plus class="h-4 w-4" />{/if}
                     Buat Kamar
                   </button>
                 </div>
@@ -694,48 +726,38 @@
                 onclick={() => {
                   showAddRoom = true;
                 }}
-                class="rounded-lg border-2 border-dashed border-slate-300 p-2.5 text-xs flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50/30 transition-colors min-h-[80px] cursor-pointer"
+                class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 text-slate-400 transition-colors hover:border-primary-400 hover:bg-primary-50/30 hover:text-primary-600"
               >
-                <Plus class="w-5 h-5" />
-                <span class="font-medium">Tambah Kamar</span>
+                <Plus class="h-6 w-6" />
+                <span class="text-sm font-semibold">Tambah Kamar</span>
               </button>
             {/if}
           </div>
         {:else}
-          <div class="text-center py-8 text-slate-400 text-sm">
-            <Hotel class="w-8 h-8 mx-auto mb-2" />
-            <p>Belum ada kamar</p>
-            <p class="text-xs mt-1">Klik "Auto-Generate" atau tambah manual</p>
+          <div class="py-12 text-center text-sm text-slate-400">
+            <Hotel class="mx-auto mb-3 h-10 w-10" />
+            <p class="font-medium text-slate-500">Belum ada kamar</p>
+            <p class="mt-1 text-xs">Klik "Auto-Generate" atau tambah manual</p>
             <button
               type="button"
               onclick={() => {
                 showAddRoom = true;
               }}
-              class="mt-3 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed border-indigo-300 text-indigo-500 text-xs font-medium rounded-lg hover:bg-indigo-50 transition-colors"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-primary-300 px-4 py-2 text-sm font-semibold text-primary-600 transition-colors hover:bg-primary-50"
             >
-              <Plus class="w-3.5 h-3.5" />
+              <Plus class="h-4 w-4" />
               Tambah Kamar Manual
             </button>
           </div>
         {/if}
-
-        <!-- Unassigned Notice -->
-        {#if unassignedCount > 0}
-          <div
-            class="mx-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2 text-xs"
-          >
-            <Users class="w-4 h-4 text-amber-500" />
-            <span class="text-amber-700">
-              <strong>{unassignedCount}</strong> jamaah belum ditempatkan
-            </span>
-          </div>
-        {/if}
-      {:else}
-        <div class="text-center py-8 text-slate-400 text-sm">
-          Tidak ada data
-        </div>
-      {/if}
-    </div>
+      </div>
+    {:else}
+      <div
+        class="rounded-2xl border border-slate-200/70 bg-white py-12 text-center text-sm text-slate-400 shadow-sm"
+      >
+        Tidak ada data
+      </div>
+    {/if}
   </div>
 {/if}
 

@@ -7,7 +7,13 @@
     CheckCircle,
     ExternalLink,
     ScanLine,
+    Sparkles,
+    ShieldCheck,
+    FileCheck,
+    AlertCircle,
+    Lock,
   } from "lucide-svelte";
+  import PageHeader from "../components/PageHeader.svelte";
   import TableResult from "../components/TableResult.svelte";
   import FileUpload from "../components/FileUpload.svelte";
   import SubscriptionBanner from "../components/SubscriptionBanner.svelte";
@@ -321,38 +327,61 @@
 </script>
 
 <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
-  <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h1 class="font-serif text-xl font-bold text-slate-900">AI Scanner</h1>
-      <p class="text-sm text-slate-500">
-        Upload KTP, KK, paspor, dan visa untuk diekstrak menjadi data jamaah.
-      </p>
-    </div>
-    {#if localSubscription?.plan === "pro"}
-      <div class="inline-flex w-fit items-center gap-2 rounded-full border border-primary-100 bg-white px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm">
-        <Crown class="h-4 w-4 text-amber-500" />
-        Pro Active
-      </div>
-    {/if}
-  </header>
+  <PageHeader
+    kicker="Fitur Unggulan"
+    title="AI Scanner"
+    subtitle="Upload KTP, KK, paspor, dan visa untuk diekstrak menjadi data jamaah."
+  >
+    {#snippet actions()}
+      {#if localSubscription?.plan === "pro"}
+        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-[#C99A2E]/30 bg-[#F7EFD6] px-4 py-2 text-sm font-semibold text-[#8a6a1d] shadow-sm">
+          <Crown class="h-4 w-4 text-[#C99A2E]" />
+          Pro Active
+        </div>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
+  <!-- AI flow / info panel -->
   <div class="mb-6 grid gap-4 lg:grid-cols-3">
-    <div class="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm lg:col-span-2">
+    <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm lg:col-span-2">
       <div class="flex items-start gap-4">
-        <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+        <div class="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-800 text-white">
           <ScanLine class="h-6 w-6" />
+          <div class="scan-beam pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-[#C99A2E] shadow-[0_0_10px_2px_#C99A2E]"></div>
         </div>
         <div>
-          <h2 class="text-sm font-bold text-slate-900">Alur Scan Dokumen</h2>
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-bold text-[#10211c]">Alur Scan Dokumen</h2>
+            <span class="inline-flex items-center gap-1 rounded-full bg-[#F7EFD6] px-2 py-0.5 text-[11px] font-bold text-[#8a6a1d]">
+              <Sparkles class="h-3 w-3 text-[#C99A2E]" /> AI OCR
+            </span>
+          </div>
           <p class="mt-1 text-sm leading-relaxed text-slate-500">
             Pilih grup, upload dokumen, review hasil AI, lalu simpan ke grup atau export Excel.
           </p>
+          <div class="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500">
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1">
+              <FileCheck class="h-3.5 w-3.5 text-primary-600" /> Upload
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1">
+              <Sparkles class="h-3.5 w-3.5 text-primary-600" /> Ekstrak AI
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1">
+              <ShieldCheck class="h-3.5 w-3.5 text-primary-600" /> Review &amp; Simpan
+            </span>
+          </div>
         </div>
       </div>
     </div>
-    <div class="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-      <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Mode AI</p>
-      <p class="mt-2 text-sm font-semibold text-slate-900">{cacheModeLabels[processingCacheMode]}</p>
+    <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
+      <div class="flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F7EFD6] text-[#C99A2E]">
+          <Sparkles class="h-4 w-4" />
+        </div>
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Mode AI</p>
+      </div>
+      <p class="mt-2 text-sm font-semibold text-[#10211c]">{cacheModeLabels[processingCacheMode]}</p>
       <p class="mt-1 text-xs text-slate-500">{canUseBypassCacheMode ? "Bypass tersedia untuk Pro." : "Default aman untuk pemrosesan rutin."}</p>
     </div>
   </div>
@@ -402,10 +431,12 @@
   {#if isBlocked}
     <div class="py-8 text-center">
       <div
-        class="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm sm:p-12"
+        class="rounded-2xl border border-slate-200/70 bg-white p-8 shadow-sm sm:p-12"
       >
-        <div class="text-5xl sm:text-6xl mb-4">🔒</div>
-        <h2 class="text-lg sm:text-xl font-bold text-slate-800 mb-2">
+        <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#F7EFD6] text-[#C99A2E]">
+          <Lock class="h-8 w-8" />
+        </div>
+        <h2 class="text-lg sm:text-xl font-bold text-[#10211c] mb-2">
           Akses Terbatas
         </h2>
         <p class="text-slate-500 mb-6 text-sm sm:text-base">
@@ -414,16 +445,16 @@
         </p>
         <button
           onclick={() => (showUpgradeModal = true)}
-          class="mx-auto flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-6 py-3 font-semibold text-white shadow-lg shadow-primary-500/20 transition-all hover:-translate-y-0.5"
+          class="mx-auto flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
         >
-          <Crown class="h-5 w-5" />
+          <Crown class="h-5 w-5 text-[#F7EFD6]" />
           Upgrade ke Pro - Rp299.000/bulan
         </button>
       </div>
     </div>
   {:else}
     <!-- Group Selector -->
-    <div class="mb-6 rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+    <div class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
       <GroupSelector
         bind:selectedGroup
         onGroupSelect={(g) => (selectedGroup = g)}
@@ -437,17 +468,18 @@
     {#if groupSaveSuccess}
       <div class="mb-5">
         <div
-          class="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
+          class="flex items-center gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-4"
         >
-          <CheckCircle class="h-5 w-5 text-emerald-500 flex-shrink-0" />
-          <span class="text-sm text-emerald-700">{groupSaveSuccess}</span>
+          <CheckCircle class="h-5 w-5 text-primary-600 flex-shrink-0" />
+          <span class="text-sm text-primary-700">{groupSaveSuccess}</span>
         </div>
       </div>
     {/if}
 
     <div class="mb-6">
-      <details class="rounded-3xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
-        <summary class="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+      <details class="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 shadow-sm">
+        <summary class="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer select-none">
+          <Sparkles class="h-4 w-4 text-primary-600" />
           Advanced OCR Settings
         </summary>
         <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -455,7 +487,7 @@
           <select
             id="cache-mode"
             bind:value={processingCacheMode}
-            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white"
+            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100"
           >
             <option value="default">default</option>
             <option value="refresh">refresh</option>
@@ -483,7 +515,7 @@
         class="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 p-4"
       >
         <div class="flex items-center gap-2">
-          <span class="text-red-500 text-lg">!</span>
+          <AlertCircle class="h-5 w-5 flex-shrink-0 text-red-500" />
           <span class="text-sm text-red-700">
             <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(
               ", ",
@@ -541,8 +573,8 @@
     >
       <div class="flex justify-between items-center mb-4">
         <div class="flex items-center gap-2">
-          <Crown class="h-5 w-5 text-emerald-500" />
-          <h3 class="font-bold text-lg text-slate-800">Upgrade ke Pro</h3>
+          <Crown class="h-5 w-5 text-[#C99A2E]" />
+          <h3 class="font-bold text-lg text-[#10211c]">Upgrade ke Pro</h3>
         </div>
         <button
           onclick={closeUpgradeModal}
@@ -556,11 +588,11 @@
       {#if paymentStatus === "paid"}
         <div class="text-center py-6">
           <div
-            class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4"
+            class="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4"
           >
-            <CheckCircle class="h-8 w-8 text-emerald-500" />
+            <CheckCircle class="h-8 w-8 text-primary-600" />
           </div>
-          <h4 class="text-lg font-bold text-slate-800 mb-1">
+          <h4 class="text-lg font-bold text-[#10211c] mb-1">
             Pembayaran Berhasil!
           </h4>
           <p class="text-sm text-slate-500">
@@ -568,7 +600,7 @@
           </p>
           <button
             onclick={closeUpgradeModal}
-            class="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 rounded-xl transition-all"
+            class="mt-4 w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-xl transition-all"
           >
             Mulai Menggunakan Pro
           </button>
@@ -594,31 +626,31 @@
           >
             Tahunan
             <span
-              class="absolute -top-2 -right-1 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold"
+              class="absolute -top-2 -right-1 text-[10px] bg-[#C99A2E] text-white px-1.5 py-0.5 rounded-full font-bold"
               >HEMAT</span
             >
           </button>
         </div>
 
         <div
-          class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4"
+          class="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-4"
         >
           {#if selectedPlan === "annual"}
-            <p class="text-2xl font-bold text-emerald-700">
-               Rp 2.990.000<span class="text-sm font-normal text-emerald-500">
+            <p class="text-2xl font-bold text-primary-800">
+               Rp 2.990.000<span class="text-sm font-normal text-primary-600">
                  / tahun</span
               >
             </p>
-            <p class="text-sm text-emerald-600 mt-1">
+            <p class="text-sm text-primary-700 mt-1">
               Hemat ~Rp 598.000 — setara ~Rp 249.000/bulan
             </p>
           {:else}
-            <p class="text-2xl font-bold text-emerald-700">
-               Rp 299.000<span class="text-sm font-normal text-emerald-500">
+            <p class="text-2xl font-bold text-primary-800">
+               Rp 299.000<span class="text-sm font-normal text-primary-600">
                  / bulan</span
               >
             </p>
-            <p class="text-sm text-emerald-600 mt-1">
+            <p class="text-sm text-primary-700 mt-1">
               Unlimited scan dokumen, prioritas support
             </p>
           {/if}
@@ -626,19 +658,19 @@
 
         <div class="space-y-2 mb-5">
           <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Unlimited
+            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Unlimited
             scan dokumen
           </div>
           <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Unlimited
+            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Unlimited
             grup jamaah
           </div>
           <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Export
+            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Export
             Excel
           </div>
           <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-emerald-500 flex-shrink-0" /> Prioritas
+            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Prioritas
             support
           </div>
         </div>
@@ -682,7 +714,7 @@
           <button
             onclick={startPayment}
             disabled={paymentLoading}
-            class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+            class="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
           >
             {#if paymentLoading}
               <Loader2 class="h-5 w-5 animate-spin" /> Memproses...
@@ -699,3 +731,19 @@
     </div>
   </div>
 {/if}
+
+<style>
+  /* Animated scan-line beam on the AI scanner icon tile */
+  .scan-beam {
+    animation: scan-sweep 1.8s ease-in-out infinite;
+  }
+  @keyframes scan-sweep {
+    0% { top: 0; opacity: 0; }
+    15% { opacity: 1; }
+    85% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scan-beam { animation: none; opacity: 0; }
+  }
+</style>
