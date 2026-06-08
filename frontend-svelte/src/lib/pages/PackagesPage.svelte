@@ -9,6 +9,7 @@
     ExternalLink,
     Globe,
     Hotel,
+    Layers,
     Link2,
     Loader2,
     Lock,
@@ -21,6 +22,9 @@
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import IDRInput from '../components/IDRInput.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import { ApiService } from '../services/api';
   import { showToast } from '../services/toast.svelte.js';
 
@@ -82,6 +86,15 @@
       ? packages
       : packages.filter((pkg) => pkg.status === filterStatus)
   );
+
+  // Summary tiles (Suluk design). All values derived from the loaded packages.
+  let summaryStats = $derived({
+    totalPackages: packages.length,
+    openPackages: packages.filter((pkg) => pkg.status === 'open').length,
+    publishedPackages: packages.filter((pkg) => pkg.is_published).length,
+    totalSeats: packages.reduce((sum, pkg) => sum + (pkg.total_seats || 0), 0),
+    reservedSeats: packages.reduce((sum, pkg) => sum + (pkg.reserved_seats || 0), 0),
+  });
 
   onMount(loadPackages);
 
@@ -448,26 +461,37 @@
   }
 </script>
 
-<div class="flex h-screen flex-col">
-  <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
-    <div class="flex items-center justify-between gap-4">
-      <div>
-        <h1 class="font-serif text-xl font-bold text-slate-800">Paket & Harga</h1>
-        <p class="mt-0.5 text-sm text-slate-500">{packages.length} paket tersedia</p>
-      </div>
-      {#if canEditPackages}
-        <button
-          type="button"
-          onclick={openCreateForm}
-          class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700 hover:shadow-md"
-        >
-          <Plus class="h-4 w-4" />
-          Buat Paket
-        </button>
-      {/if}
+<div class="flex h-screen flex-col bg-slate-50">
+  <div class="flex-1 overflow-y-auto px-6 py-6">
+    <PageHeader
+      kicker="Penjualan"
+      title="Paket & Harga"
+      subtitle="Kelola paket umroh & haji, harga, kuota, dan publikasi ke halaman publik."
+    >
+      {#snippet actions()}
+        {#if canEditPackages}
+          <button
+            type="button"
+            onclick={openCreateForm}
+            class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700 hover:shadow-md"
+          >
+            <Plus class="h-4 w-4" />
+            Buat Paket
+          </button>
+        {/if}
+      {/snippet}
+    </PageHeader>
+
+    <!-- Summary cards (Suluk design) -->
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard icon={Layers} label="Total Paket" value={`${summaryStats.totalPackages}`} accent="#1B7F5A" sub="paket tersedia" />
+      <StatCard icon={Globe} label="Dipublikasikan" value={`${summaryStats.publishedPackages}`} accent="#2563a8" sub="tampil ke publik" />
+      <StatCard icon={Package} label="Paket Open" value={`${summaryStats.openPackages}`} accent="#C99A2E" sub="menerima pendaftaran" />
+      <StatCard icon={Users} label="Kuota Terisi" value={`${summaryStats.reservedSeats}/${summaryStats.totalSeats}`} accent="#c0392b" sub="kursi terbooking" />
     </div>
 
-    <div class="mt-4 flex gap-1 overflow-x-auto pb-0.5">
+    <!-- Filter tabs -->
+    <div class="mt-5 flex gap-1 overflow-x-auto pb-0.5">
       {#each STATUS_TABS as tab}
         <button
           type="button"
@@ -481,93 +505,98 @@
         </button>
       {/each}
     </div>
-  </div>
 
-  <div class="flex-1 overflow-y-auto bg-slate-50 p-6">
-    {#if isLoading}
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {#each [1, 2, 3] as item}
-          <div class="h-52 animate-pulse rounded-2xl bg-white" aria-hidden="true">{item}</div>
-        {/each}
-      </div>
-    {:else if filtered.length === 0}
-      <div class="flex flex-col items-center justify-center py-24 text-slate-400">
-        <Package class="mb-3 h-12 w-12 opacity-30" />
-        <p class="font-medium">Belum ada paket</p>
-        <p class="mt-1 text-sm">
-          {#if canEditPackages}
-            Buat paket pertama untuk mulai membagikan penawaran ke jamaah.
-          {:else}
-            Belum ada paket yang bisa ditampilkan.
-          {/if}
-        </p>
-      </div>
-    {:else}
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {#each filtered as pkg}
-          <button
-            type="button"
-            onclick={() => openDetail(pkg)}
-            class="group relative rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200/60 transition-all hover:shadow-md hover:ring-primary-200"
-          >
-            <div class="mb-3 flex items-center justify-between">
-              <StatusBadge status={pkg.status} size="xs" />
-              <span class="flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                {#if pkg.is_published}
-                  <Globe class="h-3 w-3" /> Publik
-                {:else}
-                  <Lock class="h-3 w-3" /> Internal
-                {/if}
-              </span>
-            </div>
-
-            <h3 class="mb-1 text-[15px] font-bold leading-snug text-slate-800 group-hover:text-primary-700">
-              {pkg.name}
-            </h3>
-            <p class="text-[12px] font-medium text-slate-400">{typeLabel(pkg.package_type)}</p>
-
-            <div class="mt-3 space-y-1.5 text-[12px] text-slate-500">
-              <div class="flex items-center gap-1.5">
-                <CalendarDays class="h-3.5 w-3.5 flex-shrink-0" />
-                {formatDate(pkg.departure_date)} - {formatDate(pkg.return_date)}
+    <!-- Package grid -->
+    <div class="mt-5">
+      {#if isLoading}
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {#each [1, 2, 3] as item}
+            <div class="h-64 animate-pulse rounded-2xl bg-white" aria-hidden="true">{item}</div>
+          {/each}
+        </div>
+      {:else if filtered.length === 0}
+        <EmptyState
+          icon={Package}
+          title="Belum ada paket"
+          text={canEditPackages
+            ? 'Buat paket pertama untuk mulai membagikan penawaran ke jamaah.'
+            : 'Belum ada paket yang bisa ditampilkan.'}
+        />
+      {:else}
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {#each filtered as pkg}
+            <button
+              type="button"
+              onclick={() => openDetail(pkg)}
+              class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <!-- Gradient banner -->
+              <div class="relative flex min-h-[104px] flex-col justify-end bg-gradient-to-br from-primary-600 to-primary-700 p-4">
+                <div class="absolute right-3.5 top-3.5">
+                  <StatusBadge status={pkg.status} size="xs" />
+                </div>
+                <div class="absolute left-4 top-3.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.05em] text-white/90">
+                  {#if pkg.is_published}
+                    <Globe class="h-3.5 w-3.5" /> Publik
+                  {:else}
+                    <Lock class="h-3.5 w-3.5" /> Internal
+                  {/if}
+                </div>
+                <h3 class="font-serif text-[19px] font-bold leading-tight text-white drop-shadow-sm">
+                  {pkg.name}
+                </h3>
+                <p class="mt-0.5 text-[12px] font-medium text-white/85">{typeLabel(pkg.package_type)}</p>
               </div>
-              <div class="flex items-center gap-1.5">
-                <Plane class="h-3.5 w-3.5 flex-shrink-0" />
-                {pkg.airline || '-'} {#if pkg.flight_number_go}&middot; {pkg.flight_number_go}{/if}
-              </div>
-              <div class="flex items-center gap-1.5">
-                <Hotel class="h-3.5 w-3.5 flex-shrink-0" />
-                {pkg.hotel_makkah_name || '-'}
-              </div>
-            </div>
 
-            <div class="mt-4">
-              <div class="mb-1 flex items-center justify-between text-[11px]">
-                <span class="text-slate-400">Kuota terisi</span>
-                <span class="font-semibold text-slate-600">{pkg.reserved_seats}/{pkg.total_seats}</span>
-              </div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  class="h-full rounded-full {pkg.reserved_seats >= pkg.total_seats ? 'bg-red-400' : 'bg-emerald-400'}"
-                  style="width: {pkg.total_seats > 0 ? Math.min(100, Math.round((pkg.reserved_seats / pkg.total_seats) * 100)) : 0}%"
-                ></div>
-              </div>
-            </div>
+              <!-- Body -->
+              <div class="flex flex-1 flex-col gap-3.5 p-5">
+                <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-slate-500">
+                  <span class="flex items-center gap-1.5">
+                    <CalendarDays class="h-3.5 w-3.5 flex-shrink-0" />
+                    {formatDate(pkg.departure_date)} - {formatDate(pkg.return_date)}
+                  </span>
+                  <span class="flex items-center gap-1.5">
+                    <Plane class="h-3.5 w-3.5 flex-shrink-0" />
+                    {pkg.airline || '-'} {#if pkg.flight_number_go}&middot; {pkg.flight_number_go}{/if}
+                  </span>
+                  <span class="flex items-center gap-1.5">
+                    <Hotel class="h-3.5 w-3.5 flex-shrink-0" />
+                    {pkg.hotel_makkah_name || '-'}
+                  </span>
+                </div>
 
-            <div class="mt-4 border-t border-slate-100 pt-3">
-              <p class="text-[11px] text-slate-400">Mulai dari</p>
-              {#if getLowestPrice(pkg)}
-                <p class="text-sm font-bold text-primary-700">{formatIDR(getLowestPrice(pkg))}</p>
-              {:else}
-                <p class="text-sm font-semibold text-slate-400">Harga belum diatur</p>
-              {/if}
-            </div>
+                <div>
+                  <div class="mb-1 flex items-center justify-between text-[11.5px]">
+                    <span class="font-semibold text-slate-500">Kuota terisi</span>
+                    <span class="font-bold tabular text-[#10211c]" style="font-variant-numeric:tabular-nums">{pkg.reserved_seats}/{pkg.total_seats}</span>
+                  </div>
+                  <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      class="h-full rounded-full {pkg.reserved_seats >= pkg.total_seats ? 'bg-red-400' : 'bg-primary-600'}"
+                      style="width: {pkg.total_seats > 0 ? Math.min(100, Math.round((pkg.reserved_seats / pkg.total_seats) * 100)) : 0}%"
+                    ></div>
+                  </div>
+                </div>
 
-            <ChevronRight class="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300 group-hover:text-primary-400" />
-          </button>
-        {/each}
-      </div>
-    {/if}
+                <div class="mt-auto flex items-end justify-between border-t border-slate-100 pt-3.5">
+                  <div>
+                    <p class="text-[11.5px] font-semibold text-slate-400">Mulai dari</p>
+                    {#if getLowestPrice(pkg)}
+                      <p class="text-[19px] font-extrabold tabular text-[#10211c]" style="font-variant-numeric:tabular-nums">{formatIDR(getLowestPrice(pkg))}</p>
+                    {:else}
+                      <p class="text-sm font-semibold text-slate-400">Harga belum diatur</p>
+                    {/if}
+                  </div>
+                  <span class="flex items-center gap-1 text-[12.5px] font-bold text-primary-600">
+                    Detail <ChevronRight class="h-4 w-4" />
+                  </span>
+                </div>
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
   </div>
 </div>
 

@@ -1,8 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { Users, DollarSign, CheckCheck, Plus, Pencil, Search } from 'lucide-svelte';
+  import { Users, DollarSign, CheckCheck, Plus, Pencil, Search, UserCheck, TrendingUp, Wallet } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
+  import Avatar from '../components/Avatar.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService } from '../services/api.js';
 
@@ -29,6 +32,14 @@
   let agentCommissions = $state([]);
 
   function formatIDR(n) { return n ? `Rp ${Number(n).toLocaleString('id-ID')}` : 'Rp 0'; }
+
+  // Summary stats (Suluk design) derived from existing data.
+  let summaryStats = $derived({
+    agentCount: agents.length,
+    totalJamaah: agents.reduce((s, a) => s + (a.total_jamaah || 0), 0),
+    totalOmzet: agents.reduce((s, a) => s + (a.total_commissions || 0), 0),
+    outstanding: agents.reduce((s, a) => s + (a.total_outstanding || 0), 0),
+  });
 
   async function loadData() {
     loading = true;
@@ -79,13 +90,27 @@
 </script>
 
 <div class="flex flex-col gap-6 p-4 lg:p-8">
-  <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div><h1 class="font-serif text-xl font-bold text-slate-900">Komisi Agen</h1><p class="text-sm text-slate-500">Kelola jaringan agen dan komisi referral.</p></div>
-  </header>
+  <PageHeader kicker="Komisi Agen" title="Komisi Agen" subtitle="Kelola jaringan agen dan komisi referral.">
+    {#snippet actions()}
+      {#if tab === 'agents'}
+        <button type="button" onclick={openNewAgent} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"><Plus class="h-4 w-4" /> Agen</button>
+      {:else}
+        <button type="button" onclick={openNewCommission} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"><Plus class="h-4 w-4" /> Komisi</button>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   {#if loading}
     <div class="flex items-center justify-center py-16"><div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div></div>
   {:else}
+    <!-- Summary cards (Suluk design) -->
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard icon={UserCheck} label="Agen Aktif" value={`${summaryStats.agentCount}`} accent="#1B7F5A" />
+      <StatCard icon={Users} label="Jamaah dari Agen" value={`${summaryStats.totalJamaah}`} accent="#2563a8" />
+      <StatCard icon={TrendingUp} label="Total Omzet Agen" value={formatIDR(summaryStats.totalOmzet)} accent="#C99A2E" />
+      <StatCard icon={Wallet} label="Komisi Terutang" value={formatIDR(summaryStats.outstanding)} accent="#c0392b" />
+    </div>
+
     <!-- Tabs -->
     <div class="flex items-center justify-between">
       <div class="flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
@@ -94,58 +119,100 @@
       </div>
       {#if tab === 'agents'}
         <div class="flex items-center gap-2">
-          <div class="relative"><Search class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input type="text" bind:value={searchQuery} oninput={loadData} placeholder="Cari..." class="rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-primary-400 w-40" /></div>
-          <button type="button" onclick={openNewAgent} class="flex items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"><Plus class="h-3.5 w-3.5" /> Agen</button>
+          <div class="relative"><Search class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input type="text" bind:value={searchQuery} oninput={loadData} placeholder="Cari..." class="w-40 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100" /></div>
         </div>
       {:else}
         <div class="flex items-center gap-2">
-          <select bind:value={statusFilter} onchange={loadData} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium outline-none">
+          <select bind:value={statusFilter} onchange={loadData} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium outline-none focus:border-primary-400">
             <option value="all">Semua</option><option value="pending">Pending</option><option value="paid">Dibayar</option>
           </select>
-          <button type="button" onclick={openNewCommission} class="flex items-center gap-2 rounded-xl bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700"><Plus class="h-3.5 w-3.5" /> Komisi</button>
         </div>
       {/if}
     </div>
 
     <!-- Agents Tab -->
     {#if tab === 'agents'}
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {#each agents as a}
-          <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between mb-3">
-              <div>
-                <h3 class="font-semibold text-slate-800">{a.name}</h3>
-                <p class="text-xs text-slate-500">{a.phone || '-'}</p>
-              </div>
-              <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-700">{a.commission_rate}%</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
-              <div><span class="text-slate-400">Total Komisi</span><p class="font-bold text-slate-800">{formatIDR(a.total_commissions)}</p></div>
-              <div><span class="text-slate-400">Dibayar</span><p class="font-bold text-emerald-600">{formatIDR(a.total_paid)}</p></div>
-              <div><span class="text-slate-400">Outstanding</span><p class="font-bold text-amber-600">{formatIDR(a.total_outstanding)}</p></div>
-              <div><span class="text-slate-400">Jamaah</span><p class="font-bold text-slate-800">{a.total_jamaah}</p></div>
-            </div>
-            <div class="flex gap-2">
-              <button type="button" onclick={() => editAgent(a)} class="flex-1 rounded-lg border border-slate-200 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Pencil class="h-3 w-3 inline mr-1" />Edit</button>
-              <button type="button" onclick={() => viewAgentCommissions(a)} class="flex-1 rounded-lg bg-primary-50 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100">Komisi</button>
-            </div>
-          </div>
-        {/each}
+      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+        {#if agents.length === 0}
+          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Users class="mb-2 h-10 w-10" /><p class="text-sm">Belum ada agen</p></div>
+        {:else}
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left">
+                <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Agen / Mitra</th>
+                <th class="px-4 py-3 text-center text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Komisi</th>
+                <th class="hidden px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 md:table-cell">Total Komisi</th>
+                <th class="hidden px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 lg:table-cell">Dibayar</th>
+                <th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</th>
+                <th class="px-4 py-3 text-center text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jamaah</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each agents as a}
+                <tr class="border-b border-slate-100 transition-colors last:border-0 hover:bg-primary-50/30">
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center gap-3">
+                      <Avatar name={a.name} size={40} />
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-bold text-[#10211c]">{a.name}</p>
+                        <p class="truncate text-xs text-slate-400">{a.phone || '-'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3.5 text-center">
+                    <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-700">{a.commission_rate}%</span>
+                  </td>
+                  <td class="hidden px-4 py-3.5 text-right font-bold text-slate-800 md:table-cell" style="font-variant-numeric:tabular-nums">{formatIDR(a.total_commissions)}</td>
+                  <td class="hidden px-4 py-3.5 text-right font-bold text-emerald-600 lg:table-cell" style="font-variant-numeric:tabular-nums">{formatIDR(a.total_paid)}</td>
+                  <td class="px-4 py-3.5 text-right font-bold text-amber-600" style="font-variant-numeric:tabular-nums">{formatIDR(a.total_outstanding)}</td>
+                  <td class="px-4 py-3.5 text-center font-bold text-slate-800" style="font-variant-numeric:tabular-nums">{a.total_jamaah}</td>
+                  <td class="px-4 py-3.5 text-right">
+                    <div class="flex justify-end gap-2">
+                      <button type="button" onclick={() => editAgent(a)} class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Pencil class="h-3 w-3" />Edit</button>
+                      <button type="button" onclick={() => viewAgentCommissions(a)} class="rounded-lg bg-primary-50 px-2.5 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100">Komisi</button>
+                    </div>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
       </div>
-      {#if agents.length === 0}<div class="flex flex-col items-center justify-center py-16 text-slate-400"><Users class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada agen</p></div>{/if}
     {/if}
 
     <!-- Commissions Tab -->
     {#if tab === 'commissions'}
-      <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
         {#if commissions.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><DollarSign class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada komisi</p></div>
+          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><DollarSign class="mb-2 h-10 w-10" /><p class="text-sm">Belum ada komisi</p></div>
         {:else}
           <table class="w-full text-sm">
-            <thead class="border-b border-slate-100 bg-slate-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Agen</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Jamaah</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Paket</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Jumlah</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Status</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500"></th></tr></thead>
-            <tbody class="divide-y divide-slate-50">
+            <thead>
+              <tr class="text-left">
+                <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Agen</th>
+                <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jamaah</th>
+                <th class="hidden px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 md:table-cell">Paket</th>
+                <th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jumlah</th>
+                <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
               {#each commissions as c}
-                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">{c.agent_name}</td><td class="px-4 py-3 text-slate-600">{c.jamaah_name || '-'}</td><td class="px-4 py-3 text-xs text-slate-500">{c.package_name || '-'}</td><td class="px-4 py-3 text-right font-bold text-slate-700">{formatIDR(c.commission_amount)}</td><td class="px-4 py-3"><StatusBadge status={c.status} size="xs" /></td><td class="px-4 py-3 text-right">{#if c.status === 'pending'}<button type="button" onclick={() => payCommission(c.id)} class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"><CheckCheck class="h-3 w-3 inline mr-1" />Bayar</button>{/if}</td></tr>
+                <tr class="border-b border-slate-100 transition-colors last:border-0 hover:bg-primary-50/30">
+                  <td class="px-5 py-3.5">
+                    <div class="flex items-center gap-3">
+                      <Avatar name={c.agent_name} size={36} />
+                      <span class="text-sm font-bold text-[#10211c]">{c.agent_name}</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3.5 text-slate-600">{c.jamaah_name || '-'}</td>
+                  <td class="hidden px-4 py-3.5 text-xs text-slate-500 md:table-cell">{c.package_name || '-'}</td>
+                  <td class="px-4 py-3.5 text-right font-bold text-slate-800" style="font-variant-numeric:tabular-nums">{formatIDR(c.commission_amount)}</td>
+                  <td class="px-4 py-3.5"><StatusBadge status={c.status} size="xs" /></td>
+                  <td class="px-4 py-3.5 text-right">{#if c.status === 'pending'}<button type="button" onclick={() => payCommission(c.id)} class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"><CheckCheck class="h-3 w-3" />Bayar</button>{/if}</td>
+                </tr>
               {/each}
             </tbody>
           </table>

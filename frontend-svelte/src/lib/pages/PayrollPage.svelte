@@ -1,11 +1,14 @@
 <script>
   import { onMount } from 'svelte';
   import {
-    Users, Receipt, Wallet, CheckCheck, Plus,
-    Pencil, FileText,
+    Users, Receipt, Wallet, Plus,
+    Pencil, FileText, Banknote, Clock,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
+  import Avatar from '../components/Avatar.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService, authHeaders } from '../services/api.js';
 
@@ -132,22 +135,17 @@
 </script>
 
 <div class="flex flex-col gap-6 p-4 lg:p-8">
-  <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h1 class="font-serif text-xl font-bold text-slate-900">Penggajian</h1>
-      <p class="text-sm text-slate-500">Kelola karyawan, gaji, dan kasbon.</p>
-    </div>
-  </header>
+  <PageHeader kicker="Penggajian" title="Penggajian" subtitle="Kelola karyawan, gaji, dan kasbon." />
 
   {#if loading}
     <div class="flex items-center justify-center py-16"><div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div></div>
   {:else}
     <!-- Summary -->
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-slate-800">{summary.active_employees}/{summary.total_employees}</p><p class="text-xs text-slate-500">Karyawan Aktif</p></div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-blue-600">{formatIDR(summary.monthly_payroll)}</p><p class="text-xs text-slate-500">Gaji Bulan Ini</p></div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-amber-600">{formatIDR(summary.outstanding_advances)}</p><p class="text-xs text-slate-500">Kasbon Outstanding</p></div>
-      <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-slate-800">{formatIDR(summary.total_advances)}</p><p class="text-xs text-slate-500">Total Kasbon</p></div>
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard icon={Users} label="Karyawan Aktif" value={`${summary.active_employees}/${summary.total_employees}`} accent="#1B7F5A" />
+      <StatCard icon={Banknote} label="Gaji Bulan Ini" value={formatIDR(summary.monthly_payroll)} accent="#2563a8" />
+      <StatCard icon={Clock} label="Kasbon Outstanding" value={formatIDR(summary.outstanding_advances)} accent="#C99A2E" />
+      <StatCard icon={Wallet} label="Total Kasbon" value={formatIDR(summary.total_advances)} accent="#1B7F5A" />
     </div>
 
     <!-- Tabs -->
@@ -160,15 +158,22 @@
     <!-- Employees Tab -->
     {#if tab === 'employees'}
       <div class="flex justify-end"><button type="button" onclick={openNewEmployee} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"><Plus class="h-4 w-4" /> Tambah Karyawan</button></div>
-      <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
         {#if employees.length === 0}
           <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Users class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada karyawan</p></div>
         {:else}
           <table class="w-full text-sm">
-            <thead class="border-b border-slate-100 bg-slate-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Nama</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Jabatan</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Tipe</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Gaji Pokok</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Tunjangan</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500"></th></tr></thead>
-            <tbody class="divide-y divide-slate-50">
+            <thead><tr class="border-b border-slate-100"><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Nama</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jabatan</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Tipe</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Gaji Pokok</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Tunjangan</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"></th></tr></thead>
+            <tbody>
               {#each employees as e}
-                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">{e.name}</td><td class="px-4 py-3 text-slate-600">{e.position}</td><td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {e.type === 'tetap' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}">{e.type === 'tetap' ? 'Tetap' : 'Freelance'}</span></td><td class="px-4 py-3 text-right font-semibold text-slate-700">{formatIDR(e.base_salary)}</td><td class="px-4 py-3 text-right text-slate-600">{formatIDR(e.allowance)}</td><td class="px-4 py-3 text-right"><button type="button" onclick={() => editEmployee(e)} class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><Pencil class="h-4 w-4" /></button></td></tr>
+                <tr class="transition-colors hover:bg-primary-50/30">
+                  <td class="border-b border-slate-100 px-4 py-3.5"><div class="flex items-center gap-3"><Avatar name={e.name} size={38} /><span class="font-bold text-[#10211c]">{e.name}</span></div></td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-slate-600">{e.position}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5"><span class="rounded-full px-2 py-0.5 text-xs font-medium {e.type === 'tetap' ? 'bg-primary-50 text-primary-700' : 'bg-purple-50 text-purple-700'}">{e.type === 'tetap' ? 'Tetap' : 'Freelance'}</span></td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right font-semibold text-slate-700" style="font-variant-numeric:tabular-nums">{formatIDR(e.base_salary)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-slate-600" style="font-variant-numeric:tabular-nums">{formatIDR(e.allowance)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right"><button type="button" onclick={() => editEmployee(e)} class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><Pencil class="h-4 w-4" /></button></td>
+                </tr>
               {/each}
             </tbody>
           </table>
@@ -179,23 +184,23 @@
     <!-- Slips Tab -->
     {#if tab === 'slips'}
       <div class="flex justify-end"><button type="button" onclick={() => { slipForm = { employee_id: '', period: new Date().toISOString().slice(0, 7), package_id: '', notes: '' }; showSlipDrawer = true; }} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"><FileText class="h-4 w-4" /> Buat Slip</button></div>
-      <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
         {#if slips.length === 0}
           <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Receipt class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada slip gaji</p></div>
         {:else}
           <table class="w-full text-sm">
-            <thead class="border-b border-slate-100 bg-slate-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Karyawan</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Periode</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Gaji Kotor</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">PPh21</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">BPJS</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Bersih</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Status</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500"></th></tr></thead>
-            <tbody class="divide-y divide-slate-50">
+            <thead><tr class="border-b border-slate-100"><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Karyawan</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Periode</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Gaji Kotor</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">PPh21</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">BPJS</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Bersih</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"></th></tr></thead>
+            <tbody>
               {#each slips as s}
-                <tr class="hover:bg-slate-50">
-                  <td class="px-4 py-3 font-medium text-slate-800">{s.employee_name}</td>
-                  <td class="px-4 py-3 text-slate-600">{s.period}</td>
-                  <td class="px-4 py-3 text-right text-slate-700">{formatIDR(s.base_salary + s.allowance)}</td>
-                  <td class="px-4 py-3 text-right text-red-600">{formatIDR(s.pph21_amount)}</td>
-                  <td class="px-4 py-3 text-right text-red-600">{formatIDR(s.bpjs_amount)}</td>
-                  <td class="px-4 py-3 text-right font-bold text-emerald-600">{formatIDR(s.net_salary)}</td>
-                  <td class="px-4 py-3"><StatusBadge status={s.status} size="xs" /></td>
-                  <td class="px-4 py-3 text-right">
+                <tr class="transition-colors hover:bg-primary-50/30">
+                  <td class="border-b border-slate-100 px-4 py-3.5"><div class="flex items-center gap-3"><Avatar name={s.employee_name} size={38} /><span class="font-bold text-[#10211c]">{s.employee_name}</span></div></td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-slate-600">{s.period}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-slate-700" style="font-variant-numeric:tabular-nums">{formatIDR(s.base_salary + s.allowance)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-red-600" style="font-variant-numeric:tabular-nums">{formatIDR(s.pph21_amount)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-red-600" style="font-variant-numeric:tabular-nums">{formatIDR(s.bpjs_amount)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right font-bold text-primary-600" style="font-variant-numeric:tabular-nums">{formatIDR(s.net_salary)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5"><StatusBadge status={s.status} size="xs" /></td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right">
                     {#if s.status === 'draft'}
                       <button type="button" onclick={() => finalizeSlip(s.id)} class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">Final</button>
                     {:else if s.status === 'final'}
@@ -213,15 +218,22 @@
     <!-- Advances Tab -->
     {#if tab === 'advances'}
       <div class="flex justify-end"><button type="button" onclick={() => { advanceForm = { employee_id: '', amount: 0, reason: '' }; showAdvanceDrawer = true; }} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"><Wallet class="h-4 w-4" /> Catat Kasbon</button></div>
-      <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
         {#if advances.length === 0}
           <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Wallet class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada kasbon</p></div>
         {:else}
           <table class="w-full text-sm">
-            <thead class="border-b border-slate-100 bg-slate-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Karyawan</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Jumlah</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500">Sisa</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Alasan</th><th class="px-4 py-3 text-left text-xs font-semibold text-slate-500">Status</th><th class="px-4 py-3 text-right text-xs font-semibold text-slate-500"></th></tr></thead>
-            <tbody class="divide-y divide-slate-50">
+            <thead><tr class="border-b border-slate-100"><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Karyawan</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jumlah</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Sisa</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Alasan</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"></th></tr></thead>
+            <tbody>
               {#each advances as a}
-                <tr class="hover:bg-slate-50"><td class="px-4 py-3 font-medium text-slate-800">{a.employee_name}</td><td class="px-4 py-3 text-right font-semibold text-slate-700">{formatIDR(a.amount)}</td><td class="px-4 py-3 text-right {a.remaining > 0 ? 'text-amber-600 font-semibold' : 'text-slate-400'}">{formatIDR(a.remaining)}</td><td class="px-4 py-3 max-w-[200px] truncate text-xs text-slate-500">{a.reason || '-'}</td><td class="px-4 py-3"><StatusBadge status={a.status} size="xs" /></td><td class="px-4 py-3 text-right">{#if a.remaining > 0}<button type="button" onclick={() => openRepay(a)} class="rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-200">Bayar</button>{/if}</td></tr>
+                <tr class="transition-colors hover:bg-primary-50/30">
+                  <td class="border-b border-slate-100 px-4 py-3.5"><div class="flex items-center gap-3"><Avatar name={a.employee_name} size={38} /><span class="font-bold text-[#10211c]">{a.employee_name}</span></div></td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right font-semibold text-slate-700" style="font-variant-numeric:tabular-nums">{formatIDR(a.amount)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right {a.remaining > 0 ? 'text-amber-600 font-semibold' : 'text-slate-400'}" style="font-variant-numeric:tabular-nums">{formatIDR(a.remaining)}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 max-w-[200px] truncate text-xs text-slate-500">{a.reason || '-'}</td>
+                  <td class="border-b border-slate-100 px-4 py-3.5"><StatusBadge status={a.status} size="xs" /></td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right">{#if a.remaining > 0}<button type="button" onclick={() => openRepay(a)} class="rounded-lg bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-200">Bayar</button>{/if}</td>
+                </tr>
               {/each}
             </tbody>
           </table>

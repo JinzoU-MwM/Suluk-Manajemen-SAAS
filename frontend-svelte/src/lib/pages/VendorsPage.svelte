@@ -3,10 +3,13 @@
   import {
     Building2, Plus, Search, AlertCircle, ChevronRight, X,
     Pencil, Trash2, Banknote, Calendar, Filter, CreditCard,
+    Truck, Wallet, Boxes,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import IDRInput from '../components/IDRInput.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService } from '../services/api.js';
 
@@ -318,59 +321,40 @@
     katering: 'bg-rose-50 text-rose-700',
     lainnya: 'bg-slate-100 text-slate-600',
   };
+
+  const typeIcon = {
+    maskapai: Truck, hotel: Building2, transport: Truck,
+    perlengkapan: Boxes, katering: Boxes, lainnya: Building2,
+  };
 </script>
 
 <div class="flex h-screen flex-col">
   <!-- Header -->
   <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="font-serif text-xl font-bold text-slate-800">Vendor & Biaya Ops</h1>
-        <p class="mt-0.5 text-sm text-slate-500">Kelola vendor dan catat pengeluaran operasional per trip</p>
-      </div>
-      {#if !isLoading}
-        <button
-          type="button"
-          onclick={openCreateVendor}
-          class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
-        >
-          <Plus class="h-4 w-4" /> Tambah Vendor
-        </button>
-      {/if}
-    </div>
+    <PageHeader
+      kicker="Operasional"
+      title="Vendor & Biaya Ops"
+      subtitle="Kelola vendor dan catat pengeluaran operasional per trip"
+    >
+      {#snippet actions()}
+        {#if !isLoading}
+          <button
+            type="button"
+            onclick={openCreateVendor}
+            class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
+          >
+            <Plus class="h-4 w-4" /> Tambah Vendor
+          </button>
+        {/if}
+      {/snippet}
+    </PageHeader>
 
-    <!-- Summary cards -->
-    <div class="mt-4 grid grid-cols-3 gap-3">
-      <div class="rounded-xl bg-red-50 p-3">
-        <p class="text-[11px] font-semibold text-red-400">Total Outstanding</p>
-        <p class="mt-0.5 text-base font-bold text-red-700">
-          {#if isLoading}
-            <span class="inline-block h-5 w-24 animate-pulse rounded bg-red-200"></span>
-          {:else}
-            {formatIDR(debtSummary?.total_outstanding_idr || 0)}
-          {/if}
-        </p>
-      </div>
-      <div class="rounded-xl bg-amber-50 p-3">
-        <p class="text-[11px] font-semibold text-amber-400">Overdue</p>
-        <p class="mt-0.5 text-base font-bold text-amber-700">
-          {#if isLoading}
-            <span class="inline-block h-5 w-16 animate-pulse rounded bg-amber-200"></span>
-          {:else}
-            {overdueCount} tagihan
-          {/if}
-        </p>
-      </div>
-      <div class="rounded-xl bg-blue-50 p-3">
-        <p class="text-[11px] font-semibold text-blue-400">Total Vendor</p>
-        <p class="mt-0.5 text-base font-bold text-blue-700">
-          {#if isLoading}
-            <span class="inline-block h-5 w-12 animate-pulse rounded bg-blue-200"></span>
-          {:else}
-            {vendors.length}
-          {/if}
-        </p>
-      </div>
+    <!-- Summary cards (Suluk design) -->
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard icon={Truck} label="Total Vendor" value={`${vendors.length}`} accent="#1B7F5A" />
+      <StatCard icon={Wallet} label="Total Outstanding" value={formatIDR(debtSummary?.total_outstanding_idr || 0)} accent="#c0392b" />
+      <StatCard icon={AlertCircle} label="Overdue" value={`${overdueCount} tagihan`} accent="#C99A2E" />
+      <StatCard icon={Boxes} label="Kategori" value={`${VENDOR_TYPES.length - 1}`} accent="#2563a8" />
     </div>
 
     <!-- Search + filter -->
@@ -400,69 +384,81 @@
   </div>
 
   <!-- Vendor table -->
-  <div class="flex-1 overflow-auto">
+  <div class="flex-1 overflow-auto p-6">
     {#if isLoading}
-      <div class="space-y-3 p-6">
+      <div class="space-y-3">
         {#each [1,2,3,4,5] as _}
-          <div class="h-16 animate-pulse rounded-xl bg-slate-100"></div>
+          <div class="h-16 animate-pulse rounded-2xl bg-slate-100"></div>
         {/each}
       </div>
     {:else if filteredVendors.length === 0}
-      <div class="flex flex-col items-center justify-center py-24 text-slate-400">
+      <div class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-24 text-slate-400 shadow-sm">
         <Building2 class="mb-3 h-12 w-12 opacity-30" />
         <p class="font-medium">Tidak ada vendor</p>
         <p class="mt-1 text-sm">Klik "Tambah Vendor" untuk menambahkan vendor pertama</p>
       </div>
     {:else}
-      <table class="w-full min-w-[700px]">
-        <thead class="sticky top-0 bg-slate-50">
-          <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-            <th class="px-6 py-3">Vendor</th>
-            <th class="px-4 py-3">Tipe</th>
-            <th class="px-4 py-3">PIC</th>
-            <th class="px-4 py-3">Kontak</th>
-            <th class="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-50">
-          {#each filteredVendors as v}
-            <tr
-              class="group bg-white transition-colors hover:bg-primary-50/30 cursor-pointer"
-              onclick={() => openDetail(v)}
-            >
-              <td class="px-6 py-3.5">
-                <p class="text-sm font-semibold text-slate-800">{v.name}</p>
-                {#if v.npwp}
-                  <p class="text-xs text-slate-400">NPWP: {v.npwp}</p>
-                {/if}
-              </td>
-              <td class="px-4 py-3.5">
-                <span class="inline-block rounded-md px-2 py-0.5 text-xs font-semibold {typeColor[v.type] || typeColor.lainnya}">
-                  {typeLabel[v.type] || v.type}
-                </span>
-              </td>
-              <td class="px-4 py-3.5">
-                <p class="text-sm text-slate-700">{v.pic_name || '—'}</p>
-              </td>
-              <td class="px-4 py-3.5">
-                <p class="text-sm text-slate-600">{v.pic_phone || '—'}</p>
-                {#if v.pic_email}
-                  <p class="text-xs text-slate-400">{v.pic_email}</p>
-                {/if}
-              </td>
-              <td class="px-4 py-3.5 text-right">
-                <button
-                  type="button"
-                  onclick={(e) => { e.stopPropagation(); openDetail(v); }}
-                  class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
+      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[700px]">
+            <thead>
+              <tr class="border-b border-slate-100 text-left">
+                <th class="px-6 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Vendor</th>
+                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Tipe</th>
+                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">PIC</th>
+                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Kontak</th>
+                <th class="px-4 py-3.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each filteredVendors as v}
+                {@const VIcon = typeIcon[v.type] || Building2}
+                <tr
+                  class="group cursor-pointer bg-white transition-colors hover:bg-primary-50/40"
+                  onclick={() => openDetail(v)}
                 >
-                  Detail <ChevronRight class="h-3 w-3" />
-                </button>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+                  <td class="border-b border-slate-100 px-6 py-3.5">
+                    <div class="flex items-center gap-3">
+                      <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style="background:#C99A2E18;color:#C99A2E">
+                        <VIcon class="h-[19px] w-[19px]" />
+                      </div>
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-bold text-[#10211c]">{v.name}</p>
+                        {#if v.npwp}
+                          <p class="truncate text-xs text-slate-400">NPWP: {v.npwp}</p>
+                        {/if}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <span class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold {typeColor[v.type] || typeColor.lainnya}">
+                      {typeLabel[v.type] || v.type}
+                    </span>
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <p class="text-sm text-slate-700">{v.pic_name || '—'}</p>
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <p class="text-sm text-slate-600">{v.pic_phone || '—'}</p>
+                    {#if v.pic_email}
+                      <p class="text-xs text-slate-400">{v.pic_email}</p>
+                    {/if}
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 text-right">
+                    <button
+                      type="button"
+                      onclick={(e) => { e.stopPropagation(); openDetail(v); }}
+                      class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
+                    >
+                      Detail <ChevronRight class="h-3 w-3" />
+                    </button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
     {/if}
   </div>
 </div>

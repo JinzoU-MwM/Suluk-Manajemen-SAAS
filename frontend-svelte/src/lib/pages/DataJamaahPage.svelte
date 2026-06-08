@@ -1,9 +1,12 @@
-﻿<script>
+<script>
   import { onMount } from "svelte";
   import {
     AlertCircle,
+    BadgeCheck,
+    BookUser,
     FileText,
     Loader2,
+    Plane,
     Search,
     UserPlus,
     UsersRound,
@@ -13,6 +16,8 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Pager from "../components/Pager.svelte";
   import PageHeader from "../components/PageHeader.svelte";
+  import StatCard from "../components/StatCard.svelte";
+  import Avatar from "../components/Avatar.svelte";
 
   let { onNavigate = () => {} } = $props();
 
@@ -43,6 +48,14 @@
         .some((value) => String(value).toLowerCase().includes(needle));
     }),
   );
+
+  // Summary tiles (Suluk design). Counts are over the loaded group's members.
+  let statTiles = $derived([
+    { label: "Total di Grup", value: String(members.length), icon: UsersRound, accent: "#1B7F5A" },
+    { label: "Punya Paspor", value: String(members.filter((m) => m.no_paspor).length), icon: BookUser, accent: "#2563a8" },
+    { label: "Punya Identitas", value: String(members.filter((m) => m.no_identitas).length), icon: BadgeCheck, accent: "#C99A2E" },
+    { label: "Punya Visa", value: String(members.filter((m) => m.no_visa).length), icon: Plane, accent: "#1B7F5A" },
+  ]);
 
   // Pagination (client-side over the filtered members)
   const PAGE_SIZE = 25;
@@ -115,44 +128,43 @@
     </div>
   {/if}
 
-  <div class="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-    <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-      <label for="jamaah-group-select" class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Grup Keberangkatan</label>
-      <select
-        id="jamaah-group-select"
-        bind:value={selectedGroupId}
-        onchange={loadMembers}
-        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white"
-      >
-        {#if isLoadingGroups}
-          <option>Memuat grup...</option>
-        {:else if groups.length === 0}
-          <option value="">Belum ada grup</option>
-        {:else}
-          {#each groups as group}
-            <option value={String(group.id)}>{group.name} - {group.member_count || 0} jamaah</option>
-          {/each}
-        {/if}
-      </select>
-    </div>
-
-    <div class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-      <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Total di Grup</p>
-      <div class="mt-2 flex items-end gap-2">
-        <span class="text-3xl font-extrabold text-slate-900">{members.length}</span>
-        <span class="pb-1 text-sm text-slate-500">jamaah</span>
-      </div>
-    </div>
+  <!-- Summary cards (Suluk design) -->
+  <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {#each statTiles as t}
+      <StatCard icon={t.icon} label={t.label} value={t.value} accent={t.accent} />
+    {/each}
   </div>
 
-  <div class="rounded-3xl border border-slate-100 bg-white shadow-sm">
+  <!-- Group selector -->
+  <div class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+    <label for="jamaah-group-select" class="mb-2 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Grup Keberangkatan</label>
+    <select
+      id="jamaah-group-select"
+      bind:value={selectedGroupId}
+      onchange={loadMembers}
+      class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white"
+    >
+      {#if isLoadingGroups}
+        <option>Memuat grup...</option>
+      {:else if groups.length === 0}
+        <option value="">Belum ada grup</option>
+      {:else}
+        {#each groups as group}
+          <option value={String(group.id)}>{group.name} - {group.member_count || 0} jamaah</option>
+        {/each}
+      {/if}
+    </select>
+  </div>
+
+  <!-- Jamaah list -->
+  <div class="rounded-2xl border border-slate-200/70 bg-white shadow-sm">
     <div class="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 class="text-sm font-bold text-slate-900">{selectedGroup?.name || "Daftar Jamaah"}</h2>
+        <h2 class="text-sm font-bold text-[#10211c]">{selectedGroup?.name || "Daftar Jamaah"}</h2>
         <p class="text-xs text-slate-500">Data operasional yang tersimpan dari hasil scan dan input grup.</p>
       </div>
       <div class="relative w-full sm:w-72">
-        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           bind:value={search}
           class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-primary-400 focus:bg-white"
@@ -175,27 +187,32 @@
     {:else}
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+          <thead>
             <tr>
-              <th class="px-5 py-3 font-bold">Nama</th>
-              <th class="hidden px-5 py-3 font-bold md:table-cell">Paspor</th>
-              <th class="hidden px-5 py-3 font-bold lg:table-cell">Identitas</th>
-              <th class="hidden px-5 py-3 font-bold lg:table-cell">Visa</th>
-              <th class="px-5 py-3 font-bold">Dokumen</th>
+              <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Nama</th>
+              <th class="hidden px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 md:table-cell">Paspor</th>
+              <th class="hidden px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 lg:table-cell">Identitas</th>
+              <th class="hidden px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 lg:table-cell">Visa</th>
+              <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Dokumen</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody>
             {#each pagedMembers as member}
-              <tr class="hover:bg-slate-50/70">
-                <td class="px-5 py-4">
-                  <p class="font-semibold text-slate-900">{displayName(member)}</p>
-                  <p class="text-xs text-slate-400 md:hidden">{member.no_paspor || member.no_identitas || "-"}</p>
-                  <p class="hidden text-xs text-slate-400 md:block">{member.title || "-"} {member.tanggal_lahir || ""}</p>
+              <tr class="transition-colors hover:bg-primary-50/30">
+                <td class="border-b border-slate-100 px-5 py-3.5">
+                  <div class="flex items-center gap-3">
+                    <Avatar name={displayName(member)} size={38} />
+                    <div class="min-w-0">
+                      <p class="truncate font-bold text-[#10211c]">{displayName(member)}</p>
+                      <p class="truncate text-xs text-slate-400 md:hidden">{member.no_paspor || member.no_identitas || "-"}</p>
+                      <p class="hidden truncate text-xs text-slate-400 md:block">{member.title || "-"} {member.tanggal_lahir || ""}</p>
+                    </div>
+                  </div>
                 </td>
-                <td class="hidden px-5 py-4 text-slate-600 md:table-cell">{member.no_paspor || "-"}</td>
-                <td class="hidden px-5 py-4 text-slate-600 lg:table-cell">{member.no_identitas || "-"}</td>
-                <td class="hidden px-5 py-4 text-slate-600 lg:table-cell">{member.no_visa || "-"}</td>
-                <td class="px-5 py-4">
+                <td class="hidden border-b border-slate-100 px-5 py-3.5 text-slate-600 md:table-cell">{member.no_paspor || "-"}</td>
+                <td class="hidden border-b border-slate-100 px-5 py-3.5 text-slate-600 lg:table-cell">{member.no_identitas || "-"}</td>
+                <td class="hidden border-b border-slate-100 px-5 py-3.5 text-slate-600 lg:table-cell">{member.no_visa || "-"}</td>
+                <td class="border-b border-slate-100 px-5 py-3.5">
                   <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                     <FileText class="h-3.5 w-3.5" />
                     Tersimpan
