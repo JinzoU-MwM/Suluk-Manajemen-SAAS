@@ -19,6 +19,7 @@ type ScanResultStatus string
 
 const (
 	ResultStatusPending    ScanResultStatus = "pending"
+	ResultStatusProcessing ScanResultStatus = "processing"
 	ResultStatusCompleted  ScanResultStatus = "completed"
 	ResultStatusFailed     ScanResultStatus = "failed"
 	ResultStatusPartial    ScanResultStatus = "partial"
@@ -95,4 +96,28 @@ type CreateExportTemplateRequest struct {
 	HeaderRow     int    `json:"header_row,omitempty"`
 	DataStartRow  int    `json:"data_start_row,omitempty"`
 	IsDefault     bool   `json:"is_default,omitempty"`
+}
+
+
+type CacheStats struct {
+	TotalEntries        int   `json:"total_entries"`
+	TotalHits           int   `json:"total_hits"`
+	ExpiredEntries      int   `json:"expired_entries"`
+	CacheHitsToday      int   `json:"cache_hits_today"`
+	ApiCallsToday       int   `json:"api_calls_today"`
+	TotalProcessingTimeMs int `json:"total_processing_time_ms"`
+}
+
+type NormalizeRequest struct {
+	Data    any    `json:"data" validate:"required"`
+	DocType string `json:"doc_type" validate:"required"`
+}
+
+type ExportSiskopatuhRequest struct {
+	PackageID *string `json:"package_id,omitempty"`
+	Format    string  `json:"format,omitempty"`
+}
+
+func ParseUUID(s string) (uuid.UUID, error) {
+	return uuid.Parse(s)
 }

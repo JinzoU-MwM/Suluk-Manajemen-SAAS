@@ -4,19 +4,37 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/jamaah-in/v2/internal/aiocr/model"
 	"github.com/jamaah-in/v2/internal/aiocr/repository"
 )
 
 type AIOCRService struct {
-	repo *repository.AIOCRRepo
+	repo   *repository.AIOCRRepo
+	gemini *GeminiClient
+	logger *zap.SugaredLogger
 }
 
-func NewAIOCRService(repo *repository.AIOCRRepo) *AIOCRService {
-	return &AIOCRService{repo: repo}
+func NewAIOCRService(repo *repository.AIOCRRepo, gemini *GeminiClient, logger *zap.SugaredLogger) *AIOCRService {
+	return &AIOCRService{
+		repo:   repo,
+		gemini: gemini,
+		logger: logger,
+	}
+}
+
+func (s *AIOCRService) StartWorker(ctx context.Context) {
+	if s.gemini == nil {
+		s.logger.Warn("Gemini API key not configured - AI scanner worker will not start")
+		return
+	}
+	worker := NewWorker(s.repo, s.gemini, s.logger)
+	go worker.Start(ctx, 5*time.Second)
 }
 
 func (s *AIOCRService) CreateScanJob(ctx context.Context, orgID, userID uuid.UUID, req model.CreateScanJobRequest) (*model.ScanJob, error) {
@@ -101,6 +119,47 @@ func (s *AIOCRService) GetScanResult(ctx context.Context, id, orgID uuid.UUID) (
 
 func (s *AIOCRService) GetScanResultsByJob(ctx context.Context, orgID, jobID uuid.UUID) ([]model.ScanResult, error) {
 	return s.repo.GetScanResultsByJob(ctx, orgID, jobID)
+}
+
+func (s *AIOCRService) GetCacheStats(ctx context.Context, orgID uuid.UUID) (*model.CacheStats, error) {
+	r, err := s.repo.GetCacheStats(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.CacheStats{
+		TotalEntries:          r.TotalEntries,
+		TotalHits:             r.TotalHits,
+		ExpiredEntries:        r.ExpiredEntries,
+		CacheHitsToday:        r.CacheHitsToday,
+		ApiCallsToday:         r.ApiCallsToday,
+		TotalProcessingTimeMs: r.TotalProcessingTimeMs,
+	}, nil
+}
+
+func (s *AIOCRService) ClearCache(ctx context.Context, orgID uuid.UUID) error {
+	return s.repo.ClearCache(ctx)
+}
+
+func (s *AIOCRService) NormalizeToSiskopatuh(ctx context.Context, orgID uuid.UUID, req model.NormalizeRequest) (any, error) {
+	return normalizeToSiskopatuh(req.Data, req.DocType), nil
+}
+
+func (s *AIOCRService) ExportSiskopatuhExcel(ctx context.Context, orgID uuid.UUID, req model.ExportSiskopatuhRequest) ([]byte, error) {
+	var packageID *uuid.UUID
+	if req.PackageID != nil && *req.PackageID != "" {
+		pid, err := uuid.Parse(*req.PackageID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid package_id: %w", err)
+		}
+		packageID = &pid
+	}
+
+	results, err := s.repo.GetCompletedScanResults(ctx, orgID, packageID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch scan results: %w", err)
+	}
+
+	return generateSiskopatuhExcel(results)
 }
 
 func (s *AIOCRService) CreateExportTemplate(ctx context.Context, orgID, userID uuid.UUID, req model.CreateExportTemplateRequest) (*model.ExportTemplate, error) {

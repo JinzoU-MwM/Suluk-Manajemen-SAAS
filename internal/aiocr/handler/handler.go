@@ -93,6 +93,54 @@ func (h *AIOCRHandler) GetScanResultsByJob(c *fiber.Ctx) error {
 	return response.OK(c, results)
 }
 
+func (h *AIOCRHandler) GetCacheStats(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	stats, err := h.svc.GetCacheStats(c.Context(), claims.OrgID)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, stats)
+}
+
+func (h *AIOCRHandler) ClearCache(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	if err := h.svc.ClearCache(c.Context(), claims.OrgID); err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "cache cleared"})
+}
+
+func (h *AIOCRHandler) NormalizeToSiskopatuh(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	var req model.NormalizeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+
+	result, err := h.svc.NormalizeToSiskopatuh(c.Context(), claims.OrgID, req)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, result)
+}
+
+func (h *AIOCRHandler) ExportSiskopatuhExcel(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	var req model.ExportSiskopatuhRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+
+	excelData, err := h.svc.ExportSiskopatuhExcel(c.Context(), claims.OrgID, req)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+
+	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Set("Content-Disposition", "attachment; filename=siskopatuh_export.xlsx")
+	return c.Send(excelData)
+}
+
 func (h *AIOCRHandler) CreateExportTemplate(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 
