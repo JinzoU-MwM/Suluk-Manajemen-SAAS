@@ -27,7 +27,9 @@ const expenseCols = `id, org_id, package_id, category, description, vendor_name,
 
 const insertCols = `id, org_id, package_id, category, description, vendor_name, amount, currency, exchange_rate, expense_date, due_date, status`
 
-func (r *FinanceRepo) scanExpense(scanner interface{ Scan(dest ...interface{}) error }) (*model.TripExpense, error) {
+func (r *FinanceRepo) scanExpense(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*model.TripExpense, error) {
 	e := &model.TripExpense{}
 	err := scanner.Scan(&e.ID, &e.OrgID, &e.PackageID, &e.Category, &e.Description, &e.VendorName,
 		&e.Amount, &e.Currency, &e.ExchangeRate, &e.AmountIDR, &e.ExpenseDate, &e.DueDate,

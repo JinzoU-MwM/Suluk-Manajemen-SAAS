@@ -104,11 +104,11 @@ func (h *FinanceHandler) ExportExpenses(c *fiber.Ctx) error {
 	row := 5
 	total := int64(0)
 	for _, exp := range expenses {
-			f.SetCellValue(sheet, fmt.Sprintf("A%d", row), row-4)
-			f.SetCellValue(sheet, fmt.Sprintf("B%d", row), exp.CreatedAt.Format("02/01/2006"))
-			f.SetCellValue(sheet, fmt.Sprintf("C%d", row), exp.Category)
-			f.SetCellValue(sheet, fmt.Sprintf("D%d", row), exp.Description)
-			f.SetCellValue(sheet, fmt.Sprintf("E%d", row), exp.Amount)
+		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), row-4)
+		f.SetCellValue(sheet, fmt.Sprintf("B%d", row), exp.CreatedAt.Format("02/01/2006"))
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), exp.Category)
+		f.SetCellValue(sheet, fmt.Sprintf("D%d", row), exp.Description)
+		f.SetCellValue(sheet, fmt.Sprintf("E%d", row), exp.Amount)
 		total += exp.Amount
 		row++
 	}

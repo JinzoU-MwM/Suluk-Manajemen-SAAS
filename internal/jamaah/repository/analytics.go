@@ -14,10 +14,10 @@ type MonthlyTrend struct {
 }
 
 type RecentGroup struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	MemberCount int     `json:"member_count"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	MemberCount int       `json:"member_count"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // GetAnalyticsStats fills the core jamaah aggregates in a single round-trip.

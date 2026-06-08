@@ -27,11 +27,11 @@ type AICacheEntry struct {
 }
 
 type CacheStatsResult struct {
-	TotalEntries        int `json:"total_entries"`
-	TotalHits           int `json:"total_hits"`
-	ExpiredEntries      int `json:"expired_entries"`
-	CacheHitsToday      int `json:"cache_hits_today"`
-	ApiCallsToday       int `json:"api_calls_today"`
+	TotalEntries          int `json:"total_entries"`
+	TotalHits             int `json:"total_hits"`
+	ExpiredEntries        int `json:"expired_entries"`
+	CacheHitsToday        int `json:"cache_hits_today"`
+	ApiCallsToday         int `json:"api_calls_today"`
 	TotalProcessingTimeMs int `json:"total_processing_time_ms"`
 }
 

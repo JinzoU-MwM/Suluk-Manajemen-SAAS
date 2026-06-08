@@ -3,26 +3,26 @@ package service
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/jamaah/model"
 	"github.com/jamaah-in/v2/internal/jamaah/repository"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 )
 
 type JamaahService struct {
 	repo        *repository.JamaahRepo
 	invoiceAddr string
-	httpClient  *http.Client
+	httpc       *httpclient.Client
 }
 
 func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr string) *JamaahService {
 	return &JamaahService{
 		repo:        repo,
 		invoiceAddr: invoiceAddr,
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		httpc:       httpclient.New(),
 	}
 }
 
@@ -32,7 +32,7 @@ func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, req 
 	}
 
 	p := &model.JamaahProfile{
-		ID:   uuid.New(),
+		ID:    uuid.New(),
 		OrgID: orgID,
 		Title: req.Title,
 		Nama:  req.Nama,
@@ -318,14 +318,14 @@ func (s *JamaahService) RegisterToPackage(ctx context.Context, orgID, userID uui
 		OrgID:          orgID,
 		JamaahID:       jamaahID,
 		PackageID:      req.PackageID,
-		RoomType:        req.RoomType,
-		PriceSnapshot:   req.PriceSnapshot,
-		DiscountAmount:  req.DiscountAmount,
-		CustomPrice:     req.CustomPrice,
-		PipelineStatus:  string(model.StatusProspek),
-		RegisteredAt:    time.Now(),
-		MahramID:        nil,
-		InternalNotes:   "",
+		RoomType:       req.RoomType,
+		PriceSnapshot:  req.PriceSnapshot,
+		DiscountAmount: req.DiscountAmount,
+		CustomPrice:    req.CustomPrice,
+		PipelineStatus: string(model.StatusProspek),
+		RegisteredAt:   time.Now(),
+		MahramID:       nil,
+		InternalNotes:  "",
 	}
 
 	if err := s.repo.CreateRegistration(ctx, reg); err != nil {
@@ -392,11 +392,11 @@ func (s *JamaahService) ListByPackage(ctx context.Context, orgID, packageID uuid
 
 func (s *JamaahService) AddNote(ctx context.Context, jamaahID, orgID, userID uuid.UUID, req model.AddNoteRequest) (*model.JamaahNote, error) {
 	note := &model.JamaahNote{
-		ID:        uuid.New(),
-		JamaahID:  jamaahID,
-		OrgID:     orgID,
-		UserID:    userID,
-		Content:   req.Content,
+		ID:       uuid.New(),
+		JamaahID: jamaahID,
+		OrgID:    orgID,
+		UserID:   userID,
+		Content:  req.Content,
 	}
 	if err := s.repo.CreateNote(ctx, note); err != nil {
 		return nil, err

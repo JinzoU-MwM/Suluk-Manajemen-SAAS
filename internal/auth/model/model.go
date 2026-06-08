@@ -32,33 +32,33 @@ const (
 
 type User struct {
 	ID            uuid.UUID `json:"id" db:"id"`
-	Email         string     `json:"email" db:"email"`
-	Name          string     `json:"name" db:"name"`
-	PasswordHash  string     `json:"-" db:"password_hash"`
-	EmailVerified bool       `json:"email_verified" db:"email_verified"`
-	Phone         *string    `json:"phone,omitempty" db:"phone"`
-	PhoneVerified bool       `json:"phone_verified" db:"phone_verified"`
-	Role          string     `json:"role" db:"role"`
-	IsActive      bool       `json:"is_active" db:"is_active"`
-	IsSuperAdmin  bool       `json:"is_super_admin" db:"is_super_admin"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
+	Email         string    `json:"email" db:"email"`
+	Name          string    `json:"name" db:"name"`
+	PasswordHash  string    `json:"-" db:"password_hash"`
+	EmailVerified bool      `json:"email_verified" db:"email_verified"`
+	Phone         *string   `json:"phone,omitempty" db:"phone"`
+	PhoneVerified bool      `json:"phone_verified" db:"phone_verified"`
+	Role          string    `json:"role" db:"role"`
+	IsActive      bool      `json:"is_active" db:"is_active"`
+	IsSuperAdmin  bool      `json:"is_super_admin" db:"is_super_admin"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Organization struct {
 	ID          uuid.UUID `json:"id" db:"id"`
-	Name        string     `json:"name" db:"name"`
-	Slug        string     `json:"slug" db:"slug"`
-	LogoURL     *string    `json:"logo_url,omitempty" db:"logo_url"`
-	Address     *string    `json:"address,omitempty" db:"address"`
-	Phone       *string    `json:"phone,omitempty" db:"phone"`
-	Email       *string    `json:"email,omitempty" db:"email"`
-	BankName    *string    `json:"bank_name,omitempty" db:"bank_name"`
-	BankAccount *string    `json:"bank_account,omitempty" db:"bank_account"`
-	BankHolder  *string    `json:"bank_holder,omitempty" db:"bank_holder"`
-	CreatedBy   uuid.UUID  `json:"created_by" db:"created_by"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	Name        string    `json:"name" db:"name"`
+	Slug        string    `json:"slug" db:"slug"`
+	LogoURL     *string   `json:"logo_url,omitempty" db:"logo_url"`
+	Address     *string   `json:"address,omitempty" db:"address"`
+	Phone       *string   `json:"phone,omitempty" db:"phone"`
+	Email       *string   `json:"email,omitempty" db:"email"`
+	BankName    *string   `json:"bank_name,omitempty" db:"bank_name"`
+	BankAccount *string   `json:"bank_account,omitempty" db:"bank_account"`
+	BankHolder  *string   `json:"bank_holder,omitempty" db:"bank_holder"`
+	CreatedBy   uuid.UUID `json:"created_by" db:"created_by"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type TeamMember struct {
@@ -93,7 +93,7 @@ type RefreshToken struct {
 }
 
 type AuditLog struct {
-	ID        uuid.UUID `json:"id" db:"id"`
+	ID        uuid.UUID  `json:"id" db:"id"`
 	OrgID     *uuid.UUID `json:"org_id,omitempty" db:"org_id"`
 	UserID    *uuid.UUID `json:"user_id,omitempty" db:"user_id"`
 	Action    string     `json:"action" db:"action"`
@@ -106,8 +106,8 @@ type AuditLog struct {
 }
 
 type Notification struct {
-	ID        uuid.UUID `json:"id" db:"id"`
-	OrgID     uuid.UUID `json:"org_id" db:"org_id"`
+	ID        uuid.UUID  `json:"id" db:"id"`
+	OrgID     uuid.UUID  `json:"org_id" db:"org_id"`
 	UserID    *uuid.UUID `json:"user_id,omitempty" db:"user_id"`
 	Severity  string     `json:"severity" db:"severity"`
 	Title     string     `json:"title" db:"title"`
@@ -148,7 +148,7 @@ type AddTicketMessageRequest struct {
 }
 
 type TicketWithMessages struct {
-	Ticket   Ticket           `json:"ticket"`
+	Ticket   Ticket          `json:"ticket"`
 	Messages []TicketMessage `json:"messages"`
 }
 
@@ -233,10 +233,10 @@ type AcceptInviteRequest struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	ExpiresAt    int64     `json:"expires_at"`
-	User         User      `json:"user"`
+	AccessToken  string        `json:"access_token"`
+	RefreshToken string        `json:"refresh_token"`
+	ExpiresAt    int64         `json:"expires_at"`
+	User         User          `json:"user"`
 	Organization *Organization `json:"organization,omitempty"`
 }
 

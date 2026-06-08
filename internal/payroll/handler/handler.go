@@ -3,9 +3,9 @@ package handler
 import (
 	"github.com/gofiber/fiber/v2"
 
-	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/payroll/model"
 	"github.com/jamaah-in/v2/internal/payroll/service"
+	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 )
 
 type PayrollHandler struct {

@@ -175,11 +175,11 @@ type BillStatusDetail struct {
 }
 
 type OwnerDashboard struct {
-	Summary          DashboardSummary   `json:"summary"`
-	ActivePackages   []PackageOverview  `json:"active_packages"`
-	Alerts           DashboardAlerts    `json:"alerts"`
-	RevenueChart     []MonthlyRevenue   `json:"revenue_chart"`
-	RecentInvoices   []InvoiceOverview  `json:"recent_invoices,omitempty"`
+	Summary        DashboardSummary  `json:"summary"`
+	ActivePackages []PackageOverview `json:"active_packages"`
+	Alerts         DashboardAlerts   `json:"alerts"`
+	RevenueChart   []MonthlyRevenue  `json:"revenue_chart"`
+	RecentInvoices []InvoiceOverview `json:"recent_invoices,omitempty"`
 	// Partial is true when one or more upstream services failed and the figures
 	// below are incomplete (zeros for the failed sources rather than real data).
 	// DegradedSources names which sources failed so the UI can warn the owner
@@ -189,35 +189,35 @@ type OwnerDashboard struct {
 }
 
 type DashboardSummary struct {
-	TotalRevenue     int64   `json:"total_revenue"`    // was monthly_revenue
-	TotalPiutang     int64   `json:"total_piutang"`    // was active_piutang
-	TotalDebt        int64   `json:"total_debt"`       // was total_vendor_debt
+	TotalRevenue     int64   `json:"total_revenue"` // was monthly_revenue
+	TotalPiutang     int64   `json:"total_piutang"` // was active_piutang
+	TotalDebt        int64   `json:"total_debt"`    // was total_vendor_debt
 	GrossProfitMonth int64   `json:"gross_profit_month"`
 	OverdueInvoices  int64   `json:"overdue_invoices"`
-	TotalPackages    int     `json:"total_packages"`   // was active_packages
+	TotalPackages    int     `json:"total_packages"` // was active_packages
 	TotalJamaah      int     `json:"total_jamaah"`
 	RevenueGrowthPct float64 `json:"revenue_growth_pct"`
 }
 
 type PackageOverview struct {
-	ID             uuid.UUID `json:"id"`
-	Name           string    `json:"name"`
-	Status         string    `json:"status"`
-	DepartureDate  *string   `json:"departure_date,omitempty"`
-	TotalSeats     int       `json:"total_seats"`
-	ReservedSeats  int       `json:"reserved_seats"`
-	Revenue        int64     `json:"revenue"`
-	Paid           int64     `json:"paid"`
-	Remaining      int64     `json:"remaining"`
-	PaymentPct     float64   `json:"payment_pct"`
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	Status        string    `json:"status"`
+	DepartureDate *string   `json:"departure_date,omitempty"`
+	TotalSeats    int       `json:"total_seats"`
+	ReservedSeats int       `json:"reserved_seats"`
+	Revenue       int64     `json:"revenue"`
+	Paid          int64     `json:"paid"`
+	Remaining     int64     `json:"remaining"`
+	PaymentPct    float64   `json:"payment_pct"`
 }
 
 type DashboardAlerts struct {
-	PassportExpiringSoon  int `json:"passport_expiring_soon"`
-	OverdueFollowUps      int `json:"overdue_follow_ups"`
-	IncompleteDocuments   int `json:"incomplete_documents"` // was incomplete_docs
-	OverduePayments       int `json:"overdue_payments"`     // was overdue_invoices (matches frontend)
-	VendorBillsDueSoon    int `json:"vendor_bills_due_soon"`
+	PassportExpiringSoon int `json:"passport_expiring_soon"`
+	OverdueFollowUps     int `json:"overdue_follow_ups"`
+	IncompleteDocuments  int `json:"incomplete_documents"` // was incomplete_docs
+	OverduePayments      int `json:"overdue_payments"`     // was overdue_invoices (matches frontend)
+	VendorBillsDueSoon   int `json:"vendor_bills_due_soon"`
 }
 
 type MonthlyRevenue struct {

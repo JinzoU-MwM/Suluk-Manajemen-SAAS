@@ -28,14 +28,20 @@ func (s *AgentService) CreateAgent(ctx context.Context, orgID string, req model.
 		BankAccountName:   req.BankAccountName,
 		Notes:             req.Notes,
 	}
-	if a.CommissionRate <= 0 { a.CommissionRate = 5.0 }
-	if err := s.repo.CreateAgent(ctx, a); err != nil { return nil, err }
+	if a.CommissionRate <= 0 {
+		a.CommissionRate = 5.0
+	}
+	if err := s.repo.CreateAgent(ctx, a); err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 
 func (s *AgentService) ListAgents(ctx context.Context, orgID, search string, page, limit int) (*model.AgentListResponse, error) {
 	agents, total, err := s.repo.ListAgents(ctx, orgID, search, page, limit)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &model.AgentListResponse{Agents: agents, Total: total}, nil
 }
 
@@ -45,18 +51,42 @@ func (s *AgentService) GetAgent(ctx context.Context, id, orgID string) (*model.A
 
 func (s *AgentService) UpdateAgent(ctx context.Context, id, orgID string, req model.UpdateAgentRequest) (*model.Agent, error) {
 	updates := map[string]interface{}{}
-	if req.Name != nil { updates["name"] = *req.Name }
-	if req.Phone != nil { updates["phone"] = *req.Phone }
-	if req.Email != nil { updates["email"] = *req.Email }
-	if req.Address != nil { updates["address"] = *req.Address }
-	if req.CommissionRate != nil { updates["commission_rate"] = *req.CommissionRate }
-	if req.BankName != nil { updates["bank_name"] = *req.BankName }
-	if req.BankAccountNumber != nil { updates["bank_account_number"] = *req.BankAccountNumber }
-	if req.BankAccountName != nil { updates["bank_account_name"] = *req.BankAccountName }
-	if req.Notes != nil { updates["notes"] = *req.Notes }
-	if req.IsActive != nil { updates["is_active"] = *req.IsActive }
-	if len(updates) == 0 { return s.repo.GetAgent(ctx, id, orgID) }
-	if err := s.repo.UpdateAgent(ctx, id, orgID, updates); err != nil { return nil, err }
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Phone != nil {
+		updates["phone"] = *req.Phone
+	}
+	if req.Email != nil {
+		updates["email"] = *req.Email
+	}
+	if req.Address != nil {
+		updates["address"] = *req.Address
+	}
+	if req.CommissionRate != nil {
+		updates["commission_rate"] = *req.CommissionRate
+	}
+	if req.BankName != nil {
+		updates["bank_name"] = *req.BankName
+	}
+	if req.BankAccountNumber != nil {
+		updates["bank_account_number"] = *req.BankAccountNumber
+	}
+	if req.BankAccountName != nil {
+		updates["bank_account_name"] = *req.BankAccountName
+	}
+	if req.Notes != nil {
+		updates["notes"] = *req.Notes
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
+	if len(updates) == 0 {
+		return s.repo.GetAgent(ctx, id, orgID)
+	}
+	if err := s.repo.UpdateAgent(ctx, id, orgID, updates); err != nil {
+		return nil, err
+	}
 	return s.repo.GetAgent(ctx, id, orgID)
 }
 
@@ -70,17 +100,29 @@ func (s *AgentService) CreateCommission(ctx context.Context, orgID string, req m
 		PackageName:      req.PackageName,
 		Notes:            req.Notes,
 	}
-	if req.JamaahID != "" { c.JamaahID = &req.JamaahID }
-	if req.InvoiceID != "" { c.InvoiceID = &req.InvoiceID }
-	if req.PackageID != "" { c.PackageID = &req.PackageID }
-	if c.CommissionRate <= 0 { c.CommissionRate = 5.0 }
-	if err := s.repo.CreateCommission(ctx, c); err != nil { return nil, err }
+	if req.JamaahID != "" {
+		c.JamaahID = &req.JamaahID
+	}
+	if req.InvoiceID != "" {
+		c.InvoiceID = &req.InvoiceID
+	}
+	if req.PackageID != "" {
+		c.PackageID = &req.PackageID
+	}
+	if c.CommissionRate <= 0 {
+		c.CommissionRate = 5.0
+	}
+	if err := s.repo.CreateCommission(ctx, c); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
 func (s *AgentService) ListCommissions(ctx context.Context, orgID, agentID, status string, page, limit int) (*model.CommissionListResponse, error) {
 	comms, total, err := s.repo.ListCommissions(ctx, orgID, agentID, status, page, limit)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &model.CommissionListResponse{Commissions: comms, Total: total}, nil
 }
 

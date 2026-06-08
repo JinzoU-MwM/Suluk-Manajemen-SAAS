@@ -32,10 +32,10 @@ func Internal(c *fiber.Ctx, err error) error {
 }
 
 type APIResponse struct {
-	Success bool        `json:"success"`
-	Data    any         `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
-	Errors  []FieldError `json:"errors,omitempty"`
+	Success bool            `json:"success"`
+	Data    any             `json:"data,omitempty"`
+	Error   string          `json:"error,omitempty"`
+	Errors  []FieldError    `json:"errors,omitempty"`
 	Meta    *PaginationMeta `json:"meta,omitempty"`
 }
 

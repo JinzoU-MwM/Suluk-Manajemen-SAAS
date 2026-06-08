@@ -40,11 +40,11 @@ func (s *AuthService) UpgradeToPro(ctx context.Context, orgID uuid.UUID, req mod
 	expiresAt := now.AddDate(0, 1, 0)
 	if sub == nil {
 		sub = &model.Subscription{
-			ID:       uuid.New(),
-			OrgID:    orgID,
-			Plan:     "pro",
-			Status:   "active",
-			StartsAt: now,
+			ID:        uuid.New(),
+			OrgID:     orgID,
+			Plan:      "pro",
+			Status:    "active",
+			StartsAt:  now,
 			ExpiresAt: &expiresAt,
 		}
 		return s.repo.CreateSubscription(ctx, sub)

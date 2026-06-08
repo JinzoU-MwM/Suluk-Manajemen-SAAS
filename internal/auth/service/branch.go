@@ -2,10 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -111,35 +108,5 @@ func (s *AuthService) GetConsolidatedStats(ctx context.Context, parentOrgID stri
 // fetchJSON does an authenticated GET to a sibling service and unwraps the
 // standard {success, data} envelope into out.
 func (s *AuthService) fetchJSON(ctx context.Context, addr, path, authToken string, out interface{}) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+addr+path, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", authToken)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("service %s returned status %d", path, resp.StatusCode)
-	}
-
-	var envelope struct {
-		Success bool            `json:"success"`
-		Data    json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return err
-	}
-	if !envelope.Success {
-		return fmt.Errorf("service %s returned error", path)
-	}
-	return json.Unmarshal(envelope.Data, out)
+	return s.httpc.GetJSON(ctx, addr, path, authToken, out)
 }

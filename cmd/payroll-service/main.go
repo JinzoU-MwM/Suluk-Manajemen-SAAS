@@ -5,19 +5,17 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"go.uber.org/zap"
 
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
-	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
+	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 
@@ -76,7 +74,7 @@ func main() {
 	app.Get("/health", sharedHealth.Handler("payroll",
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
-	authMW := authMiddleware(jwtManager, logger)
+	authMW := sharedMW.AuthMiddleware(jwtManager)
 
 	api := app.Group("/api/v1/payroll", authMW)
 	api.Get("/summary", payrollHandler.GetSummary)
@@ -107,27 +105,5 @@ func main() {
 	defer cancel()
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
 		logger.Errorf("payroll service shutdown: %v", err)
-	}
-}
-
-func authMiddleware(jwtMgr *sharedAuth.JWTManager, logger *zap.SugaredLogger) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "missing authorization header"})
-		}
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenStr == authHeader {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "invalid authorization format"})
-		}
-		if jwtMgr == nil {
-			return c.Status(500).JSON(fiber.Map{"success": false, "error": "JWT not configured"})
-		}
-		claims, err := jwtMgr.ValidateToken(tokenStr)
-		if err != nil {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "invalid or expired token"})
-		}
-		c.Locals("claims", claims)
-		return c.Next()
 	}
 }

@@ -2,9 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
-	"io"
-	"net/http"
 
 	"github.com/google/uuid"
 
@@ -47,38 +44,18 @@ type invoiceBalance struct {
 	TotalRemaining int64     `json:"total_remaining"`
 }
 
+// fetchBalances is best-effort: the CRM list still renders (without balances) if
+// the invoice service is unavailable. The shared client adds timeout + retry.
 func (s *JamaahService) fetchBalances(ctx context.Context, authToken string) map[uuid.UUID]invoiceBalance {
 	if s.invoiceAddr == "" || authToken == "" {
 		return nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+s.invoiceAddr+"/api/v1/invoices/balances", nil)
-	if err != nil {
+	var balances []invoiceBalance
+	if err := s.httpc.GetJSON(ctx, s.invoiceAddr, "/api/v1/invoices/balances", authToken, &balances); err != nil {
 		return nil
 	}
-	req.Header.Set("Authorization", authToken)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return nil
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil
-	}
-
-	var env struct {
-		Success bool             `json:"success"`
-		Data    []invoiceBalance `json:"data"`
-	}
-	if err := json.Unmarshal(body, &env); err != nil || !env.Success {
-		return nil
-	}
-	m := make(map[uuid.UUID]invoiceBalance, len(env.Data))
-	for _, b := range env.Data {
+	m := make(map[uuid.UUID]invoiceBalance, len(balances))
+	for _, b := range balances {
 		m[b.JamaahID] = b
 	}
 	return m

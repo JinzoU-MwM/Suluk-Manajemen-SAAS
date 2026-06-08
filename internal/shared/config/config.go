@@ -9,14 +9,14 @@ import (
 )
 
 type Config struct {
-	App        AppConfig
-	Database   DatabaseConfig
-	Redis      RedisConfig
-	NATS       NATSConfig
-	MinIO      MinIOConfig
-	JWT        JWTConfig
-	Server     ServerConfig
-	Gemini     GeminiConfig
+	App      AppConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	NATS     NATSConfig
+	MinIO    MinIOConfig
+	JWT      JWTConfig
+	Server   ServerConfig
+	Gemini   GeminiConfig
 }
 
 type AppConfig struct {

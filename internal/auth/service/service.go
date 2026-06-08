@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +14,7 @@ import (
 	"github.com/jamaah-in/v2/internal/auth/model"
 	"github.com/jamaah-in/v2/internal/auth/repository"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 	sharedRedis "github.com/jamaah-in/v2/internal/shared/redis"
 )
 
@@ -24,7 +24,7 @@ type AuthService struct {
 	redis       *sharedRedis.Client
 	jamaahAddr  string
 	invoiceAddr string
-	httpClient  *http.Client
+	httpc       *httpclient.Client
 }
 
 func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis *sharedRedis.Client, jamaahAddr, invoiceAddr string) *AuthService {
@@ -34,7 +34,7 @@ func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis
 		redis:       redis,
 		jamaahAddr:  jamaahAddr,
 		invoiceAddr: invoiceAddr,
-		httpClient:  &http.Client{Timeout: 10 * time.Second},
+		httpc:       httpclient.New(),
 	}
 }
 
@@ -99,11 +99,11 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 	}
 
 	s.repo.CreateAuditLog(ctx, &model.AuditLog{
-		ID:     uuid.New(),
-		OrgID:  &org.ID,
-		UserID: &userID,
-		Action: "user.register",
-		Entity: "user",
+		ID:       uuid.New(),
+		OrgID:    &org.ID,
+		UserID:   &userID,
+		Action:   "user.register",
+		Entity:   "user",
 		EntityID: &userID,
 		NewValue: map[string]string{"email": user.Email, "name": user.Name},
 	})
@@ -516,10 +516,10 @@ func (s *AuthService) getUserOrgAndRole(ctx context.Context, userID uuid.UUID) (
 func (s *AuthService) storeRefreshToken(ctx context.Context, refreshToken string, userID uuid.UUID) error {
 	hash := hashToken(refreshToken)
 	rt := &model.RefreshToken{
-		ID:         uuid.New(),
-		UserID:     userID,
-		TokenHash:  hash,
-		ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
+		ID:        uuid.New(),
+		UserID:    userID,
+		TokenHash: hash,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 	}
 	return s.repo.CreateRefreshToken(ctx, rt)
 }

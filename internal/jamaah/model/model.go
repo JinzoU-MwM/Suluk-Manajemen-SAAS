@@ -9,12 +9,12 @@ import (
 type PipelineStatus string
 
 const (
-	StatusProspek  PipelineStatus = "prospek"
-	StatusSurvey   PipelineStatus = "survey"
-	StatusBooking  PipelineStatus = "booking"
-	StatusDP       PipelineStatus = "dp"
-	StatusCicilan  PipelineStatus = "cicilan"
-	StatusLunas    PipelineStatus = "lunas"
+	StatusProspek   PipelineStatus = "prospek"
+	StatusSurvey    PipelineStatus = "survey"
+	StatusBooking   PipelineStatus = "booking"
+	StatusDP        PipelineStatus = "dp"
+	StatusCicilan   PipelineStatus = "cicilan"
+	StatusLunas     PipelineStatus = "lunas"
 	StatusBerangkat PipelineStatus = "berangkat"
 	StatusSelesai   PipelineStatus = "selesai"
 	StatusBatal     PipelineStatus = "batal"
@@ -27,10 +27,10 @@ func ValidPipelineStatuses() []string {
 type LeadSource string
 
 const (
-	LeadWalkIn  LeadSource = "walk_in"
+	LeadWalkIn   LeadSource = "walk_in"
 	LeadReferral LeadSource = "referral"
-	LeadOnline  LeadSource = "online"
-	LeadAgent   LeadSource = "agent"
+	LeadOnline   LeadSource = "online"
+	LeadAgent    LeadSource = "agent"
 )
 
 func ValidLeadSources() []string {
@@ -38,12 +38,12 @@ func ValidLeadSources() []string {
 }
 
 type JamaahProfile struct {
-	ID                     uuid.UUID  `json:"id" db:"id"`
-	OrgID                  uuid.UUID  `json:"org_id" db:"org_id"`
-	Title                  string     `json:"title" db:"title"`
-	Nama                   string     `json:"nama" db:"nama"`
+	ID                    uuid.UUID  `json:"id" db:"id"`
+	OrgID                 uuid.UUID  `json:"org_id" db:"org_id"`
+	Title                 string     `json:"title" db:"title"`
+	Nama                  string     `json:"nama" db:"nama"`
 	NamaAyah              string     `json:"nama_ayah" db:"nama_ayah"`
-	JenisIdentitas         string     `json:"jenis_identitas" db:"jenis_identitas"`
+	JenisIdentitas        string     `json:"jenis_identitas" db:"jenis_identitas"`
 	NoIdentitas           *string    `json:"no_identitas,omitempty" db:"no_identitas"`
 	NamaPaspor            string     `json:"nama_paspor" db:"nama_paspor"`
 	NoPaspor              *string    `json:"no_paspor,omitempty" db:"no_paspor"`
@@ -53,7 +53,7 @@ type JamaahProfile struct {
 	TanggalLahir          *time.Time `json:"tanggal_lahir,omitempty" db:"tanggal_lahir"`
 	Gender                string     `json:"gender" db:"gender"`
 	Alamat                string     `json:"alamat" db:"alamat"`
-	Provinsi               string     `json:"provinsi" db:"provinsi"`
+	Provinsi              string     `json:"provinsi" db:"provinsi"`
 	Kabupaten             string     `json:"kabupaten" db:"kabupaten"`
 	Kecamatan             string     `json:"kecamatan" db:"kecamatan"`
 	Kelurahan             string     `json:"kelurahan" db:"kelurahan"`
@@ -66,13 +66,13 @@ type JamaahProfile struct {
 	GolonganDarah         string     `json:"golongan_darah" db:"golongan_darah"`
 	ProviderVisa          string     `json:"provider_visa" db:"provider_visa"`
 	NoVisa                string     `json:"no_visa" db:"no_visa"`
-	TanggalVisa          *time.Time `json:"tanggal_visa,omitempty" db:"tanggal_visa"`
+	TanggalVisa           *time.Time `json:"tanggal_visa,omitempty" db:"tanggal_visa"`
 	TanggalVisaAkhir      *time.Time `json:"tanggal_visa_akhir,omitempty" db:"tanggal_visa_akhir"`
-	Asuransi               string     `json:"asuransi" db:"asuransi"`
+	Asuransi              string     `json:"asuransi" db:"asuransi"`
 	NoPolis               string     `json:"no_polis" db:"no_polis"`
 	TanggalInputPolis     *time.Time `json:"tanggal_input_polis,omitempty" db:"tanggal_input_polis"`
 	TanggalAwalPolis      *time.Time `json:"tanggal_awal_polis,omitempty" db:"tanggal_awal_polis"`
-	TanggalAkhirPolis    *time.Time `json:"tanggal_akhir_polis,omitempty" db:"tanggal_akhir_polis"`
+	TanggalAkhirPolis     *time.Time `json:"tanggal_akhir_polis,omitempty" db:"tanggal_akhir_polis"`
 	NoBpjs                string     `json:"no_bpjs" db:"no_bpjs"`
 	Email                 string     `json:"email" db:"email"`
 	ContactEmergencyName  string     `json:"contact_emergency_name" db:"contact_emergency_name"`
@@ -96,19 +96,19 @@ type JamaahPackageRegistration struct {
 	OrgID          uuid.UUID  `json:"org_id" db:"org_id"`
 	JamaahID       uuid.UUID  `json:"jamaah_id" db:"jamaah_id"`
 	PackageID      uuid.UUID  `json:"package_id" db:"package_id"`
-	RoomType        string     `json:"room_type" db:"room_type"`
-	PriceSnapshot   int64      `json:"price_snapshot" db:"price_snapshot"`
-	DiscountAmount  int64      `json:"discount_amount" db:"discount_amount"`
-	CustomPrice     *int64     `json:"custom_price,omitempty" db:"custom_price"`
-	PipelineStatus  string     `json:"pipeline_status" db:"pipeline_status"`
-	RegisteredAt    time.Time  `json:"registered_at" db:"registered_at"`
-	DPDate          *time.Time `json:"dp_date,omitempty" db:"dp_date"`
-	LunasDate       *time.Time `json:"lunas_date,omitempty" db:"lunas_date"`
-	BerangkatDate   *time.Time `json:"berangkat_date,omitempty" db:"berangkat_date"`
-	MahramID        *uuid.UUID `json:"mahram_id,omitempty" db:"mahram_id"`
-	InternalNotes   string     `json:"internal_notes" db:"internal_notes"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+	RoomType       string     `json:"room_type" db:"room_type"`
+	PriceSnapshot  int64      `json:"price_snapshot" db:"price_snapshot"`
+	DiscountAmount int64      `json:"discount_amount" db:"discount_amount"`
+	CustomPrice    *int64     `json:"custom_price,omitempty" db:"custom_price"`
+	PipelineStatus string     `json:"pipeline_status" db:"pipeline_status"`
+	RegisteredAt   time.Time  `json:"registered_at" db:"registered_at"`
+	DPDate         *time.Time `json:"dp_date,omitempty" db:"dp_date"`
+	LunasDate      *time.Time `json:"lunas_date,omitempty" db:"lunas_date"`
+	BerangkatDate  *time.Time `json:"berangkat_date,omitempty" db:"berangkat_date"`
+	MahramID       *uuid.UUID `json:"mahram_id,omitempty" db:"mahram_id"`
+	InternalNotes  string     `json:"internal_notes" db:"internal_notes"`
+	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type JamaahNote struct {
@@ -134,27 +134,27 @@ type FollowUp struct {
 }
 
 type JamaahDocument struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	JamaahID    uuid.UUID  `json:"jamaah_id" db:"jamaah_id"`
-	PackageID   *uuid.UUID `json:"package_id,omitempty" db:"package_id"`
-	OrgID       uuid.UUID  `json:"org_id" db:"org_id"`
-	DocType     string     `json:"doc_type" db:"doc_type"`
-	Status      string     `json:"status" db:"status"`
-	FileURL     *string    `json:"file_url,omitempty" db:"file_url"`
-	FileName    *string    `json:"file_name,omitempty" db:"file_name"`
-	FileSize    *int64     `json:"file_size,omitempty" db:"file_size"`
-	Notes       string     `json:"notes" db:"notes"`
-	VerifiedBy  *uuid.UUID `json:"verified_by,omitempty" db:"verified_by"`
-	VerifiedAt  *time.Time `json:"verified_at,omitempty" db:"verified_at"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	ID         uuid.UUID  `json:"id" db:"id"`
+	JamaahID   uuid.UUID  `json:"jamaah_id" db:"jamaah_id"`
+	PackageID  *uuid.UUID `json:"package_id,omitempty" db:"package_id"`
+	OrgID      uuid.UUID  `json:"org_id" db:"org_id"`
+	DocType    string     `json:"doc_type" db:"doc_type"`
+	Status     string     `json:"status" db:"status"`
+	FileURL    *string    `json:"file_url,omitempty" db:"file_url"`
+	FileName   *string    `json:"file_name,omitempty" db:"file_name"`
+	FileSize   *int64     `json:"file_size,omitempty" db:"file_size"`
+	Notes      string     `json:"notes" db:"notes"`
+	VerifiedBy *uuid.UUID `json:"verified_by,omitempty" db:"verified_by"`
+	VerifiedAt *time.Time `json:"verified_at,omitempty" db:"verified_at"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type SiskopatuhRow struct {
-	Title              string `json:"title"`
-	Nama               string `json:"nama"`
+	Title             string `json:"title"`
+	Nama              string `json:"nama"`
 	NamaAyah          string `json:"nama_ayah"`
-	JenisIdentitas     string `json:"jenis_identitas"`
+	JenisIdentitas    string `json:"jenis_identitas"`
 	NoIdentitas       string `json:"no_identitas"`
 	NamaPaspor        string `json:"nama_paspor"`
 	NoPaspor          string `json:"no_paspor"`
@@ -169,64 +169,64 @@ type SiskopatuhRow struct {
 	Kelurahan         string `json:"kelurahan"`
 	NoTelepon         string `json:"no_telepon"`
 	NoHP              string `json:"no_hp"`
-	Kewarganegaraan  string `json:"kewarganegaraan"`
-	StatusPernikahan string `json:"status_pernikahan"`
+	Kewarganegaraan   string `json:"kewarganegaraan"`
+	StatusPernikahan  string `json:"status_pernikahan"`
 	Pendidikan        string `json:"pendidikan"`
 	Pekerjaan         string `json:"pekerjaan"`
 	ProviderVisa      string `json:"provider_visa"`
 	NoVisa            string `json:"no_visa"`
 	TanggalVisa       string `json:"tanggal_visa"`
-	TanggalVisaAkhir string `json:"tanggal_visa_akhir"`
+	TanggalVisaAkhir  string `json:"tanggal_visa_akhir"`
 	Asuransi          string `json:"asuransi"`
 	NoPolis           string `json:"no_polis"`
 	TanggalInputPolis string `json:"tanggal_input_polis"`
-	TanggalAwalPolis string `json:"tanggal_awal_polis"`
+	TanggalAwalPolis  string `json:"tanggal_awal_polis"`
 	TanggalAkhirPolis string `json:"tanggal_akhir_polis"`
 	NoBpjs            string `json:"no_bpjs"`
 }
 
 type CreateJamaahRequest struct {
-	Title                 string  `json:"title" validate:"max=20"`
-	Nama                  string  `json:"nama" validate:"required,min=2,max=255"`
-	NamaAyah             string  `json:"nama_ayah,omitempty"`
-	JenisIdentitas         string  `json:"jenis_identitas,omitempty"`
-	NoIdentitas           string  `json:"no_identitas,omitempty"`
-	NamaPaspor            string  `json:"nama_paspor,omitempty"`
-	NoPaspor              string  `json:"no_paspor,omitempty"`
-	TanggalPaspor         string  `json:"tanggal_paspor,omitempty"`
-	KotaPaspor            string  `json:"kota_paspor,omitempty"`
-	TempatLahir           string  `json:"tempat_lahir,omitempty"`
-	TanggalLahir          string  `json:"tanggal_lahir,omitempty"`
-	Gender                string  `json:"gender,omitempty"`
-	Alamat                string  `json:"alamat,omitempty"`
-	Provinsi              string  `json:"provinsi,omitempty"`
-	Kabupaten             string  `json:"kabupaten,omitempty"`
-	Kecamatan             string  `json:"kecamatan,omitempty"`
-	Kelurahan             string  `json:"kelurahan,omitempty"`
-	NoTelepon             string  `json:"no_telepon,omitempty"`
-	NoHP                  string  `json:"no_hp,omitempty"`
-	Kewarganegaraan       string  `json:"kewarganegaraan,omitempty"`
-	StatusPernikahan      string  `json:"status_pernikahan,omitempty"`
-	Pendidikan            string  `json:"pendidikan,omitempty"`
-	Pekerjaan             string  `json:"pekerjaan,omitempty"`
-	ProviderVisa          string  `json:"provider_visa,omitempty"`
-	NoVisa                string  `json:"no_visa,omitempty"`
-	Asuransi               string  `json:"asuransi,omitempty"`
-	NoPolis               string  `json:"no_polis,omitempty"`
-	Email                 string  `json:"email,omitempty"`
-	ContactEmergencyName  string  `json:"contact_emergency_name,omitempty"`
-	ContactEmergencyPhone string  `json:"contact_emergency_phone,omitempty"`
-	LeadSource            string  `json:"lead_source,omitempty"`
-	IhramSize             string  `json:"ihram_size,omitempty"`
-	MukenaSize            string  `json:"mukena_size,omitempty"`
-	BajuSize              string  `json:"baju_size,omitempty"`
+	Title                 string `json:"title" validate:"max=20"`
+	Nama                  string `json:"nama" validate:"required,min=2,max=255"`
+	NamaAyah              string `json:"nama_ayah,omitempty"`
+	JenisIdentitas        string `json:"jenis_identitas,omitempty"`
+	NoIdentitas           string `json:"no_identitas,omitempty"`
+	NamaPaspor            string `json:"nama_paspor,omitempty"`
+	NoPaspor              string `json:"no_paspor,omitempty"`
+	TanggalPaspor         string `json:"tanggal_paspor,omitempty"`
+	KotaPaspor            string `json:"kota_paspor,omitempty"`
+	TempatLahir           string `json:"tempat_lahir,omitempty"`
+	TanggalLahir          string `json:"tanggal_lahir,omitempty"`
+	Gender                string `json:"gender,omitempty"`
+	Alamat                string `json:"alamat,omitempty"`
+	Provinsi              string `json:"provinsi,omitempty"`
+	Kabupaten             string `json:"kabupaten,omitempty"`
+	Kecamatan             string `json:"kecamatan,omitempty"`
+	Kelurahan             string `json:"kelurahan,omitempty"`
+	NoTelepon             string `json:"no_telepon,omitempty"`
+	NoHP                  string `json:"no_hp,omitempty"`
+	Kewarganegaraan       string `json:"kewarganegaraan,omitempty"`
+	StatusPernikahan      string `json:"status_pernikahan,omitempty"`
+	Pendidikan            string `json:"pendidikan,omitempty"`
+	Pekerjaan             string `json:"pekerjaan,omitempty"`
+	ProviderVisa          string `json:"provider_visa,omitempty"`
+	NoVisa                string `json:"no_visa,omitempty"`
+	Asuransi              string `json:"asuransi,omitempty"`
+	NoPolis               string `json:"no_polis,omitempty"`
+	Email                 string `json:"email,omitempty"`
+	ContactEmergencyName  string `json:"contact_emergency_name,omitempty"`
+	ContactEmergencyPhone string `json:"contact_emergency_phone,omitempty"`
+	LeadSource            string `json:"lead_source,omitempty"`
+	IhramSize             string `json:"ihram_size,omitempty"`
+	MukenaSize            string `json:"mukena_size,omitempty"`
+	BajuSize              string `json:"baju_size,omitempty"`
 }
 
 type UpdateJamaahRequest struct {
 	Title                 *string `json:"title,omitempty"`
 	Nama                  *string `json:"nama,omitempty"`
-	NamaAyah             *string `json:"nama_ayah,omitempty"`
-	JenisIdentitas         *string `json:"jenis_identitas,omitempty"`
+	NamaAyah              *string `json:"nama_ayah,omitempty"`
+	JenisIdentitas        *string `json:"jenis_identitas,omitempty"`
 	NoIdentitas           *string `json:"no_identitas,omitempty"`
 	NamaPaspor            *string `json:"nama_paspor,omitempty"`
 	NoPaspor              *string `json:"no_paspor,omitempty"`
@@ -248,7 +248,7 @@ type UpdateJamaahRequest struct {
 	Pekerjaan             *string `json:"pekerjaan,omitempty"`
 	ProviderVisa          *string `json:"provider_visa,omitempty"`
 	NoVisa                *string `json:"no_visa,omitempty"`
-	Asuransi               *string `json:"asuransi,omitempty"`
+	Asuransi              *string `json:"asuransi,omitempty"`
 	NoPolis               *string `json:"no_polis,omitempty"`
 	Email                 *string `json:"email,omitempty"`
 	ContactEmergencyName  *string `json:"contact_emergency_name,omitempty"`
@@ -260,11 +260,11 @@ type UpdateJamaahRequest struct {
 }
 
 type RegisterToPackageRequest struct {
-	PackageID    uuid.UUID `json:"package_id" validate:"required"`
-	RoomType     string     `json:"room_type" validate:"required,oneof=quad triple double single"`
-	PriceSnapshot int64     `json:"price_snapshot" validate:"min=1"`
-	DiscountAmount int64    `json:"discount_amount,omitempty"`
-	CustomPrice   *int64    `json:"custom_price,omitempty"`
+	PackageID      uuid.UUID `json:"package_id" validate:"required"`
+	RoomType       string    `json:"room_type" validate:"required,oneof=quad triple double single"`
+	PriceSnapshot  int64     `json:"price_snapshot" validate:"min=1"`
+	DiscountAmount int64     `json:"discount_amount,omitempty"`
+	CustomPrice    *int64    `json:"custom_price,omitempty"`
 }
 
 // CRMJamaahRow is a jamaah profile hydrated with its latest package registration
@@ -297,8 +297,8 @@ type AddNoteRequest struct {
 
 type AddFollowUpRequest struct {
 	PackageID   *string `json:"package_id,omitempty"`
-	Description string `json:"description" validate:"required"`
-	DueDate     string `json:"due_date" validate:"required"`
+	Description string  `json:"description" validate:"required"`
+	DueDate     string  `json:"due_date" validate:"required"`
 }
 
 type UploadDocumentRequest struct {
@@ -313,8 +313,8 @@ type UpdateDocumentStatusRequest struct {
 }
 
 type DashboardAlerts struct {
-	PassportExpiring90 []JamaahProfile `json:"passport_expiring_90"`
-	PassportExpiring30 []JamaahProfile `json:"passport_expiring_30"`
+	PassportExpiring90 []JamaahProfile  `json:"passport_expiring_90"`
+	PassportExpiring30 []JamaahProfile  `json:"passport_expiring_30"`
 	OverdueFollowUps   []FollowUp       `json:"overdue_follow_ups"`
 	IncompleteDocs     []JamaahDocument `json:"incomplete_docs"`
 }

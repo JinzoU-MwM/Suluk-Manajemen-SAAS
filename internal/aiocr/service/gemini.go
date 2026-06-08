@@ -38,8 +38,8 @@ type geminiImage struct {
 }
 
 type geminiConfig struct {
-	Temperature     float64  `json:"temperature,omitempty"`
-	MaxOutputTokens int      `json:"maxOutputTokens,omitempty"`
+	Temperature      float64 `json:"temperature,omitempty"`
+	MaxOutputTokens  int     `json:"maxOutputTokens,omitempty"`
 	ResponseMimeType string  `json:"responseMimeType,omitempty"`
 }
 
@@ -109,9 +109,9 @@ func NewGeminiClient(apiKey string) *GeminiClient {
 		httpCli: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				MaxIdleConns:        10,
-				IdleConnTimeout:     30 * time.Second,
-				DisableCompression:  false,
+				MaxIdleConns:       10,
+				IdleConnTimeout:    30 * time.Second,
+				DisableCompression: false,
 			},
 		},
 	}

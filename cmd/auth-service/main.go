@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"go.uber.org/zap"
 
 	"github.com/jamaah-in/v2/internal/auth/handler"
 	"github.com/jamaah-in/v2/internal/auth/repository"
@@ -110,7 +108,7 @@ func main() {
 	authPublic.Post("/login", authHandler.Login)
 	authPublic.Post("/refresh", authHandler.RefreshToken)
 
-	authPrivate := app.Group("/api/v1/auth", authMiddleware(jwtManager, logger))
+	authPrivate := app.Group("/api/v1/auth", sharedMW.AuthMiddleware(jwtManager))
 	authPrivate.Post("/logout", authHandler.Logout)
 	authPrivate.Get("/me", authHandler.GetMe)
 	authPrivate.Put("/me", authHandler.UpdateMe)
@@ -125,7 +123,7 @@ func main() {
 	authPublic.Post("/forgot-password", authHandler.ForgotPassword)
 	authPublic.Post("/reset-password", authHandler.ResetPassword)
 
-	orgs := app.Group("/api/v1/orgs", authMiddleware(jwtManager, logger))
+	orgs := app.Group("/api/v1/orgs", sharedMW.AuthMiddleware(jwtManager))
 	orgs.Post("/", authHandler.CreateOrganization)
 	orgs.Get("/", authHandler.GetOrganization)
 	orgs.Get("/members", authHandler.ListTeamMembers)
@@ -138,25 +136,25 @@ func main() {
 	orgs.Get("/branches", authHandler.ListBranches)
 	orgs.Get("/dashboard/consolidated", authHandler.GetConsolidatedDashboard)
 
-	subscription := app.Group("/api/v1/subscription", authMiddleware(jwtManager, logger))
+	subscription := app.Group("/api/v1/subscription", sharedMW.AuthMiddleware(jwtManager))
 	subscription.Get("/status", authHandler.GetSubscriptionStatus)
 	subscription.Post("/upgrade", authHandler.UpgradeToPro)
 	subscription.Get("/trial-status", authHandler.GetTrialStatus)
 	subscription.Post("/activate-trial", authHandler.ActivateTrial)
 	subscription.Get("/pricing", authHandler.GetPricing)
 
-	notifications := app.Group("/api/v1/notifications", authMiddleware(jwtManager, logger))
+	notifications := app.Group("/api/v1/notifications", sharedMW.AuthMiddleware(jwtManager))
 	notifications.Get("/", authHandler.ListNotifications)
 	notifications.Put("/:id/read", authHandler.MarkNotificationRead)
 	notifications.Put("/read-all", authHandler.MarkAllNotificationsRead)
 
-	tickets := app.Group("/api/v1/tickets", authMiddleware(jwtManager, logger))
+	tickets := app.Group("/api/v1/tickets", sharedMW.AuthMiddleware(jwtManager))
 	tickets.Get("/", authHandler.ListTickets)
 	tickets.Post("/", authHandler.CreateTicket)
 	tickets.Get("/:id/messages", authHandler.GetTicketMessages)
 	tickets.Post("/:id/messages", authHandler.AddTicketMessage)
 
-	team := app.Group("/api/v1/team", authMiddleware(jwtManager, logger))
+	team := app.Group("/api/v1/team", sharedMW.AuthMiddleware(jwtManager))
 	team.Get("/", authHandler.GetOrganization)
 	team.Post("/create", authHandler.CreateOrganization)
 	team.Post("/invite", authHandler.InviteMember)
@@ -165,7 +163,7 @@ func main() {
 	team.Post("/join/:token", authHandler.AcceptInvite)
 	team.Delete("/invites/:inviteId", authHandler.CancelInvite)
 
-	app.Post("/api/v1/invite/accept", authMiddleware(jwtManager, logger), authHandler.AcceptInvite)
+	app.Post("/api/v1/invite/accept", sharedMW.AuthMiddleware(jwtManager), authHandler.AcceptInvite)
 
 	go func() {
 		if err := app.Listen(fmt.Sprintf(":%d", cfg.Server.Port)); err != nil {
@@ -183,31 +181,5 @@ func main() {
 	defer cancel()
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
 		logger.Errorf("fiber shutdown: %v", err)
-	}
-}
-
-func authMiddleware(jwtMgr *sharedAuth.JWTManager, logger *zap.SugaredLogger) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "missing authorization header"})
-		}
-
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenStr == authHeader {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "invalid authorization format"})
-		}
-
-		if jwtMgr == nil {
-			return c.Status(500).JSON(fiber.Map{"success": false, "error": "JWT not configured"})
-		}
-
-		claims, err := jwtMgr.ValidateToken(tokenStr)
-		if err != nil {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "invalid or expired token"})
-		}
-
-		c.Locals("claims", claims)
-		return c.Next()
 	}
 }

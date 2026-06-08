@@ -17,6 +17,7 @@ import (
 
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 )
 
 var httpClient *http.Client
@@ -47,7 +48,7 @@ func main() {
 		WriteTimeout: 60 * time.Second,
 	})
 
-	app.Use(recover.New())
+	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))
 	allowedOrigins := getEnv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8005,https://test.jni.my.id")
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
@@ -62,12 +63,12 @@ func main() {
 	})
 
 	services := map[string]string{
-		"auth":     getEnv("AUTH_SERVICE_ADDR", "localhost:50051"),
-		"package":  getEnv("PACKAGE_SERVICE_ADDR", "localhost:50052"),
-		"jamaah":   getEnv("JAMAAH_SERVICE_ADDR", "localhost:50053"),
-		"invoice":  getEnv("INVOICE_SERVICE_ADDR", "localhost:50054"),
-		"finance":  getEnv("FINANCE_SERVICE_ADDR", "localhost:50055"),
-		"aiocr":    getEnv("AIOCR_SERVICE_ADDR", "localhost:50056"),
+		"auth":      getEnv("AUTH_SERVICE_ADDR", "localhost:50051"),
+		"package":   getEnv("PACKAGE_SERVICE_ADDR", "localhost:50052"),
+		"jamaah":    getEnv("JAMAAH_SERVICE_ADDR", "localhost:50053"),
+		"invoice":   getEnv("INVOICE_SERVICE_ADDR", "localhost:50054"),
+		"finance":   getEnv("FINANCE_SERVICE_ADDR", "localhost:50055"),
+		"aiocr":     getEnv("AIOCR_SERVICE_ADDR", "localhost:50056"),
 		"vendor":    getEnv("VENDOR_SERVICE_ADDR", "localhost:50057"),
 		"contract":  getEnv("CONTRACT_SERVICE_ADDR", "localhost:50058"),
 		"inventory": getEnv("INVENTORY_SERVICE_ADDR", "localhost:50059"),

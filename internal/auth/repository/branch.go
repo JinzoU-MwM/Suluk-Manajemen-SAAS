@@ -17,10 +17,10 @@ func (r *AuthRepo) CreateBranch(ctx context.Context, parentOrgID uuid.UUID, name
 }
 
 func (r *AuthRepo) ListBranches(ctx context.Context, parentOrgID uuid.UUID) ([]struct {
-	ID         uuid.UUID
-	Name       string
-	Slug       string
-	CreatedAt  interface{}
+	ID        uuid.UUID
+	Name      string
+	Slug      string
+	CreatedAt interface{}
 }, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, branch_name, slug, created_at
@@ -32,23 +32,23 @@ func (r *AuthRepo) ListBranches(ctx context.Context, parentOrgID uuid.UUID) ([]s
 	}
 	defer rows.Close()
 	type Branch struct {
-		ID        uuid.UUID `json:"id"`
-		Name      string    `json:"name"`
-		Slug      string    `json:"slug"`
+		ID        uuid.UUID   `json:"id"`
+		Name      string      `json:"name"`
+		Slug      string      `json:"slug"`
 		CreatedAt interface{} `json:"created_at"`
 	}
 	var result []struct {
-		ID         uuid.UUID
-		Name       string
-		Slug       string
-		CreatedAt  interface{}
+		ID        uuid.UUID
+		Name      string
+		Slug      string
+		CreatedAt interface{}
 	}
 	for rows.Next() {
 		var b struct {
-			ID         uuid.UUID
-			Name       string
-			Slug       string
-			CreatedAt  interface{}
+			ID        uuid.UUID
+			Name      string
+			Slug      string
+			CreatedAt interface{}
 		}
 		rows.Scan(&b.ID, &b.Name, &b.Slug, &b.CreatedAt)
 		result = append(result, b)

@@ -68,7 +68,7 @@ func (s *PackageService) CreatePackage(ctx context.Context, orgID uuid.UUID, req
 		HotelMadinahNights:   req.HotelMadinahNights,
 		HotelMadinahDistance: req.HotelMadinahDistance,
 		Itinerary:            req.Itinerary,
-		IsPublished:           false,
+		IsPublished:          false,
 		Status:               "draft",
 	}
 
@@ -78,13 +78,13 @@ func (s *PackageService) CreatePackage(ctx context.Context, orgID uuid.UUID, req
 
 	for i, tierReq := range req.PricingTiers {
 		tier := &model.PricingTier{
-			ID:         uuid.New(),
-			PackageID:  pkg.ID,
-			RoomType:   tierReq.RoomType,
-			Price:      tierReq.Price,
-			Label:      tierReq.Label,
+			ID:          uuid.New(),
+			PackageID:   pkg.ID,
+			RoomType:    tierReq.RoomType,
+			Price:       tierReq.Price,
+			Label:       tierReq.Label,
 			IsEarlyBird: tierReq.IsEarlyBird,
-			SortOrder:  i,
+			SortOrder:   i,
 		}
 		if tierReq.EarlyBirdExpiresAt != nil {
 			t, err := repository.ParseDate(tierReq.EarlyBirdExpiresAt)
@@ -306,7 +306,7 @@ func (s *PackageService) CreateCostComponent(ctx context.Context, packageID, org
 	if _, err := s.repo.GetPackageByID(ctx, packageID, orgID); err != nil {
 		return nil, err
 	}
-cc := &model.CostComponent{
+	cc := &model.CostComponent{
 		ID:              uuid.New(),
 		PackageID:       packageID,
 		Name:            req.Name,

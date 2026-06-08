@@ -53,7 +53,7 @@ func NewJWTManager(privateKeyPath, publicKeyKeyPath string, accessTTL, refreshTT
 	return &JWTManager{
 		privateKey: privKey,
 		publicKey:  pubKey,
-		accessTTL: accessTTL,
+		accessTTL:  accessTTL,
 		refreshTTL: refreshTTL,
 	}, nil
 }

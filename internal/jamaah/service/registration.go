@@ -29,8 +29,12 @@ func (s *JamaahService) GenerateRegistrationLink(ctx context.Context, orgID, use
 		IsActive:  true,
 		CreatedBy: &userID,
 	}
-	if req.GroupID != "" { link.GroupID = &req.GroupID }
-	if req.PackageID != "" { link.PackageID = &req.PackageID }
+	if req.GroupID != "" {
+		link.GroupID = &req.GroupID
+	}
+	if req.PackageID != "" {
+		link.PackageID = &req.PackageID
+	}
 
 	if err := s.repo.CreateRegistrationLink(ctx, link); err != nil {
 		return nil, err
@@ -101,12 +105,12 @@ func (s *JamaahService) ApprovePending(ctx context.Context, orgID string, pendin
 	}
 
 	profile := &model.JamaahProfile{
-		OrgID:        uuid.MustParse(orgID),
-		Nama:         pr.Name,
-		NoHP:         pr.PhoneNumber,
-		Email:        pr.Email,
-		NoIdentitas:  &pr.KtpFileURL,
-		NoPaspor:     &pr.PassportFileURL,
+		OrgID:       uuid.MustParse(orgID),
+		Nama:        pr.Name,
+		NoHP:        pr.PhoneNumber,
+		Email:       pr.Email,
+		NoIdentitas: &pr.KtpFileURL,
+		NoPaspor:    &pr.PassportFileURL,
 	}
 
 	if err := s.repo.CreateProfile(ctx, profile); err != nil {

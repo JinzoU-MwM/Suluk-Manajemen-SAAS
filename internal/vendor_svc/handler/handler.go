@@ -7,10 +7,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
-	"github.com/jamaah-in/v2/internal/vendor_svc/model"
-	"github.com/jamaah-in/v2/internal/vendor_svc/service"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
+	"github.com/jamaah-in/v2/internal/vendor_svc/model"
+	"github.com/jamaah-in/v2/internal/vendor_svc/service"
 )
 
 type VendorHandler struct {

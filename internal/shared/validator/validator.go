@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	nikRegex  = regexp.MustCompile(`^[0-9]{16}$`)
+	nikRegex   = regexp.MustCompile(`^[0-9]{16}$`)
 	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	phoneRegex = regexp.MustCompile(`^(\+62|62|0)[0-9]{8,13}$`)
 	uuidRegex  = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

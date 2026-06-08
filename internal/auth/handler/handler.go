@@ -419,17 +419,17 @@ func sanitizeUser(u *model.User) fiber.Map {
 
 func sanitizeUserMap(u *model.User) fiber.Map {
 	m := fiber.Map{
-		"id":              u.ID,
-		"email":           u.Email,
-		"name":            u.Name,
-		"email_verified":  u.EmailVerified,
-		"phone":           u.Phone,
-		"phone_verified":  u.PhoneVerified,
-		"role":            u.Role,
-		"is_active":       u.IsActive,
-		"is_super_admin":  u.IsSuperAdmin,
-		"created_at":      u.CreatedAt,
-		"updated_at":      u.UpdatedAt,
+		"id":             u.ID,
+		"email":          u.Email,
+		"name":           u.Name,
+		"email_verified": u.EmailVerified,
+		"phone":          u.Phone,
+		"phone_verified": u.PhoneVerified,
+		"role":           u.Role,
+		"is_active":      u.IsActive,
+		"is_super_admin": u.IsSuperAdmin,
+		"created_at":     u.CreatedAt,
+		"updated_at":     u.UpdatedAt,
 	}
 	return m
 }

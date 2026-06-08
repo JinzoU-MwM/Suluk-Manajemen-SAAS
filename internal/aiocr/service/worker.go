@@ -29,9 +29,9 @@ func NewWorker(repo *repository.AIOCRRepo, gemini *GeminiClient, logger *zap.Sug
 		httpCli: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
-				MaxIdleConns:        20,
-				IdleConnTimeout:     60 * time.Second,
-				DisableCompression:  false,
+				MaxIdleConns:       20,
+				IdleConnTimeout:    60 * time.Second,
+				DisableCompression: false,
 			},
 		},
 	}

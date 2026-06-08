@@ -388,9 +388,9 @@ func (r *JamaahRepo) GetPassportExpiring(ctx context.Context, orgID uuid.UUID, w
 
 var (
 	ErrProfileNotFound      = fmt.Errorf("jamaah profile not found")
-	ErrNIKExists           = fmt.Errorf("NIK already exists in this organization")
-	ErrPasporExists        = fmt.Errorf("passport number already exists in this organization")
+	ErrNIKExists            = fmt.Errorf("NIK already exists in this organization")
+	ErrPasporExists         = fmt.Errorf("passport number already exists in this organization")
 	ErrRegistrationNotFound = fmt.Errorf("registration not found")
-	ErrFollowUpNotFound    = fmt.Errorf("follow-up not found")
-	ErrDocumentNotFound    = fmt.Errorf("document not found")
+	ErrFollowUpNotFound     = fmt.Errorf("follow-up not found")
+	ErrDocumentNotFound     = fmt.Errorf("document not found")
 )

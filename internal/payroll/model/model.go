@@ -52,8 +52,8 @@ type Advance struct {
 	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 
-	EmployeeName string              `json:"employee_name,omitempty" db:"-"`
-	Repayments   []AdvanceRepayment  `json:"repayments,omitempty" db:"-"`
+	EmployeeName string             `json:"employee_name,omitempty" db:"-"`
+	Repayments   []AdvanceRepayment `json:"repayments,omitempty" db:"-"`
 }
 
 type AdvanceRepayment struct {
@@ -111,9 +111,9 @@ type RepayAdvanceRequest struct {
 }
 
 type PayrollSummary struct {
-	TotalEmployees   int   `json:"total_employees"`
-	ActiveEmployees  int   `json:"active_employees"`
-	TotalAdvances    int64 `json:"total_advances"`
+	TotalEmployees      int   `json:"total_employees"`
+	ActiveEmployees     int   `json:"active_employees"`
+	TotalAdvances       int64 `json:"total_advances"`
 	OutstandingAdvances int64 `json:"outstanding_advances"`
-	MonthlyPayroll   int64 `json:"monthly_payroll"`
+	MonthlyPayroll      int64 `json:"monthly_payroll"`
 }

@@ -52,7 +52,7 @@ type Invoice struct {
 	JamaahID        uuid.UUID  `json:"jamaah_id" db:"jamaah_id"`
 	PackageID       uuid.UUID  `json:"package_id" db:"package_id"`
 	RegistrationID  uuid.UUID  `json:"registration_id" db:"registration_id"`
-	RoomType         string     `json:"room_type" db:"room_type"`
+	RoomType        string     `json:"room_type" db:"room_type"`
 	PriceSnapshot   int64      `json:"price_snapshot" db:"price_snapshot"`
 	DiscountAmount  int64      `json:"discount_amount" db:"discount_amount"`
 	SurchargeAmount int64      `json:"surcharge_amount" db:"surcharge_amount"`
@@ -79,39 +79,39 @@ type PaymentSchedule struct {
 	InstallmentNum int        `json:"installment_num" db:"installment_num"`
 	Amount         int64      `json:"amount" db:"amount"`
 	DueDate        *time.Time `json:"due_date,omitempty" db:"due_date"`
-	Description    *string   `json:"description,omitempty" db:"description"`
+	Description    *string    `json:"description,omitempty" db:"description"`
 	IsPaid         bool       `json:"is_paid" db:"is_paid"`
 	PaidAt         *time.Time `json:"paid_at,omitempty" db:"paid_at"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 }
 
 type Payment struct {
-	ID              uuid.UUID  `json:"id" db:"id"`
-	OrgID           uuid.UUID  `json:"org_id" db:"org_id"`
-	InvoiceID       uuid.UUID  `json:"invoice_id" db:"invoice_id"`
-	Amount          int64      `json:"amount" db:"amount"`
-	PaymentMethod   string     `json:"payment_method" db:"payment_method"`
-	BankName        *string    `json:"bank_name,omitempty" db:"bank_name"`
-	AccountNumber   *string    `json:"account_number,omitempty" db:"account_number"`
-	ReferenceNumber *string    `json:"reference_number,omitempty" db:"reference_number"`
-	ProofURL        *string    `json:"proof_url,omitempty" db:"proof_url"`
-	Notes           string     `json:"notes,omitempty" db:"notes"`
-	ReceivedBy      uuid.UUID  `json:"received_by" db:"received_by"`
-	PaidAt          time.Time  `json:"paid_at" db:"paid_at"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	ID              uuid.UUID `json:"id" db:"id"`
+	OrgID           uuid.UUID `json:"org_id" db:"org_id"`
+	InvoiceID       uuid.UUID `json:"invoice_id" db:"invoice_id"`
+	Amount          int64     `json:"amount" db:"amount"`
+	PaymentMethod   string    `json:"payment_method" db:"payment_method"`
+	BankName        *string   `json:"bank_name,omitempty" db:"bank_name"`
+	AccountNumber   *string   `json:"account_number,omitempty" db:"account_number"`
+	ReferenceNumber *string   `json:"reference_number,omitempty" db:"reference_number"`
+	ProofURL        *string   `json:"proof_url,omitempty" db:"proof_url"`
+	Notes           string    `json:"notes,omitempty" db:"notes"`
+	ReceivedBy      uuid.UUID `json:"received_by" db:"received_by"`
+	PaidAt          time.Time `json:"paid_at" db:"paid_at"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
 
 type CreateInvoiceRequest struct {
-	JamaahID       uuid.UUID  `json:"jamaah_id" validate:"required"`
-	PackageID      uuid.UUID  `json:"package_id" validate:"required"`
-	RegistrationID  uuid.UUID  `json:"registration_id" validate:"required"`
-	RoomType        string     `json:"room_type" validate:"required,oneof=quad triple double single"`
-	PriceSnapshot   int64      `json:"price_snapshot" validate:"min=1"`
-	DiscountAmount  int64      `json:"discount_amount,omitempty"`
-	SurchargeAmount int64      `json:"surcharge_amount,omitempty"`
-	PaymentScheme   string     `json:"payment_scheme" validate:"required,oneof=dp_lunas cicilan full"`
-	DueDate         string     `json:"due_date,omitempty"`
-	Notes           string     `json:"notes,omitempty"`
+	JamaahID        uuid.UUID `json:"jamaah_id" validate:"required"`
+	PackageID       uuid.UUID `json:"package_id" validate:"required"`
+	RegistrationID  uuid.UUID `json:"registration_id" validate:"required"`
+	RoomType        string    `json:"room_type" validate:"required,oneof=quad triple double single"`
+	PriceSnapshot   int64     `json:"price_snapshot" validate:"min=1"`
+	DiscountAmount  int64     `json:"discount_amount,omitempty"`
+	SurchargeAmount int64     `json:"surcharge_amount,omitempty"`
+	PaymentScheme   string    `json:"payment_scheme" validate:"required,oneof=dp_lunas cicilan full"`
+	DueDate         string    `json:"due_date,omitempty"`
+	Notes           string    `json:"notes,omitempty"`
 }
 
 type UpdateInvoiceRequest struct {
@@ -147,12 +147,12 @@ type RecordPaymentRequest struct {
 }
 
 type InvoiceSummary struct {
-	TotalInvoices   int64 `json:"total_invoices"`
-	TotalAmount     int64 `json:"total_amount"`
-	TotalPaid       int64 `json:"total_paid"`
-	TotalRemaining  int64 `json:"total_remaining"`
+	TotalInvoices    int64 `json:"total_invoices"`
+	TotalAmount      int64 `json:"total_amount"`
+	TotalPaid        int64 `json:"total_paid"`
+	TotalRemaining   int64 `json:"total_remaining"`
 	OutstandingCount int64 `json:"outstanding_count"`
-	OverdueCount    int64 `json:"overdue_count"`
+	OverdueCount     int64 `json:"overdue_count"`
 }
 
 // JamaahBalance is the per-jamaah invoice aggregate used by the CRM list to show
@@ -207,19 +207,19 @@ type RefundPolicy struct {
 }
 
 type Refund struct {
-	ID         uuid.UUID   `json:"id" db:"id"`
-	OrgID      uuid.UUID   `json:"org_id" db:"org_id"`
-	InvoiceID  uuid.UUID   `json:"invoice_id" db:"invoice_id"`
-	Amount     int64       `json:"amount" db:"amount"`
-	RefundPct  float64     `json:"refund_pct" db:"refund_pct"`
-	Reason     string      `json:"reason" db:"reason"`
-	Status     string      `json:"status" db:"status"`
-	ApprovedBy *uuid.UUID  `json:"approved_by,omitempty" db:"approved_by"`
-	ApprovedAt *time.Time  `json:"approved_at,omitempty" db:"approved_at"`
+	ID          uuid.UUID  `json:"id" db:"id"`
+	OrgID       uuid.UUID  `json:"org_id" db:"org_id"`
+	InvoiceID   uuid.UUID  `json:"invoice_id" db:"invoice_id"`
+	Amount      int64      `json:"amount" db:"amount"`
+	RefundPct   float64    `json:"refund_pct" db:"refund_pct"`
+	Reason      string     `json:"reason" db:"reason"`
+	Status      string     `json:"status" db:"status"`
+	ApprovedBy  *uuid.UUID `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt  *time.Time `json:"approved_at,omitempty" db:"approved_at"`
 	ProcessedAt *time.Time `json:"processed_at,omitempty" db:"processed_at"`
-	Notes      string      `json:"notes" db:"notes"`
-	CreatedAt  time.Time   `json:"created_at" db:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at" db:"updated_at"`
+	Notes       string     `json:"notes" db:"notes"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type CreateRefundPolicyRequest struct {
@@ -238,10 +238,10 @@ type UpdateRefundPolicyRequest struct {
 }
 
 type InitiateRefundRequest struct {
-	Amount    int64  `json:"amount"`
+	Amount    int64   `json:"amount"`
 	RefundPct float64 `json:"refund_pct"`
-	Reason    string `json:"reason"`
-	Notes     string `json:"notes"`
+	Reason    string  `json:"reason"`
+	Notes     string  `json:"notes"`
 }
 
 type RefundActionRequest struct {
@@ -254,16 +254,16 @@ type RefundListResponse struct {
 }
 
 type PaymentOrder struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	OrgID       uuid.UUID  `json:"org_id" db:"org_id"`
-	UserID      uuid.UUID  `json:"user_id" db:"user_id"`
-	PlanType    string     `json:"plan_type" db:"plan_type"`
-	Amount      int64      `json:"amount" db:"amount"`
-	Status      string     `json:"status" db:"status"`
-	RedirectURL *string    `json:"redirect_url,omitempty" db:"redirect_url"`
-	GatewayRef  *string    `json:"gateway_ref,omitempty" db:"gateway_ref"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	ID          uuid.UUID `json:"id" db:"id"`
+	OrgID       uuid.UUID `json:"org_id" db:"org_id"`
+	UserID      uuid.UUID `json:"user_id" db:"user_id"`
+	PlanType    string    `json:"plan_type" db:"plan_type"`
+	Amount      int64     `json:"amount" db:"amount"`
+	Status      string    `json:"status" db:"status"`
+	RedirectURL *string   `json:"redirect_url,omitempty" db:"redirect_url"`
+	GatewayRef  *string   `json:"gateway_ref,omitempty" db:"gateway_ref"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type CreatePaymentOrderRequest struct {

@@ -3,19 +3,19 @@ package model
 import "time"
 
 type MemberEquipment struct {
-	ID                   string    `json:"id"`
-	OrgID                string    `json:"org_id"`
-	PackageID            string    `json:"package_id"`
-	MemberID             string    `json:"member_id"`
-	Nama                 string    `json:"nama"`
-	Gender               string    `json:"gender"`
-	BajuSize             string    `json:"baju_size"`
-	FamilyID             string    `json:"family_id"`
-	IsEquipmentReceived  bool      `json:"is_equipment_received"`
-	ReceivedItems        []string  `json:"received_items"`
-	ReceivedAt           *time.Time `json:"received_at"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	ID                  string     `json:"id"`
+	OrgID               string     `json:"org_id"`
+	PackageID           string     `json:"package_id"`
+	MemberID            string     `json:"member_id"`
+	Nama                string     `json:"nama"`
+	Gender              string     `json:"gender"`
+	BajuSize            string     `json:"baju_size"`
+	FamilyID            string     `json:"family_id"`
+	IsEquipmentReceived bool       `json:"is_equipment_received"`
+	ReceivedItems       []string   `json:"received_items"`
+	ReceivedAt          *time.Time `json:"received_at"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type InventoryItem struct {
@@ -31,10 +31,10 @@ type InventoryItem struct {
 }
 
 type ForecastResponse struct {
-	TotalMembers  int                `json:"total_members"`
-	Requirements  map[string]int     `json:"requirements"`
-	SizeBreakdown map[string]int     `json:"size_breakdown"`
-	Details       []MemberDetail     `json:"details"`
+	TotalMembers  int            `json:"total_members"`
+	Requirements  map[string]int `json:"requirements"`
+	SizeBreakdown map[string]int `json:"size_breakdown"`
+	Details       []MemberDetail `json:"details"`
 }
 
 type MemberDetail struct {
@@ -47,10 +47,10 @@ type MemberDetail struct {
 }
 
 type FulfillmentResponse struct {
-	ReceivedCount int            `json:"received_count"`
-	PendingCount  int            `json:"pending_count"`
-	Received      []MemberBrief  `json:"received"`
-	Pending       []MemberBrief  `json:"pending"`
+	ReceivedCount int           `json:"received_count"`
+	PendingCount  int           `json:"pending_count"`
+	Received      []MemberBrief `json:"received"`
+	Pending       []MemberBrief `json:"pending"`
 }
 
 type MemberBrief struct {
@@ -60,8 +60,8 @@ type MemberBrief struct {
 }
 
 type SyncMembersRequest struct {
-	PackageID string         `json:"package_id"`
-	Members   []SyncMember   `json:"members"`
+	PackageID string       `json:"package_id"`
+	Members   []SyncMember `json:"members"`
 }
 
 type SyncMember struct {
@@ -73,8 +73,8 @@ type SyncMember struct {
 }
 
 type MarkReceivedRequest struct {
-	MemberIDs      []string `json:"member_ids"`
-	ItemsReceived  []string `json:"items_received"`
+	MemberIDs     []string `json:"member_ids"`
+	ItemsReceived []string `json:"items_received"`
 }
 
 type UpdateOperationalRequest struct {

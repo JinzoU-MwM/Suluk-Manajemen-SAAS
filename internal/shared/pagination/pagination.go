@@ -1,8 +1,8 @@
 package pagination
 
 type Params struct {
-	Page     int `query:"page"`
-	PageSize int `query:"page_size"`
+	Page     int    `query:"page"`
+	PageSize int    `query:"page_size"`
 	SortBy   string `query:"sort_by"`
 	SortDir  string `query:"sort_dir"` // asc or desc
 	Search   string `query:"search"`

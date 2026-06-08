@@ -18,10 +18,10 @@ type Agent struct {
 	CreatedAt         time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 
-	TotalCommissions  int64 `json:"total_commissions" db:"-"`
-	TotalPaid         int64 `json:"total_paid" db:"-"`
-	TotalOutstanding  int64 `json:"total_outstanding" db:"-"`
-	TotalJamaah       int   `json:"total_jamaah" db:"-"`
+	TotalCommissions int64 `json:"total_commissions" db:"-"`
+	TotalPaid        int64 `json:"total_paid" db:"-"`
+	TotalOutstanding int64 `json:"total_outstanding" db:"-"`
+	TotalJamaah      int   `json:"total_jamaah" db:"-"`
 }
 
 type AgentCommission struct {

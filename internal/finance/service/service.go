@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/jamaah-in/v2/internal/finance/model"
 	"github.com/jamaah-in/v2/internal/finance/repository"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 )
 
 type FinanceService struct {
@@ -22,7 +21,7 @@ type FinanceService struct {
 	vendorAddr  string
 	packageAddr string
 	jamaahAddr  string
-	httpClient  *http.Client
+	httpc       *httpclient.Client
 }
 
 func NewFinanceService(repo *repository.FinanceRepo, invoiceAddr, vendorAddr, packageAddr, jamaahAddr string) *FinanceService {
@@ -32,9 +31,7 @@ func NewFinanceService(repo *repository.FinanceRepo, invoiceAddr, vendorAddr, pa
 		vendorAddr:  vendorAddr,
 		packageAddr: packageAddr,
 		jamaahAddr:  jamaahAddr,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		httpc:       httpclient.New(),
 	}
 }
 
@@ -176,11 +173,6 @@ func (s *FinanceService) GetOverdueExpenses(ctx context.Context, orgID uuid.UUID
 
 // --- P&L Aggregation ---
 
-type apiResponse struct {
-	Success bool            `json:"success"`
-	Data    json.RawMessage `json:"data"`
-}
-
 type packageSnapshot struct {
 	ID             uuid.UUID              `json:"id"`
 	Name           string                 `json:"name"`
@@ -191,21 +183,21 @@ type packageSnapshot struct {
 }
 
 type packageOverviewResponse struct {
-	ID             uuid.UUID `json:"id"`
-	Name           string    `json:"name"`
-	Status         string    `json:"status"`
-	DepartureDate  *string   `json:"departure_date,omitempty"`
-	TotalSeats     int       `json:"total_seats"`
-	ReservedSeats  int       `json:"reserved_seats"`
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	Status        string    `json:"status"`
+	DepartureDate *string   `json:"departure_date,omitempty"`
+	TotalSeats    int       `json:"total_seats"`
+	ReservedSeats int       `json:"reserved_seats"`
 }
 
 type invoiceSummaryResponse struct {
-	TotalInvoices   int64 `json:"total_invoices"`
-	TotalAmount     int64 `json:"total_amount"`
-	TotalPaid       int64 `json:"total_paid"`
-	TotalRemaining  int64 `json:"total_remaining"`
+	TotalInvoices    int64 `json:"total_invoices"`
+	TotalAmount      int64 `json:"total_amount"`
+	TotalPaid        int64 `json:"total_paid"`
+	TotalRemaining   int64 `json:"total_remaining"`
 	OutstandingCount int64 `json:"outstanding_count"`
-	OverdueCount    int64 `json:"overdue_count"`
+	OverdueCount     int64 `json:"overdue_count"`
 }
 
 func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID, authToken string) (*model.OwnerDashboard, error) {
@@ -791,40 +783,7 @@ func (s *FinanceService) fetchOpenPackages(ctx context.Context, authToken string
 }
 
 func (s *FinanceService) fetchFromService(ctx context.Context, addr, path, authToken string) (json.RawMessage, error) {
-	url := "http://" + addr + path
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	if authToken != "" {
-		req.Header.Set("Authorization", authToken)
-	}
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("service returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var apiResp apiResponse
-	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	if !apiResp.Success {
-		return nil, fmt.Errorf("service returned error: %s", string(apiResp.Data))
-	}
-
-	return apiResp.Data, nil
+	return s.httpc.GetRaw(ctx, addr, path, authToken)
 }
 
 func strPtr(s string) *string {

@@ -6,8 +6,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
-	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/jamaah/model"
+	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 )
 
 func (h *JamaahHandler) PublicRegistrationInfo(c *fiber.Ctx) error {

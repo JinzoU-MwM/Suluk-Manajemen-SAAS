@@ -32,7 +32,9 @@ var invoiceCols = `id, org_id, invoice_number, jamaah_id, package_id, registrati
 	price_snapshot, discount_amount, surcharge_amount, total_amount, amount_paid, amount_remaining,
 	payment_scheme, status, issued_at, due_date, cancelled_at, cancelled_reason, notes, created_at, updated_at`
 
-func (r *InvoiceRepo) scanInvoice(scanner interface{ Scan(dest ...interface{}) error }) (*model.Invoice, error) {
+func (r *InvoiceRepo) scanInvoice(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*model.Invoice, error) {
 	inv := &model.Invoice{}
 	err := scanner.Scan(&inv.ID, &inv.OrgID, &inv.InvoiceNumber, &inv.JamaahID, &inv.PackageID, &inv.RegistrationID,
 		&inv.RoomType, &inv.PriceSnapshot, &inv.DiscountAmount, &inv.SurchargeAmount, &inv.TotalAmount,

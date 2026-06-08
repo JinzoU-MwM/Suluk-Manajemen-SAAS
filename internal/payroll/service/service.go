@@ -49,17 +49,39 @@ func (s *PayrollService) GetEmployee(ctx context.Context, id, orgID string) (*mo
 
 func (s *PayrollService) UpdateEmployee(ctx context.Context, id, orgID string, req model.UpdateEmployeeRequest) (*model.Employee, error) {
 	updates := map[string]interface{}{}
-	if req.Name != nil { updates["name"] = *req.Name }
-	if req.Position != nil { updates["position"] = *req.Position }
-	if req.Type != nil { updates["type"] = *req.Type }
-	if req.BaseSalary != nil { updates["base_salary"] = *req.BaseSalary }
-	if req.Allowance != nil { updates["allowance"] = *req.Allowance }
-	if req.BpjsTk != nil { updates["bpjs_tk"] = *req.BpjsTk }
-	if req.BpjsKes != nil { updates["bpjs_kes"] = *req.BpjsKes }
-	if req.Pph21Rate != nil { updates["pph21_rate"] = *req.Pph21Rate }
-	if req.Phone != nil { updates["phone"] = *req.Phone }
-	if req.Email != nil { updates["email"] = *req.Email }
-	if req.IsActive != nil { updates["is_active"] = *req.IsActive }
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.Position != nil {
+		updates["position"] = *req.Position
+	}
+	if req.Type != nil {
+		updates["type"] = *req.Type
+	}
+	if req.BaseSalary != nil {
+		updates["base_salary"] = *req.BaseSalary
+	}
+	if req.Allowance != nil {
+		updates["allowance"] = *req.Allowance
+	}
+	if req.BpjsTk != nil {
+		updates["bpjs_tk"] = *req.BpjsTk
+	}
+	if req.BpjsKes != nil {
+		updates["bpjs_kes"] = *req.BpjsKes
+	}
+	if req.Pph21Rate != nil {
+		updates["pph21_rate"] = *req.Pph21Rate
+	}
+	if req.Phone != nil {
+		updates["phone"] = *req.Phone
+	}
+	if req.Email != nil {
+		updates["email"] = *req.Email
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
 	if len(updates) == 0 {
 		return s.repo.GetEmployee(ctx, id, orgID)
 	}
@@ -81,15 +103,15 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 	net := gross - pph21 - bpjs
 
 	slip := &model.SalarySlip{
-		OrgID:      orgID,
-		EmployeeID: req.EmployeeID,
-		Period:     req.Period,
-		BaseSalary: emp.BaseSalary,
-		Allowance:  emp.Allowance,
+		OrgID:       orgID,
+		EmployeeID:  req.EmployeeID,
+		Period:      req.Period,
+		BaseSalary:  emp.BaseSalary,
+		Allowance:   emp.Allowance,
 		Pph21Amount: pph21,
-		BpjsAmount: bpjs,
-		NetSalary:  net,
-		Notes:      req.Notes,
+		BpjsAmount:  bpjs,
+		NetSalary:   net,
+		Notes:       req.Notes,
 	}
 	if req.PackageID != "" {
 		slip.PackageID = &req.PackageID

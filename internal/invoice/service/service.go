@@ -32,7 +32,7 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, orgID, userID uuid.U
 		JamaahID:        req.JamaahID,
 		PackageID:       req.PackageID,
 		RegistrationID:  req.RegistrationID,
-		RoomType:         req.RoomType,
+		RoomType:        req.RoomType,
 		PriceSnapshot:   req.PriceSnapshot,
 		DiscountAmount:  req.DiscountAmount,
 		SurchargeAmount: req.SurchargeAmount,

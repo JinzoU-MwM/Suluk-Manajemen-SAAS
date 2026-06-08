@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	ErrRefundNotFound     = fmt.Errorf("refund not found")
-	ErrRefundNotPending   = fmt.Errorf("refund not in pending status")
-	ErrPolicyNotFound     = fmt.Errorf("refund policy not found")
+	ErrRefundNotFound   = fmt.Errorf("refund not found")
+	ErrRefundNotPending = fmt.Errorf("refund not in pending status")
+	ErrPolicyNotFound   = fmt.Errorf("refund policy not found")
 )
 
 func (r *InvoiceRepo) CreateRefund(ctx context.Context, ref *model.Refund) error {

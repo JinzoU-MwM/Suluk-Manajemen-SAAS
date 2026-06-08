@@ -248,7 +248,7 @@ func (s *VendorService) CreatePayment(ctx context.Context, orgID uuid.UUID, req 
 		PaymentDate:      *paymentDate,
 		Amount:           req.Amount,
 		Currency:         req.Currency,
-		ExchangeRate:      req.ExchangeRate,
+		ExchangeRate:     req.ExchangeRate,
 		SourceAccount:    strPtr(req.SourceAccount),
 		TransferProofURL: strPtr(req.TransferProofURL),
 		Notes:            strPtr(req.Notes),
