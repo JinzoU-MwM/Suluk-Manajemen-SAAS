@@ -55,13 +55,15 @@ func main() {
 	}
 
 	aiocrRepo := repository.NewAIOCRRepo(pool)
-	aiocrService := service.NewAIOCRService(aiocrRepo)
+	geminiClient := service.NewGeminiClient(cfg.Gemini.APIKey)
+	aiocrService := service.NewAIOCRService(aiocrRepo, geminiClient, logger)
 	aiocrHandler := handler.NewAIOCRHandler(aiocrService)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-aiocr-service",
 		ReadTimeout:  60 * time.Second,
 		WriteTimeout: 60 * time.Second,
+		BodyLimit:    50 * 1024 * 1024,
 	})
 	app.Use(recover.New())
 
@@ -78,10 +80,19 @@ func main() {
 	scan.Get("/results/:id", aiocrHandler.GetScanResult)
 	scan.Get("/jobs/:jobId/results", aiocrHandler.GetScanResultsByJob)
 
-	templates := app.Group("/api/v1/export-templates", authMW)
-	templates.Post("/", aiocrHandler.CreateExportTemplate)
-	templates.Get("/", aiocrHandler.ListExportTemplates)
-	templates.Delete("/:id", aiocrHandler.DeleteExportTemplate)
+	export := app.Group("/api/v1/export-templates", authMW)
+	export.Post("/", aiocrHandler.CreateExportTemplate)
+	export.Get("/", aiocrHandler.ListExportTemplates)
+	export.Delete("/:id", aiocrHandler.DeleteExportTemplate)
+
+	ocr := app.Group("/api/v1/ocr", authMW)
+	ocr.Get("/status", aiocrHandler.ListScanJobs)
+
+	processDocs := app.Group("/api/v1/process-documents", authMW)
+	processDocs.Post("/", aiocrHandler.CreateScanJob)
+
+	genExcel := app.Group("/api/v1/generate-excel", authMW)
+	genExcel.Post("/", aiocrHandler.CreateExportTemplate)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
