@@ -1,24 +1,42 @@
 <script>
   import { onMount } from 'svelte';
   import {
-    Plus, Search, SlidersHorizontal, LayoutGrid, List,
-    Phone, Mail, ChevronRight, UserCircle, AlertTriangle,
+    Plus, Search, LayoutGrid, List,
+    Phone, ChevronRight, UserCircle, Loader2,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
-  import { showToast } from '../services/toast.svelte.js';
+  import EmptyState from '../components/EmptyState.svelte';
+  import Pager from '../components/Pager.svelte';
+  import { showToast, mapError } from '../services/toast.svelte.js';
+  import { formatRupiah as formatIDR } from '../utils/formatting.js';
+  import { ApiService } from '../services/api.js';
 
   let { onNavigate, user = null } = $props();
 
   // ── State ──────────────────────────────────────────────
   let jamaah = $state([]);
   let isLoading = $state(true);
+  let error = $state('');
   let searchQuery = $state('');
   let filterStatus = $state('all');
   let viewMode = $state('table'); // 'table' | 'kanban'
   let drawerOpen = $state(false);
   let selectedJamaah = $state(null);
   let activeTab = $state('profil');
+
+  // Pagination (server-side via /jamaah/crm meta)
+  const PAGE_SIZE = 25;
+  let page = $state(1);
+  let total = $state(0);
+  let pkgMap = new Map();
+  let searchDebounce;
+
+  // Create form
+  let showCreate = $state(false);
+  let saving = $state(false);
+  const emptyForm = { nama: '', no_hp: '', email: '', gender: '', no_identitas: '', no_paspor: '', alamat: '', lead_source: 'walk_in' };
+  let form = $state({ ...emptyForm });
 
   const PIPELINE_STATUSES = [
     { id: 'all',       label: 'Semua' },
@@ -34,32 +52,89 @@
 
   const DRAWER_TABS = [
     { id: 'profil',   label: 'Profil' },
-    { id: 'dokumen',  label: 'Dokumen' },
     { id: 'invoice',  label: 'Invoice' },
     { id: 'catatan',  label: 'Catatan' },
   ];
 
-  // ── Derived ────────────────────────────────────────────
+  const LEAD_SOURCES = [
+    { id: 'walk_in',  label: 'Walk-in' },
+    { id: 'referral', label: 'Referral' },
+    { id: 'online',   label: 'Online' },
+    { id: 'agent',    label: 'Agen' },
+  ];
+
+  // Client-side status filter over the current page (search + paging are server-side)
   let filtered = $derived(
-    jamaah.filter(j => {
-      const matchStatus = filterStatus === 'all' || j.pipeline_status === filterStatus;
-      const q = searchQuery.toLowerCase();
-      const matchSearch = !q || j.name.toLowerCase().includes(q) || j.phone.includes(q);
-      return matchStatus && matchSearch;
-    })
+    filterStatus === 'all' ? jamaah : jamaah.filter(j => j.pipeline_status === filterStatus)
   );
 
   onMount(loadJamaah);
 
   async function loadJamaah() {
     isLoading = true;
+    error = '';
     try {
-      await new Promise(r => setTimeout(r, 500)); // simulate API
-      jamaah = MOCK_JAMAAH;
-    } catch {
-      showToast('Gagal memuat data jamaah', 'error');
+      const [crm, pkgs] = await Promise.all([
+        ApiService.listCRM({ search: searchQuery, page, pageSize: PAGE_SIZE }),
+        ApiService.listPackages({ pageSize: 200 }).catch(() => ([])),
+      ]);
+      const pkgList = pkgs?.packages || pkgs?.data || pkgs || [];
+      pkgMap = new Map(pkgList.map(p => [p.id, p.name]));
+      total = crm.meta?.total || 0;
+      jamaah = (crm.data || []).map(r => ({
+        id: r.id,
+        name: r.nama,
+        phone: r.no_hp || '',
+        nik: r.no_identitas || '',
+        passport_no: r.no_paspor || '',
+        email: r.email || '',
+        gender: r.gender || '',
+        package_name: r.package_id ? (pkgMap.get(r.package_id) || 'Paket') : null,
+        room_type: r.room_type || null,
+        pipeline_status: r.pipeline_status || 'prospek',
+        total_invoice: r.total_amount || 0,
+        paid: r.total_paid || 0,
+        sisa_tagihan: r.total_remaining || 0,
+      }));
+    } catch (e) {
+      error = e.message;
+      showToast(mapError(e.message), 'error');
     } finally {
       isLoading = false;
+    }
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => { page = 1; loadJamaah(); }, 350);
+  }
+
+  function gotoPage(p) {
+    page = p;
+    loadJamaah();
+  }
+
+  function openCreate() {
+    form = { ...emptyForm };
+    showCreate = true;
+  }
+
+  async function saveProfile() {
+    if (!form.nama.trim()) {
+      showToast('Nama wajib diisi', 'warning');
+      return;
+    }
+    saving = true;
+    try {
+      await ApiService.createProfile(form);
+      showToast('Jamaah berhasil ditambahkan', 'success');
+      showCreate = false;
+      page = 1;
+      await loadJamaah();
+    } catch (e) {
+      showToast(mapError(e.message), 'error');
+    } finally {
+      saving = false;
     }
   }
 
@@ -70,38 +145,10 @@
   }
 
   function openWhatsApp(phone) {
-    const clean = phone.replace(/\D/g, '');
+    const clean = (phone || '').replace(/\D/g, '');
+    if (!clean) { showToast('Nomor HP belum diisi', 'warning'); return; }
     const number = clean.startsWith('0') ? '62' + clean.slice(1) : clean;
     window.open(`https://wa.me/${number}`, '_blank');
-  }
-
-  function formatDate(d) {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
-  function formatIDR(num) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num || 0);
-  }
-
-  // ── Mock data ───────────────────────────────────────────
-  const MOCK_JAMAAH = [
-    { id: 1, name: 'Ahmad Fauzi', nik: '3271234567890001', passport_no: 'A1234567', phone: '081234567890', email: 'ahmad@email.com', gender: 'L', package_name: 'Umroh Reguler Ramadan 2026', room_type: 'Quad', pipeline_status: 'lunas', total_invoice: 22500000, paid: 22500000, passport_expiry: '2028-06-15', sisa_tagihan: 0 },
-    { id: 2, name: 'Siti Rahayu', nik: '3271234567890002', passport_no: 'B2345678', phone: '087654321098', email: 'siti@email.com', gender: 'P', package_name: 'Umroh Reguler Ramadan 2026', room_type: 'Double', pipeline_status: 'dp', total_invoice: 29000000, paid: 10000000, passport_expiry: '2026-02-10', sisa_tagihan: 19000000 },
-    { id: 3, name: 'Budi Santoso', nik: '3271234567890003', passport_no: 'C3456789', phone: '081298765432', email: 'budi@email.com', gender: 'L', package_name: 'Umroh Plus VIP April 2026', room_type: 'Triple', pipeline_status: 'booking', total_invoice: 40000000, paid: 0, passport_expiry: '2027-08-20', sisa_tagihan: 40000000 },
-    { id: 4, name: 'Fatimah Zahra', nik: '3271234567890004', passport_no: 'D4567890', phone: '089876543210', email: 'fatimah@email.com', gender: 'P', package_name: 'Umroh Reguler Ramadan 2026', room_type: 'Quad', pipeline_status: 'cicilan', total_invoice: 22500000, paid: 15000000, passport_expiry: '2029-03-05', sisa_tagihan: 7500000 },
-    { id: 5, name: 'Rizky Pratama', nik: '3271234567890005', passport_no: null, phone: '082112345678', email: 'rizky@email.com', gender: 'L', package_name: null, room_type: null, pipeline_status: 'prospek', total_invoice: 0, paid: 0, passport_expiry: null, sisa_tagihan: 0 },
-  ];
-
-  // ── Passport expiry warning ─────────────────────────────
-  function passportWarning(expiry, departureDate) {
-    if (!expiry) return null;
-    const exp = new Date(expiry);
-    const dep = departureDate ? new Date(departureDate) : new Date();
-    const daysLeft = Math.round((exp.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysLeft < 30) return 'red';
-    if (daysLeft < 90) return 'yellow';
-    return null;
   }
 </script>
 
@@ -111,7 +158,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-xl font-bold text-slate-800">CRM & Jamaah</h1>
-        <p class="mt-0.5 text-sm text-slate-500">{filtered.length} jamaah</p>
+        <p class="mt-0.5 text-sm text-slate-500">{total} jamaah</p>
       </div>
       <div class="flex items-center gap-2">
         <!-- View toggle -->
@@ -135,6 +182,7 @@
         </div>
         <button
           type="button"
+          onclick={openCreate}
           class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
         >
           <Plus class="h-4 w-4" />
@@ -150,7 +198,8 @@
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Cari nama atau nomor HP..."
+          oninput={onSearchInput}
+          placeholder="Cari nama, HP, NIK, paspor..."
           class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
       </div>
@@ -160,9 +209,7 @@
             type="button"
             onclick={() => (filterStatus = s.id)}
             class="flex-shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-all
-              {filterStatus === s.id
-                ? 'bg-primary-600 text-white'
-                : 'text-slate-500 hover:bg-slate-100'}"
+              {filterStatus === s.id ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
           >
             {s.label}
           </button>
@@ -180,39 +227,41 @@
             <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
           {/each}
         </div>
+      {:else if error}
+        <div class="m-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{mapError(error)}</div>
       {:else if filtered.length === 0}
-        <div class="flex flex-col items-center justify-center py-24 text-slate-400">
-          <UserCircle class="mb-3 h-12 w-12 opacity-30" />
-          <p class="font-medium">Belum ada jamaah</p>
-        </div>
+        <EmptyState
+          icon={UserCircle}
+          title={searchQuery || filterStatus !== 'all' ? 'Tidak ada jamaah yang cocok' : 'Belum ada jamaah'}
+          text={searchQuery || filterStatus !== 'all' ? 'Coba ubah kata kunci atau filter.' : 'Klik “Tambah Jamaah” untuk menambah data, atau import dari AI Scanner.'}
+        />
       {:else}
-        <table class="w-full min-w-[700px]">
+        <table class="w-full">
           <thead class="sticky top-0 bg-slate-50">
             <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
               <th class="px-6 py-3">Nama</th>
-              <th class="px-4 py-3">Paket</th>
+              <th class="hidden px-4 py-3 md:table-cell">Paket</th>
               <th class="px-4 py-3">Status</th>
               <th class="px-4 py-3 text-right">Sisa Tagihan</th>
-              <th class="px-4 py-3">Paspor</th>
+              <th class="hidden px-4 py-3 lg:table-cell">Paspor</th>
               <th class="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
             {#each filtered as j}
-              {@const warn = passportWarning(j.passport_expiry, null)}
               <tr class="group bg-white transition-colors hover:bg-primary-50/30">
                 <td class="px-6 py-3.5">
                   <div class="flex items-center gap-3">
                     <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl {j.gender === 'P' ? 'bg-pink-100' : 'bg-blue-100'} text-sm font-bold {j.gender === 'P' ? 'text-pink-600' : 'text-blue-600'}">
                       {j.name.charAt(0)}
                     </div>
-                    <div>
-                      <p class="text-sm font-semibold text-slate-800">{j.name}</p>
-                      <p class="text-xs text-slate-400">{j.phone}</p>
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-semibold text-slate-800">{j.name}</p>
+                      <p class="truncate text-xs text-slate-400">{j.phone || '—'}</p>
                     </div>
                   </div>
                 </td>
-                <td class="px-4 py-3.5">
+                <td class="hidden px-4 py-3.5 md:table-cell">
                   <p class="text-sm text-slate-600">{j.package_name || '—'}</p>
                   {#if j.room_type}<p class="text-xs text-slate-400">{j.room_type}</p>{/if}
                 </td>
@@ -222,30 +271,24 @@
                 <td class="px-4 py-3.5 text-right">
                   {#if j.sisa_tagihan > 0}
                     <span class="text-sm font-semibold text-red-600">{formatIDR(j.sisa_tagihan)}</span>
-                  {:else}
+                  {:else if j.total_invoice > 0}
                     <span class="text-sm font-semibold text-emerald-600">Lunas</span>
-                  {/if}
-                </td>
-                <td class="px-4 py-3.5">
-                  {#if !j.passport_no}
-                    <span class="text-xs text-slate-400">Belum ada</span>
-                  {:else if warn === 'red'}
-                    <span class="flex items-center gap-1 text-xs font-semibold text-red-600">
-                      <AlertTriangle class="h-3 w-3" /> Segera expired
-                    </span>
-                  {:else if warn === 'yellow'}
-                    <span class="flex items-center gap-1 text-xs font-semibold text-amber-500">
-                      <AlertTriangle class="h-3 w-3" /> Exp: {formatDate(j.passport_expiry)}
-                    </span>
                   {:else}
-                    <span class="text-xs text-slate-500">{formatDate(j.passport_expiry)}</span>
+                    <span class="text-sm text-slate-400">—</span>
                   {/if}
                 </td>
-                <td class="px-4 py-3.5">
+                <td class="hidden px-4 py-3.5 lg:table-cell">
+                  {#if j.passport_no}
+                    <span class="text-xs text-slate-600">{j.passport_no}</span>
+                  {:else}
+                    <span class="text-xs text-slate-400">Belum ada</span>
+                  {/if}
+                </td>
+                <td class="px-4 py-3.5 text-right">
                   <button
                     type="button"
                     onclick={() => openDetail(j)}
-                    class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
+                    class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
                   >
                     Detail
                     <ChevronRight class="h-3 w-3" />
@@ -255,6 +298,9 @@
             {/each}
           </tbody>
         </table>
+        <div class="px-6">
+          <Pager {page} pageSize={PAGE_SIZE} {total} onchange={gotoPage} />
+        </div>
       {/if}
     </div>
 
@@ -292,6 +338,61 @@
     </div>
   {/if}
 </div>
+
+<!-- Tambah Jamaah Drawer -->
+<SlideDrawer open={showCreate} title="Tambah Jamaah" width="480px" onClose={() => (showCreate = false)}>
+  <div class="space-y-4 p-6">
+    <div class="flex flex-col gap-1">
+      <label for="c-nama" class="text-xs font-medium text-slate-700">Nama Lengkap <span class="text-red-500">*</span></label>
+      <input id="c-nama" type="text" bind:value={form.nama} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1">
+        <label for="c-hp" class="text-xs font-medium text-slate-700">No. HP</label>
+        <input id="c-hp" type="tel" bind:value={form.no_hp} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="c-gender" class="text-xs font-medium text-slate-700">Jenis Kelamin</label>
+        <select id="c-gender" bind:value={form.gender} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400">
+          <option value="">-</option>
+          <option value="L">Laki-laki</option>
+          <option value="P">Perempuan</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="c-email" class="text-xs font-medium text-slate-700">Email</label>
+      <input id="c-email" type="email" bind:value={form.email} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1">
+        <label for="c-nik" class="text-xs font-medium text-slate-700">NIK</label>
+        <input id="c-nik" type="text" bind:value={form.no_identitas} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="c-paspor" class="text-xs font-medium text-slate-700">No. Paspor</label>
+        <input id="c-paspor" type="text" bind:value={form.no_paspor} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+      </div>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="c-alamat" class="text-xs font-medium text-slate-700">Alamat</label>
+      <input id="c-alamat" type="text" bind:value={form.alamat} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="c-lead" class="text-xs font-medium text-slate-700">Sumber</label>
+      <select id="c-lead" bind:value={form.lead_source} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400">
+        {#each LEAD_SOURCES as s}<option value={s.id}>{s.label}</option>{/each}
+      </select>
+    </div>
+    <div class="flex gap-2 pt-2">
+      <button type="button" onclick={() => (showCreate = false)} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+      <button type="button" onclick={saveProfile} disabled={saving} class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">
+        {#if saving}<Loader2 class="h-4 w-4 animate-spin" />{/if}
+        Simpan
+      </button>
+    </div>
+  </div>
+</SlideDrawer>
 
 <!-- Jamaah Detail Drawer -->
 <SlideDrawer
@@ -349,11 +450,11 @@
               {@render InfoRow("Nama Lengkap", selectedJamaah.name)}
               {@render InfoRow("NIK", selectedJamaah.nik || '—')}
               {@render InfoRow("No. Paspor", selectedJamaah.passport_no || '—')}
-              {@render InfoRow("Jenis Kelamin", selectedJamaah.gender === 'L' ? 'Laki-laki' : 'Perempuan')}
+              {@render InfoRow("Jenis Kelamin", selectedJamaah.gender === 'L' ? 'Laki-laki' : selectedJamaah.gender === 'P' ? 'Perempuan' : '—')}
             </div>
             <div class="rounded-xl border border-slate-100 p-4 space-y-2.5">
               <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Kontak</h4>
-              {@render InfoRow("HP / WhatsApp", selectedJamaah.phone)}
+              {@render InfoRow("HP / WhatsApp", selectedJamaah.phone || '—')}
               {@render InfoRow("Email", selectedJamaah.email || '—')}
             </div>
             <div class="rounded-xl border border-slate-100 p-4 space-y-2.5">
@@ -361,15 +462,6 @@
               {@render InfoRow("Paket", selectedJamaah.package_name || 'Belum dipilih')}
               {@render InfoRow("Tipe Kamar", selectedJamaah.room_type || '—')}
             </div>
-          </div>
-        {:else if activeTab === 'dokumen'}
-          <div class="space-y-2">
-            {#each ['KTP', 'Kartu Keluarga', 'Paspor', 'Pas Foto 4×6', 'Suntik Meningitis'] as doc}
-              <div class="flex items-center justify-between rounded-xl border border-slate-100 p-3">
-                <span class="text-sm text-slate-700">{doc}</span>
-                <span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">BELUM</span>
-              </div>
-            {/each}
           </div>
         {:else if activeTab === 'invoice'}
           <div class="space-y-3">
@@ -396,19 +488,7 @@
             </button>
           </div>
         {:else if activeTab === 'catatan'}
-          <div class="space-y-3">
-            <textarea
-              class="w-full rounded-xl border border-slate-200 p-3 text-sm text-slate-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-              placeholder="Tambahkan catatan internal tentang jamaah ini..."
-              rows="4"
-            ></textarea>
-            <button
-              type="button"
-              class="w-full rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
-            >
-              Simpan Catatan
-            </button>
-          </div>
+          <p class="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Catatan internal akan tersedia di pembaruan berikutnya.</p>
         {/if}
       </div>
     </div>

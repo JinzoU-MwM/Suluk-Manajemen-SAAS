@@ -18,6 +18,47 @@ export function createJamaahApi({ cacheInvalidate }) {
       return unwrapData(json);
     },
 
+    // CRM list: profiles + latest registration + outstanding balance.
+    // Returns { data: [...], meta: { total, page, page_size, pages } }.
+    async listCRM({ search = '', page = 1, pageSize = 25 } = {}) {
+      const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      if (search) params.set('search', search);
+      const response = await apiFetch(`${API_URL}/jamaah/crm?${params.toString()}`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(await parseError(response));
+      const json = await response.json();
+      return { data: json.data || [], meta: json.meta || {} };
+    },
+
+    async createProfile(data) {
+      const response = await apiFetch(`${API_URL}/jamaah/`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      cacheInvalidate?.('jamaah:');
+      return unwrapData(await response.json());
+    },
+
+    async registerToPackage(jamaahId, data) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/register`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
+    async getRegistration(jamaahId, packageId) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/registrations/${packageId}`, {
+        headers: authHeaders(),
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
     async getJamaah(id) {
       const response = await apiFetch(`${API_URL}/jamaah/${id}`, { headers: authHeaders() });
       if (!response.ok) throw new Error(await parseError(response));

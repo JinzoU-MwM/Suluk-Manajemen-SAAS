@@ -272,6 +272,10 @@ func (s *InvoiceService) GetMonthlyRevenue(ctx context.Context, orgID uuid.UUID,
 	return s.repo.GetMonthlyRevenue(ctx, orgID, months)
 }
 
+func (s *InvoiceService) GetBalances(ctx context.Context, orgID uuid.UUID) ([]model.JamaahBalance, error) {
+	return s.repo.GetBalancesByJamaah(ctx, orgID)
+}
+
 func (s *InvoiceService) ListInvoicesByPackage(ctx context.Context, orgID, packageID uuid.UUID) ([]model.Invoice, error) {
 	return s.repo.ListInvoicesByPackage(ctx, orgID, packageID)
 }

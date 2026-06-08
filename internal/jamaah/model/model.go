@@ -267,6 +267,26 @@ type RegisterToPackageRequest struct {
 	CustomPrice   *int64    `json:"custom_price,omitempty"`
 }
 
+// CRMJamaahRow is a jamaah profile hydrated with its latest package registration
+// and outstanding invoice balance, for the CRM list (GET /jamaah/crm).
+type CRMJamaahRow struct {
+	ID             uuid.UUID  `json:"id"`
+	Nama           string     `json:"nama"`
+	NoHP           string     `json:"no_hp"`
+	NoIdentitas    string     `json:"no_identitas"`
+	NoPaspor       string     `json:"no_paspor"`
+	Email          string     `json:"email"`
+	Gender         string     `json:"gender"`
+	PackageID      *uuid.UUID `json:"package_id"`
+	RoomType       string     `json:"room_type"`
+	PipelineStatus string     `json:"pipeline_status"`
+	PriceSnapshot  int64      `json:"price_snapshot"`
+	DiscountAmount int64      `json:"discount_amount"`
+	TotalAmount    int64      `json:"total_amount"`
+	TotalPaid      int64      `json:"total_paid"`
+	TotalRemaining int64      `json:"total_remaining"`
+}
+
 type UpdatePipelineStatusRequest struct {
 	PipelineStatus string `json:"pipeline_status" validate:"required,oneof=prospek survey booking dp cicilan lunas berangkat selesai batal"`
 }

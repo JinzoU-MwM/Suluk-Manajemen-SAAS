@@ -296,6 +296,33 @@ func (r *InvoiceRepo) GetMonthlyRevenue(ctx context.Context, orgID uuid.UUID, mo
 	return points, nil
 }
 
+// GetBalancesByJamaah returns one row per jamaah with their summed invoice totals
+// (excluding cancelled invoices) for the org.
+func (r *InvoiceRepo) GetBalancesByJamaah(ctx context.Context, orgID uuid.UUID) ([]model.JamaahBalance, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT jamaah_id,
+			COALESCE(SUM(total_amount), 0),
+			COALESCE(SUM(amount_paid), 0),
+			COALESCE(SUM(amount_remaining), 0)
+		FROM invoices
+		WHERE org_id = $1 AND status != 'batal'
+		GROUP BY jamaah_id`, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	balances := make([]model.JamaahBalance, 0)
+	for rows.Next() {
+		var b model.JamaahBalance
+		if err := rows.Scan(&b.JamaahID, &b.TotalAmount, &b.TotalPaid, &b.TotalRemaining); err != nil {
+			return nil, err
+		}
+		balances = append(balances, b)
+	}
+	return balances, rows.Err()
+}
+
 func (r *InvoiceRepo) GetPackageRevenue(ctx context.Context, orgID, packageID uuid.UUID) (*model.PackageRevenueSummary, error) {
 	s := &model.PackageRevenueSummary{PackageID: packageID}
 	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FILTER (WHERE status != 'batal'),

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,11 +13,17 @@ import (
 )
 
 type JamaahService struct {
-	repo *repository.JamaahRepo
+	repo        *repository.JamaahRepo
+	invoiceAddr string
+	httpClient  *http.Client
 }
 
-func NewJamaahService(repo *repository.JamaahRepo) *JamaahService {
-	return &JamaahService{repo: repo}
+func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr string) *JamaahService {
+	return &JamaahService{
+		repo:        repo,
+		invoiceAddr: invoiceAddr,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, req model.CreateJamaahRequest) (*model.JamaahProfile, error) {

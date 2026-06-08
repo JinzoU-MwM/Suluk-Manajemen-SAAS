@@ -155,6 +155,15 @@ type InvoiceSummary struct {
 	OverdueCount    int64 `json:"overdue_count"`
 }
 
+// JamaahBalance is the per-jamaah invoice aggregate used by the CRM list to show
+// each jamaah's outstanding balance without an N+1 of per-jamaah requests.
+type JamaahBalance struct {
+	JamaahID       uuid.UUID `json:"jamaah_id"`
+	TotalAmount    int64     `json:"total_amount"`
+	TotalPaid      int64     `json:"total_paid"`
+	TotalRemaining int64     `json:"total_remaining"`
+}
+
 // MonthlyRevenuePoint is one bar of the owner dashboard revenue trend chart.
 // Total is the sum of payments received in that calendar month.
 type MonthlyRevenuePoint struct {

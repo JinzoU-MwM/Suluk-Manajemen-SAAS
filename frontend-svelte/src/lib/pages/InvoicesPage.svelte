@@ -2,14 +2,14 @@
   import { onMount } from 'svelte';
   import {
     Plus, Search, Receipt, AlertCircle, CheckCircle,
-    Clock, ChevronRight, Upload, Download,
+    Clock, ChevronRight, Upload, Download, Loader2,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import IDRInput from '../components/IDRInput.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Pager from '../components/Pager.svelte';
-  import { showToast } from '../services/toast.svelte.js';
+  import { showToast, mapError } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR, formatDate } from '../utils/formatting.js';
   import { invoiceApi } from '../services/apiDomains/invoiceApi.js';
   import { ApiService, authHeaders } from '../services/api.js';
@@ -31,6 +31,91 @@
   let payDate = $state(new Date().toISOString().slice(0, 10));
   let payRef = $state('');
   let payNote = $state('');
+
+  // ── Create-invoice modal ───────────────────────────────
+  let showCreate = $state(false);
+  let creating = $state(false);
+  let allJamaah = $state([]);
+  let allPackages = $state([]);
+  let cJamaahId = $state('');
+  let cJamaahSearch = $state('');
+  let cPackageId = $state('');
+  let cRoomType = $state('quad');
+  let cPrice = $state(0);
+  let cScheme = $state('dp_lunas');
+  let cDiscount = $state(0);
+  let cDueDate = $state('');
+  let cNotes = $state('');
+
+  const PAYMENT_SCHEMES = [
+    { id: 'dp_lunas', label: 'DP lalu Lunas' },
+    { id: 'cicilan',  label: 'Cicilan' },
+    { id: 'full',     label: 'Bayar Penuh' },
+  ];
+  const ROOM_TYPES = ['quad', 'triple', 'double', 'single'];
+
+  let selectedPkg = $derived(allPackages.find(p => String(p.id) === String(cPackageId)) || null);
+  let pkgTiers = $derived(selectedPkg?.pricing_tiers || []);
+  let roomOptions = $derived(pkgTiers.length ? pkgTiers.map(t => t.room_type) : ROOM_TYPES);
+  let jamaahFiltered = $derived(
+    !cJamaahSearch ? allJamaah : allJamaah.filter(j =>
+      (j.nama || j.nama_paspor || '').toLowerCase().includes(cJamaahSearch.toLowerCase()))
+  );
+
+  // Keep room type valid for the chosen package, and auto-fill price from its tier.
+  $effect(() => {
+    if (pkgTiers.length && !pkgTiers.some(t => t.room_type === cRoomType)) {
+      cRoomType = pkgTiers[0].room_type;
+    }
+  });
+  $effect(() => {
+    const tier = pkgTiers.find(t => t.room_type === cRoomType);
+    if (tier) cPrice = tier.price;
+  });
+
+  function openCreate() {
+    cJamaahId = ''; cJamaahSearch = ''; cPackageId = '';
+    cRoomType = 'quad'; cPrice = 0; cScheme = 'dp_lunas';
+    cDiscount = 0; cDueDate = ''; cNotes = '';
+    showCreate = true;
+  }
+
+  async function submitCreate() {
+    if (!cJamaahId) { showToast('Pilih jamaah terlebih dahulu', 'warning'); return; }
+    if (!cPackageId) { showToast('Pilih paket terlebih dahulu', 'warning'); return; }
+    if (!cPrice || cPrice <= 0) { showToast('Harga paket belum terisi', 'warning'); return; }
+    creating = true;
+    try {
+      // Ensure the jamaah is registered to the package, then invoice that registration.
+      let reg = await ApiService.getRegistration(cJamaahId, cPackageId);
+      if (!reg) {
+        reg = await ApiService.registerToPackage(cJamaahId, {
+          package_id: cPackageId,
+          room_type: cRoomType,
+          price_snapshot: cPrice,
+          discount_amount: cDiscount || 0,
+        });
+      }
+      await invoiceApi.createInvoice({
+        jamaah_id: cJamaahId,
+        package_id: cPackageId,
+        registration_id: reg.id,
+        room_type: cRoomType,
+        price_snapshot: cPrice,
+        discount_amount: cDiscount || 0,
+        payment_scheme: cScheme,
+        due_date: cDueDate || undefined,
+        notes: cNotes || undefined,
+      });
+      showToast('Invoice berhasil dibuat', 'success');
+      showCreate = false;
+      await loadInvoices();
+    } catch (e) {
+      showToast(mapError(e.message), 'error');
+    } finally {
+      creating = false;
+    }
+  }
 
   const INVOICE_STATUSES = [
     { id: 'all',          label: 'Semua' },
@@ -87,6 +172,8 @@
       const jamaahList = jamaahData.jamaah || jamaahData.data || jamaahData || [];
       const packageList = packageData.packages || packageData.data || packageData || [];
 
+      allJamaah = jamaahList;
+      allPackages = packageList;
       const jamaahMap = new Map(jamaahList.map(j => [j.id, j.nama || j.nama_paspor || j.name || 'Tanpa Nama']));
       const packageMap = new Map(packageList.map(p => [p.id, p.name || 'Tanpa Nama']));
 
@@ -176,6 +263,7 @@
       </div>
       <button
         type="button"
+        onclick={openCreate}
         class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
       >
         <Plus class="h-4 w-4" />
@@ -466,4 +554,88 @@
       {/if}
     </div>
   {/if}
+</SlideDrawer>
+
+<!-- Buat Invoice Drawer -->
+<SlideDrawer open={showCreate} title="Buat Invoice" width="520px" onClose={() => (showCreate = false)}>
+  <div class="space-y-4 p-6">
+    <!-- Jamaah -->
+    <div class="flex flex-col gap-1">
+      <label for="ci-jamaah" class="text-sm font-medium text-slate-700">Jamaah <span class="text-red-500">*</span></label>
+      <input
+        type="text"
+        bind:value={cJamaahSearch}
+        placeholder="Cari nama jamaah..."
+        class="mb-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400"
+      />
+      <select id="ci-jamaah" bind:value={cJamaahId} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400">
+        <option value="">— Pilih jamaah —</option>
+        {#each jamaahFiltered as j}
+          <option value={j.id}>{j.nama || j.nama_paspor || 'Tanpa nama'}</option>
+        {/each}
+      </select>
+      {#if allJamaah.length === 0}
+        <p class="text-xs text-amber-600">Belum ada jamaah. Tambahkan jamaah di menu CRM dulu.</p>
+      {/if}
+    </div>
+
+    <!-- Package -->
+    <div class="flex flex-col gap-1">
+      <label for="ci-pkg" class="text-sm font-medium text-slate-700">Paket <span class="text-red-500">*</span></label>
+      <select id="ci-pkg" bind:value={cPackageId} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400">
+        <option value="">— Pilih paket —</option>
+        {#each allPackages as p}
+          <option value={p.id}>{p.name}</option>
+        {/each}
+      </select>
+    </div>
+
+    <!-- Room type + price -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1">
+        <label for="ci-room" class="text-sm font-medium text-slate-700">Tipe Kamar</label>
+        <select id="ci-room" bind:value={cRoomType} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400">
+          {#each roomOptions as rt}
+            <option value={rt}>{rt}</option>
+          {/each}
+        </select>
+      </div>
+      <IDRInput label="Harga" bind:value={cPrice} />
+    </div>
+
+    <!-- Payment scheme -->
+    <div class="flex flex-col gap-1">
+      <label for="ci-scheme" class="text-sm font-medium text-slate-700">Skema Pembayaran</label>
+      <select id="ci-scheme" bind:value={cScheme} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400">
+        {#each PAYMENT_SCHEMES as s}
+          <option value={s.id}>{s.label}</option>
+        {/each}
+      </select>
+    </div>
+
+    <IDRInput label="Diskon (opsional)" bind:value={cDiscount} />
+
+    <div class="flex flex-col gap-1">
+      <label for="ci-due" class="text-sm font-medium text-slate-700">Jatuh Tempo (opsional)</label>
+      <input id="ci-due" type="date" bind:value={cDueDate} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label for="ci-notes" class="text-sm font-medium text-slate-700">Catatan (opsional)</label>
+      <input id="ci-notes" type="text" bind:value={cNotes} class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400" />
+    </div>
+
+    <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm">
+      <span class="text-slate-500">Total Tagihan</span>
+      <span class="font-bold text-slate-800">{formatIDR(Math.max(0, (cPrice || 0) - (cDiscount || 0)))}</span>
+    </div>
+
+    <div class="flex gap-2 pt-1">
+      <button type="button" onclick={() => (showCreate = false)} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+      <button type="button" onclick={submitCreate} disabled={creating} class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">
+        {#if creating}<Loader2 class="h-4 w-4 animate-spin" />{/if}
+        Buat Invoice
+      </button>
+    </div>
+  </div>
 </SlideDrawer>

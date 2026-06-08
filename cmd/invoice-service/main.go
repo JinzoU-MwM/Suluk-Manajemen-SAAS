@@ -79,6 +79,7 @@ func main() {
 	invoices.Get("/", invoiceHandler.ListInvoices)
 	invoices.Get("/summary", invoiceHandler.GetSummary)
 	invoices.Get("/revenue/monthly", invoiceHandler.GetMonthlyRevenue)
+	invoices.Get("/balances", invoiceHandler.GetBalances)
 	invoices.Get("/package/:pkgId/revenue", invoiceHandler.GetPackageRevenue)
 	invoices.Get("/package/:pkgId", invoiceHandler.ListByPackage)
 	invoices.Get("/number/:number", invoiceHandler.GetInvoiceByNumber)

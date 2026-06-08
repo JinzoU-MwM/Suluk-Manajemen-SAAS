@@ -55,7 +55,7 @@ func main() {
 	}
 
 	jamaahRepo := repository.NewJamaahRepo(pool)
-	jamaahService := service.NewJamaahService(jamaahRepo)
+	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"))
 	jamaahHandler := handler.NewJamaahHandler(jamaahService)
 
 	app := fiber.New(fiber.Config{
@@ -74,6 +74,7 @@ func main() {
 	jamaah := app.Group("/api/v1/jamaah", authMW)
 	jamaah.Post("/", jamaahHandler.CreateProfile)
 	jamaah.Get("/", jamaahHandler.ListProfiles)
+	jamaah.Get("/crm", jamaahHandler.ListCRM)
 	jamaah.Get("/search/nik/:nik", jamaahHandler.FindByNIK)
 	jamaah.Get("/search/paspor/:paspor", jamaahHandler.FindByPaspor)
 	jamaah.Get("/dashboard/alerts", jamaahHandler.DashboardAlerts)
