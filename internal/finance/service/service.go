@@ -765,32 +765,29 @@ func marginPercent(profit, revenue int64) float64 {
 
 // fetchOpenPackages pages through all open packages instead of capping at a
 // single page, so the owner dashboard's active_packages and total stay
-// consistent for orgs with many open packages.
+// consistent for orgs with many open packages. fetchFromService already unwraps
+// the {success, data} envelope, so `data` here is the package array itself (the
+// total/meta is not returned); the count is derived from pagination.
 func (s *FinanceService) fetchOpenPackages(ctx context.Context, authToken string) ([]packageOverviewResponse, int, error) {
 	const pageSize = 100
 	const maxPages = 50 // safety cap (5000 packages)
 	var all []packageOverviewResponse
-	total := 0
 	for page := 1; page <= maxPages; page++ {
 		path := fmt.Sprintf("/api/v1/packages?status=open&page=%d&page_size=%d", page, pageSize)
 		data, err := s.fetchFromService(ctx, s.packageAddr, path, authToken)
 		if err != nil {
 			return nil, 0, err
 		}
-		var pl struct {
-			Data  []packageOverviewResponse `json:"data"`
-			Total int                       `json:"total"`
-		}
-		if err := json.Unmarshal(data, &pl); err != nil {
+		var pageItems []packageOverviewResponse
+		if err := json.Unmarshal(data, &pageItems); err != nil {
 			return nil, 0, err
 		}
-		total = pl.Total
-		all = append(all, pl.Data...)
-		if len(pl.Data) == 0 || len(all) >= total {
+		all = append(all, pageItems...)
+		if len(pageItems) < pageSize {
 			break
 		}
 	}
-	return all, total, nil
+	return all, len(all), nil
 }
 
 func (s *FinanceService) fetchFromService(ctx context.Context, addr, path, authToken string) (json.RawMessage, error) {
