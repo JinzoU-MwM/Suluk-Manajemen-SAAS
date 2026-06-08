@@ -12,7 +12,7 @@ func (h *AuthHandler) GetSubscriptionStatus(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	result, err := h.svc.GetSubscriptionStatus(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, result)
 }
@@ -22,7 +22,7 @@ func (h *AuthHandler) UpgradeToPro(c *fiber.Ctx) error {
 	var req model.UpgradeRequest
 	_ = c.BodyParser(&req)
 	if err := h.svc.UpgradeToPro(c.Context(), claims.OrgID, req); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "upgrade successful"})
 }
@@ -31,7 +31,7 @@ func (h *AuthHandler) GetTrialStatus(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	result, err := h.svc.GetTrialStatus(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, result)
 }
@@ -47,7 +47,7 @@ func (h *AuthHandler) ActivateTrial(c *fiber.Ctx) error {
 func (h *AuthHandler) GetPricing(c *fiber.Ctx) error {
 	plans, err := h.svc.GetPricing(c.Context())
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"plans": plans})
 }

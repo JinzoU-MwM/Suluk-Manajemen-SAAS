@@ -13,7 +13,7 @@ func (h *JamaahHandler) ListGroups(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	groups, err := h.svc.ListGroups(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"groups": groups})
 }

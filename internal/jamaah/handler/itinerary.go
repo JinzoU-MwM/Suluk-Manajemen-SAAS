@@ -17,7 +17,7 @@ func (h *JamaahHandler) GetItinerary(c *fiber.Ctx) error {
 	}
 	items, err := h.svc.ListItineraries(c.Context(), claims.OrgID, groupID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"items": items})
 }

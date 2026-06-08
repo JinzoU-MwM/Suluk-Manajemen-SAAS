@@ -17,7 +17,7 @@ func (h *JamaahHandler) ListCRM(c *fiber.Ctx) error {
 
 	rows, total, err := h.svc.ListCRM(c.Context(), claims.OrgID, authToken, search, page, pageSize)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, rows, int64(total), page, pageSize)
 }

@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -108,6 +110,25 @@ func Load() *Config {
 		Gemini: GeminiConfig{
 			APIKey: envOr("GEMINI_API_KEY", ""),
 		},
+	}
+}
+
+// Validate fails fast (in production) when critical secrets are not explicitly
+// set, so a service never silently falls back to a built-in default credential.
+// Dev keeps the convenient defaults. Call once after Load() in each service main.
+func (c *Config) Validate() {
+	if c.App.Env != "production" {
+		return
+	}
+	var missing []string
+	required := []string{"POSTGRES_PASSWORD"}
+	for _, key := range required {
+		if os.Getenv(key) == "" {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) > 0 {
+		log.Fatalf("config: required env vars not set in production: %s", strings.Join(missing, ", "))
 	}
 }
 

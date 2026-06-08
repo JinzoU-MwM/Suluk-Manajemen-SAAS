@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"go.uber.org/zap"
 
@@ -19,8 +20,11 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	sharedRedis "github.com/jamaah-in/v2/internal/shared/redis"
+	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 )
 
 func main() {
@@ -31,7 +35,9 @@ func main() {
 		fmt.Sscan(p, &cfg.Server.Port)
 	}
 
+	cfg.Validate()
 	logger := sharedLogger.New(cfg.App.Env)
+	sharedResponse.SetLogger(logger)
 	logger.Infof("starting auth service on :%d", cfg.Server.Port)
 
 	ctx := context.Background()
@@ -60,8 +66,10 @@ func main() {
 			logger.Fatalf("init jwt manager: %v", err)
 		}
 		logger.Info("JWT manager initialized with RSA keys")
+	} else if cfg.App.Env == "production" {
+		logger.Fatal("JWT keys not found; refusing to start without auth in production")
 	} else {
-		logger.Warn("JWT keys not found, running without JWT validation")
+		logger.Warn("JWT keys not found, running without JWT validation (dev only)")
 		jwtManager = nil
 	}
 
@@ -78,9 +86,15 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	})
 
-	app.Use(recover.New())
+	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))
 
-	authPublic := app.Group("/api/v1/auth")
+	app.Get("/health", sharedHealth.Handler("auth",
+		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
+
+	// Rate limit unauthenticated auth endpoints to slow brute-force/abuse.
+	authLimiter := limiter.New(limiter.Config{Max: 10, Expiration: time.Minute})
+
+	authPublic := app.Group("/api/v1/auth", authLimiter)
 	authPublic.Post("/register", authHandler.Register)
 	authPublic.Post("/login", authHandler.Login)
 	authPublic.Post("/refresh", authHandler.RefreshToken)

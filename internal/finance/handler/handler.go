@@ -52,7 +52,7 @@ func (h *FinanceHandler) CreateExpense(c *fiber.Ctx) error {
 
 	expense, err := h.svc.CreateExpense(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, expense)
 }
@@ -91,7 +91,7 @@ func (h *FinanceHandler) UpdateExpense(c *fiber.Ctx) error {
 
 	expense, err := h.svc.UpdateExpense(c.Context(), id, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, expense)
 }
@@ -117,7 +117,7 @@ func (h *FinanceHandler) ListExpenses(c *fiber.Ctx) error {
 
 	expenses, total, err := h.svc.ListExpenses(c.Context(), claims.OrgID, category, status, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, expenses, int64(total), page, limit)
 }
@@ -131,7 +131,7 @@ func (h *FinanceHandler) ListExpensesByPackage(c *fiber.Ctx) error {
 
 	expenses, err := h.svc.ListExpensesByPackage(c.Context(), claims.OrgID, packageID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, expenses)
 }
@@ -148,7 +148,7 @@ func (h *FinanceHandler) GetSummary(c *fiber.Ctx) error {
 
 	summary, err := h.svc.GetSummary(c.Context(), claims.OrgID, packageID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, summary)
 }
@@ -157,7 +157,7 @@ func (h *FinanceHandler) GetOverdueExpenses(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	expenses, err := h.svc.GetOverdueExpenses(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, expenses)
 }
@@ -172,7 +172,7 @@ func (h *FinanceHandler) GetPnL(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
 	pnl, err := h.svc.GetPnL(c.Context(), claims.OrgID, packageID, authToken)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, pnl)
 }
@@ -187,7 +187,7 @@ func (h *FinanceHandler) GetOwnerDashboard(c *fiber.Ctx) error {
 	authToken := c.Get("Authorization")
 	dash, err := h.svc.GetOwnerDashboard(c.Context(), claims.OrgID, authToken)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, dash)
 }

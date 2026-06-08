@@ -908,3 +908,427 @@ The key insight is: **don't rewrite, decompose**. The existing patterns are corr
 ---
 
 *PRD Version: 1.0 | Date: 2026-06-08 | Author: Automated Codebase Analysis*
+
+---
+
+## 14. Landing Pages — Full Specification for Production
+
+### 14.0 Overview
+
+The Jamaah.in landing presence consists of two layers:
+
+| Layer | Technology | Purpose | SEO | Target |
+|-------|-----------|---------|-----|--------|
+| **Main SPA Landing** | LandingPage.svelte (853L Svelte 5) | Full product page with modules, pricing, FAQs, CTAs | Indexed (index,follow) | All visitors |
+| **SEO Guide Pages** | 4 static .html files in public/ | Feature-specific long-form guides for search engines | Indexed (index,follow) | Organic traffic from Google |
+| **PWA Assets** | manifest.json, sw.js, icons | Installable web app, offline support | - | Returning users |
+
+### Current State Assessment
+
+**What exists (good)**:
+- SPA landing has 12 well-organized sections: Hero → Stats → Pain Points → Modules → How It Works → Excel Comparison → Accounting Comparison → Pricing → FAQ → CTA → Footer
+- 4 static SEO guide pages with dark-theme design (landing-guides.css) covering: Software Travel Umrah, OCR Siskopatuh, Rooming Jamaah, Manifest Mutawwif Digital
+- All pages linked via canonical URLs, OG tags, Twitter cards
+- sitemap.xml indexes 5 URLs (home + 4 guides)
+- obots.txt allows crawling of all public pages
+- PWA manifest.json configured with display: standalone
+- Beautiful visual design: animated gradient, floating glass cards, gradient text, dot-pattern hero
+
+**What's missing (critical for production)**:
+
+| # | Gap | Severity | SEO/UX Impact |
+|---|-----|----------|---------------|
+| 1 | **No Privacy Policy page** — linked in footer but dead link | Critical | Legal compliance, Google ranking penalty, trust signal |
+| 2 | **No Terms & Conditions page** — linked in footer but dead link | Critical | Legal compliance, payment processor requirement |
+| 3 | **No Contact/Support page** — linked in footer but dead link | High | Customer trust, conversion friction |
+| 4 | **No About page** — linked in footer but dead link | High | Brand credibility for B2B SaaS |
+| 5 | **No v2-specific SEO guide pages** — existing guides only cover v1 features (OCR, Rooming, Manifest) | High | Missing organic traffic for new modules (Invoice, P&L, CRM, E-Kontrak, Payroll) |
+| 6 | **No blog/content hub** | Medium | No content marketing funnel, no topical authority for "software travel umrah" queries |
+| 7 | **No case study / testimonial section** | Medium | No social proof for B2B purchase decisions |
+| 8 | **No changelog / version history** | Low | Transparency for existing users |
+| 9 | **Footer links are dead** — Privacy, Terms, About, Contact all link to "/" | Critical | Broken UX, trust-killer |
+| 10 | **No 404 page** | Medium | Bad UX for broken links, SEO leakage |
+
+### 14.1 Landing Page Architecture (Target)
+
+\\\
+Public-Facing Pages
+├── / (index.html → SPA)              LandingPage.svelte       [Dynamic, indexable]
+├── /software-travel-umrah.html        Static HTML              [SEO guide — v2 updated]
+├── /fitur-ocr-siskopatuh.html         Static HTML              [SEO guide — v2 updated]
+├── /fitur-rooming-jamaah.html         Static HTML              [SEO guide — v2 updated]
+├── /manifest-mutawwif-digital.html    Static HTML              [SEO guide — v2 updated]
+├── /fitur-invoice-umrah.html          Static HTML              [NEW — SEO guide]
+├── /fitur-crm-jamaah.html             Static HTML              [NEW — SEO guide]
+├── /fitur-laporan-keuangan-travel.html  Static HTML            [NEW — SEO guide]
+├── /fitur-e-kontrak-umrah.html        Static HTML              [NEW — SEO guide]
+├── /fitur-penggajian-travel.html      Static HTML              [NEW — SEO guide]
+├── /privacy.html                      Static HTML              [NEW — Legal]
+├── /terms.html                        Static HTML              [NEW — Legal]
+├── /contact.html                      Static HTML              [NEW — Support]
+├── /about.html                        Static HTML or Svelte    [NEW — Brand]
+├── /blog/                             Future: content hub     [Phase 2]
+├── /404.html                          Static HTML              [NEW — Error page]
+├── /sitemap.xml                       XML (update)             [Update — add new pages]
+├── /robots.txt                        Text (update)            [Update — add new allows]
+├── /manifest.json                     JSON                     [OK — update description for v2]
+└── /sw.js                             Service Worker           [OK — update cache strategy]
+\\\
+
+### 14.2 Main SPA Landing (LandingPage.svelte) — Enhancement Spec
+
+**Current sections** (preserved):
+1. ✅ NAV (sticky header, logo, nav links, CTA)
+2. ✅ HERO (animated gradient, floating glass cards, headline, subtext, CTA buttons)
+3. ✅ STATS STRIP (4 trust metrics)
+4. ✅ PAIN POINTS (6 cards with icons)
+5. ✅ MODULES (12 module cards in grid)
+6. ✅ HOW IT WORKS (3-step flow)
+7. ✅ COMPARISON VS EXCEL (before/after table)
+8. ✅ COMPARISON VS ACCOUNTING SOFTWARE (7-row comparison table)
+9. ✅ PRICING (4-tier: Free Trial, Starter, Pro, Business)
+10. ✅ FAQ (6 accordion items)
+11. ✅ CTA (gradient banner)
+12. ✅ FOOTER (4-column: brand, produk, modul lanjutan, perusahaan)
+
+**Sections to ADD**:
+
+#### Section: TESTIMONIALS (NEW — between HOW IT WORKS and COMPARISON)
+
+\\\
+Purpose: Social proof for B2B purchase decisions
+Content:
+  - 3-4 testimonial cards from travel agency owners
+  - Each card: photo/initial avatar, name, agency name, quote (2-3 sentences), star rating
+  - Visual: light background, avatar + card shadow, quotation mark icon
+  - Placeholder text until real testimonials collected:
+    "Sebelum pakai Jamaah.in, saya harus buka 5 file Excel berbeda tiap kali ada jamaah tanya status pembayaran. Sekarang semua di satu dashboard. Hemat waktu luar biasa." — Ahmad Fauzi, PT Al-Haramain Travel
+\\\
+
+#### Section: USE CASES (NEW — before PRICING)
+
+\\\
+Purpose: Help visitors self-identify which plan fits them
+Content:
+  - 3 persona cards: Travel Kecil (1-3 trip/tahun), Travel Menengah (4-12 trip), Travel Besar (12+ trip)
+  - Each card: persona description, typical challenges, recommended plan, key features used
+  - Visual: icon per persona, colored accent stripe, "Cocok untuk:" badge
+\\\
+
+#### Fix: Footer Links (UPDATE)
+
+All footer links currently point to "/". They must point to the actual new pages:
+- Kebijakan Privasi → /privacy.html
+- Syarat & Ketentuan → /terms.html
+- Hubungi Kami → /contact.html
+- Tentang Jamaah.in → /about.html
+
+### 14.3 SEO Guide Pages — Specification
+
+Each SEO guide page follows the same template structure (already established in the 4 existing pages). Below are the 5 **new** guide pages needed for v2 modules, plus updates to the 4 existing ones.
+
+#### Template Structure (all guide pages)
+
+\\\html
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>[Feature Name] | [Benefit] - Jamaah.in</title>
+  <meta name="description" content="[150-160 char meta description with keywords]" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="https://jamaah.web.id/[page].html" />
+  
+  <!-- OG Tags -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="[Same as title]" />
+  <meta property="og:description" content="[Same as meta description]" />
+  <meta property="og:url" content="https://jamaah.web.id/[page].html" />
+  <meta property="og:image" content="https://jamaah.web.id/icon-512.png" />
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="[Same as title]" />
+  <meta name="twitter:description" content="[Same as meta description]" />
+  <meta name="twitter:image" content="https://jamaah.web.id/icon-512.png" />
+  
+  <link rel="stylesheet" href="/landing-guides.css" />
+  
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Jamaah.in",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "[Feature description]",
+    "offers": {
+      "@type": "Offer",
+      "price": "149000",
+      "priceCurrency": "IDR"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <a class="logo" href="/">Jamaah<span class="logo-dot">.in</span></a>
+      <div class="nav-links">
+        <a href="/software-travel-umrah.html">Software</a>
+        <a href="/fitur-ocr-siskopatuh.html">OCR</a>
+        <a href="/fitur-rooming-jamaah.html">Rooming</a>
+        <a href="/manifest-mutawwif-digital.html">Manifest</a>
+        <a href="/#/login">Masuk</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- HERO -->
+    <section class="hero">
+      <p class="hero-badge">[Icon] [Feature Badge]</p>
+      <h1>[Main Headline with <em>emphasis</em>]</h1>
+      <p>[2-3 sentence value proposition]</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/#/register">🚀 Coba [Feature]</a>
+        <a class="btn btn-ghost" href="/software-travel-umrah.html">Lihat Platform Lengkap →</a>
+      </div>
+      <p class="meta">Terakhir diperbarui: [Date]</p>
+    </section>
+
+    <!-- PROBLEM SECTION -->
+    <section>
+      <h2>Masalah [Problem Domain] di Travel Umrah</h2>
+      [3-4 paragraphs about the pain point]
+    </section>
+
+    <!-- SOLUTION SECTION -->
+    <section>
+      <h2>Bagaimana [Feature] Membantu</h2>
+      [Bullet list of benefits, 5-7 items]
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section>
+      <h2>Cara Kerja [Feature]</h2>
+      [3-step numbered process]
+    </section>
+
+    <!-- KEY CAPABILITIES -->
+    <section>
+      <h2>Fitur Utama [Feature]</h2>
+      [4-6 capability cards with icons]
+    </section>
+
+    <!-- FAQ (Feature-Specific) -->
+    <section>
+      <h2>Pertanyaan Umum tentang [Feature]</h2>
+      [3-4 Q&A pairs]
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-block">
+      <h2>Siap Mencoba [Feature]?</h2>
+      <p>[Closing statement]</p>
+      <a class="btn btn-primary" href="/#/register">Mulai Trial 14 Hari Gratis →</a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    [Standard footer: logo, links, copyright — same as existing guide pages]
+  </footer>
+</body>
+</html>
+\\\
+
+#### NEW Guide Page 1: itur-invoice-umrah.html
+
+| Field | Content |
+|-------|---------|
+| **Title** | Fitur Invoice Otomatis untuk Travel Umrah | Buat & Kirim Invoice dalam 2 Menit - Jamaah.in |
+| **Description** | Buat invoice jamaah otomatis dengan skema cicilan fleksibel. Rekam pembayaran, cetak kwitansi PDF, dan pantau piutang real-time. Khusus PPIU & travel umrah Indonesia. |
+| **Badge** | 📄 Invoice & Pembayaran Otomatis |
+| **Headline** | Invoice Per Jamaah Jadi *Lebih Cepat dan Akurat* |
+| **Key keywords** | invoice travel umrah, kwitansi jamaah, sistem pembayaran PPIU, invoice otomatis, cicilan umrah |
+| **Structure** | 1. Hero 2. Masalah: invoice manual rawan error, piutang tidak terpantau 3. Solusi: auto-generate, cicilan fleksibel, rekam pembayaran 4. Cara Kerja: Pilih Paket → Pilih Jamaah → Invoice Terbuat 5. Fitur Utama: auto-invoice, multi-cicilan, PDF kwitansi, piutang aging, payment history 6. FAQ: integrasi bank? beda dengan invoice manual? 7. CTA |
+
+#### NEW Guide Page 2: itur-crm-jamaah.html
+
+| Field | Content |
+|-------|---------|
+| **Title** | CRM Pipeline Jamaah untuk Travel Umrah | Lacak dari Prospek Sampai Berangkat - Jamaah.in |
+| **Description** | Lacak perjalanan jamaah dari prospek → survey → booking → DP → cicilan → lunas → berangkat. Notifikasi otomatis follow-up. Database jamaah terintegrasi lintas tahun untuk repeat order. |
+| **Badge** | 👥 CRM & Pipeline Jamaah |
+| **Headline** | Database Jamaah Terintegrasi, *Repeat Order Lebih Mudah* |
+| **Key keywords** | CRM travel umrah, database jamaah, pipeline prospek haji, follow-up jamaah, repeat order umrah |
+| **Structure** | 1. Hero 2. Masalah: data jamaah tersebar, tidak tahu histori 3. Solusi: pipeline visual, database terpusat, segmentasi 4. Cara Kerja: Input → Kategorikan → Lacak Pipeline → Konversi 5. Fitur Utama: kanban pipeline, status stages, alert follow-up, database historis, WA integration 6. FAQ 7. CTA |
+
+#### NEW Guide Page 3: itur-laporan-keuangan-travel.html
+
+| Field | Content |
+|-------|---------|
+| **Title** | Laporan Keuangan & P&L Travel Umrah | Pantau Profit Real-Time - Jamaah.in |
+| **Description** | P&L per trip real-time, piutang aging report, arus kas proyeksi, dan dashboard owner: gross profit, total piutang, margin per paket. Setara Jurnal & Accurate, dirancang untuk PPIU. |
+| **Badge** | 📊 Laporan Keuangan Real-Time |
+| **Headline** | Tahu Profit Setiap Trip *Tanpa Harus Hitung Manual* |
+| **Key keywords** | laporan keuangan travel umrah, P&L travel, profit trip haji, piutang jamaah, arus kas PPIU |
+| **Structure** | 1. Hero 2. Masalah: P&L dihitung manual di Excel setelah trip selesai 3. Solusi: real-time P&L, otomatis dari invoice dan pengeluaran vendor 4. Cara Kerja 5. Fitur Utama: P&L dashboard, piutang aging, arus kas, gross profit, margin 6. FAQ 7. CTA |
+
+#### NEW Guide Page 4: itur-e-kontrak-umrah.html
+
+| Field | Content |
+|-------|---------|
+| **Title** | E-Kontrak Digital Jamaah Umrah | Tanda Tangan Digital Tanpa Install App - Jamaah.in |
+| **Description** | Buat template kontrak dengan variabel otomatis dari database jamaah. Jamaah tanda tangan digital di HP tanpa install aplikasi. PDF immutable tersimpan aman. Audit trail lengkap. |
+| **Badge** | ✍️ E-Kontrak Digital |
+| **Headline** | Kontrak Jamaah Jadi *Lebih Profesional dan Tertelusur* |
+| **Key keywords** | e-kontrak umrah, tanda tangan digital jamaah, kontrak travel online, perjanjian umrah digital |
+| **Structure** | 1. Hero 2. Masalah: kontrak kertas rentan hilang, tidak ada audit 3. Solusi: digital, variabel otomatis, tanda tangan di HP 4. Cara Kerja 5. Fitur Utama: template variabel, link signature, signature pad, PDF immutable, tracking status 6. FAQ: kekuatan hukum? perlu app khusus? 7. CTA |
+
+#### NEW Guide Page 5: itur-penggajian-travel.html
+
+| Field | Content |
+|-------|---------|
+| **Title** | Penggajian Karyawan Travel Umrah | Slip Gaji, PPh 21, BPJS, & Honor Muthawwif - Jamaah.in |
+| **Description** | Kelola penggajian karyawan tetap travel, honor muthawwif freelance per trip, PPh 21, BPJS TK & Kesehatan, kasbon karyawan. Rekap transfer bank siap pakai. |
+| **Badge** | 💰 Penggajian & Payroll |
+| **Headline** | Gaji Karyawan & Honor Muthawwif *Terhitung Otomatis* |
+| **Key keywords** | penggajian travel umrah, slip gaji muthawwif, payroll PPIU, honor freelance haji, PPh 21 travel |
+| **Structure** | 1. Hero 2. Masalah: hitung manual, tidak ada slip formal 3. Solusi: auto-generate slip, PPh 21, BPJS 4. Cara Kerja 5. Fitur Utama: slip gaji, honor muthawwif per trip, PPh 21, BPJS, kasbon, rekap transfer 6. FAQ 7. CTA |
+
+#### UPDATE Existing Guide Pages (v1 → v2)
+
+The 4 existing guide pages need minor updates to mention v2 modules and cross-link to new pages:
+
+- **software-travel-umrah.html**: Replace module list from v1 to full v2 (12 modul). Add nav links to new guide pages in header. Add section: "Modul Bisnis (Baru di v2.1)" covering Invoice, P&L, CRM, E-Kontrak.
+- **fitur-ocr-siskopatuh.html**: Add mention: "Hasil scan sekarang langsung masuk ke CRM Pipeline jamaah". Cross-link: "Lihat juga: Fitur Invoice Otomatis".
+- **fitur-rooming-jamaah.html**: Add mention: "Rooming terintegrasi dengan modul Paket & Harga". Cross-link: "Lihat juga: Fitur E-Kontrak Digital".
+- **manifest-mutawwif-digital.html**: Add mention: "Manifest terintegrasi dengan CRM". Cross-link: "Lihat juga: Fitur Penggajian untuk honor muthawwif".
+
+### 14.4 Legal & Essential Pages — Specification
+
+#### privacy.html — Kebijakan Privasi
+
+Purpose: Legal compliance, Indonesian market requirement, Google trust signal.
+Sections: Pengantar, Data yang Kami Kumpulkan (akun, operasional, teknis), Bagaimana Kami Menggunakan Data, Penyimpanan & Keamanan (self-hosted, enkripsi, backup, audit log), Hak Pengguna (akses, koreksi, hapus, ekspor), Retensi Data, Perubahan Kebijakan, Kontak.
+Design: Clean single-column, same header/footer as guide pages. Legal review required before publishing.
+
+#### terms.html — Syarat & Ketentuan
+
+Purpose: Payment processor requirement, user agreement.
+Sections: Pendaftaran Akun, Layanan (12 modul, batasan per paket), Pembayaran & Langganan (siklus, metode, perpanjangan), Trial Gratis (14 hari, tanpa kartu kredit, manual upgrade), Pembatalan & Refund (7 hari refund, 30 hari retensi data), Kewajiban Pengguna, Batasan Tanggung Jawab, HKI, Hukum Indonesia.
+Design: Same legal style. Legal review required.
+
+#### contact.html — Hubungi Kami
+
+Content: WhatsApp Business number + jam operasional (Sen-Jum 09.00-17.00 WIB), Email support@jamaah.web.id (response < 24 jam), Link ke FAQ landing page, Office info (jika ada), CTA trial.
+Design: Simple, warm, icon-based cards.
+
+#### about.html — Tentang Jamaah.in
+
+Content: Mission (membantu 2.200+ PPIU), Story (dibangun khusus konteks PPIU Indonesia), Values (fokus PPIU, keamanan data, simplicity, customer-driven), Tech stack transparency, CTA.
+Design: Professional, blue-primary, BrandLogo prominent.
+
+### 14.5 Error Page — 404.html
+
+Content: Sad document/compass icon, "404 — Halaman Tidak Ditemukan", links to Beranda, Fitur, Kontak.
+Design: Light, friendly, consistent with landing. Meta noindex.
+
+### 14.6 SEO Keywords Strategy & Technical Requirements
+
+**Meta Tags Checklist (every page)**: title (50-60 chars), description (150-160 chars), robots, canonical URL, og:title, og:description, og:url, og:image (icon-512.png), og:type (website/article), twitter:card, JSON-LD SoftwareApplication schema.
+
+**Primary Keywords per Page**:
+
+| Page | Primary Keyword | Secondary |
+|------|----------------|-----------|
+| Landing | software travel umrah | administrasi PPIU, sistem manajemen travel haji |
+| OCR guide | OCR Siskopatuh travel umrah | scan KTP paspor visa, input data jamaah otomatis |
+| Rooming guide | rooming jamaah umrah otomatis | bagi kamar hotel jamaah |
+| Manifest guide | manifest mutawwif digital | checklist jamaah mobile |
+| Software guide | software travel umrah Indonesia | platform operasional PPIU |
+| Invoice guide | invoice travel umrah otomatis | kwitansi jamaah, cicilan umrah |
+| CRM guide | CRM jamaah travel umrah | database jamaah, pipeline prospek haji |
+| Finance guide | laporan keuangan travel umrah | P&L travel, profit trip haji |
+| E-Kontrak guide | e-kontrak umrah digital | tanda tangan digital jamaah |
+| Payroll guide | penggajian travel umrah | slip gaji muthawwif, payroll PPIU |
+
+**sitemap.xml**: Add 9 new URLs (5 feature guides + 4 legal/info pages). Existing 5 URLs preserved.
+
+**robots.txt**: Add Allow for all new .html pages. Add Disallow for authenticated SPA hash routes (/#/dashboard, /#/scanner, /#/profile).
+
+### 14.7 Implementation Plan for Landing Pages
+
+**Phase 1 — Critical Fixes (Week 1-2)**:
+1. Create privacy.html — required for legal compliance
+2. Create 	erms.html — required for payment processing
+3. Create contact.html — fix dead footer link
+4. Create bout.html — fix dead footer link
+5. Create 404.html — catch broken links
+6. Fix all footer links in LandingPage.svelte
+7. Update sitemap.xml and obots.txt
+
+**Phase 2 — v2 SEO Guides (Week 2-4)**:
+8. Create itur-invoice-umrah.html
+9. Create itur-crm-jamaah.html
+10. Create itur-laporan-keuangan-travel.html
+11. Create itur-e-kontrak-umrah.html
+12. Create itur-penggajian-travel.html
+
+**Phase 3 — Enhancements (Week 3-5)**:
+13. Update 4 existing guide pages (add v2 mentions, cross-links)
+14. Add Testimonials section to LandingPage.svelte
+15. Add Use Cases section to LandingPage.svelte
+16. Update nav headers in all guide pages to include v2 links
+
+### 14.8 Cross-Linking Strategy
+
+Every guide page should cross-link to at least 2 other relevant pages:
+
+| Source Page | Cross-Links To |
+|------------|----------------|
+| software-travel-umrah.html | OCR, Invoice, Finance |
+| fitur-ocr-siskopatuh.html | CRM, Invoice, Software |
+| fitur-rooming-jamaah.html | E-Kontrak, Manifest, Software |
+| manifest-mutawwif-digital.html | CRM, Payroll, Rooming |
+| fitur-invoice-umrah.html | Finance, CRM, Packages |
+| fitur-crm-jamaah.html | Invoice, OCR, Manifest |
+| fitur-laporan-keuangan-travel.html | Invoice, Vendors, Packages |
+| fitur-e-kontrak-umrah.html | CRM, Rooming, Packages |
+| fitur-penggajian-travel.html | Finance, Vendors, Manifest |
+
+This creates a content silo that signals topical authority to Google for "software travel umrah Indonesia" and related queries.
+
+### 14.9 PWA & Offline Considerations
+
+Current manifest.json references v1. Update for v2:
+- name: "Jamaah.in — Administrasi Travel Umrah"
+- short_name: "Jamaah.in"
+- description: "Sistem administrasi bisnis travel umrah & haji. Invoice, CRM, P&L, dan 12 modul terintegrasi untuk PPIU Indonesia."
+- start_url: "/" (same — SPA handles routing)
+- display: "standalone" (existing, correct)
+
+Current sw.js should be updated to:
+- Cache static HTML pages (SEO guides) for offline reading
+- Cache SPA shell (app CSS/JS) for offline dashboard access
+- Network-first strategy for API calls
+- Cache-first for static assets
+
+### 14.10 Content Quality Guidelines
+
+All landing page copy must follow these principles:
+
+1. **Bahasa Indonesia bisnis-profesional**: Formal tapi hangat, bukan bahasa gaul
+2. **Problem-first**: Setiap halaman dimulai dari masalah nyata di lapangan
+3. **Specific, not vague**: "Buat invoice dalam 2 menit" better than "Proses invoice cepat"
+4. **PPIU context**: Selalu gunakan istilah yang familiar di dunia travel umrah (PPIU, Siskopatuh, muthawwif, jamaah, DP, cicilan)
+5. **CTAs jelas**: Setiap halaman punya satu primary CTA (Trial/Daftar) dan satu secondary (Lihat Platform Lengkap)
+6. **Social proof**: Sebutkan "2.200+ PPIU" sebagai trust signal
+7. **Updated date**: Setiap halaman harus mencantumkan "Terakhir diperbarui: [tanggal]" untuk freshness signal
+
+---
+
+*Section 14 — Landing Pages Specification — End*

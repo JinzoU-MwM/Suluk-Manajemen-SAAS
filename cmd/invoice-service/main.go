@@ -5,13 +5,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"go.uber.org/zap"
 
 	"github.com/jamaah-in/v2/internal/invoice/handler"
 	"github.com/jamaah-in/v2/internal/invoice/repository"
@@ -19,7 +17,10 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
+	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 )
 
 func main() {
@@ -30,7 +31,9 @@ func main() {
 		cfg.Server.Port, _ = strconv.Atoi(p)
 	}
 
+	cfg.Validate()
 	logger := sharedLogger.New(cfg.App.Env)
+	sharedResponse.SetLogger(logger)
 	logger.Infof("starting invoice service on :%d", cfg.Server.Port)
 
 	ctx := context.Background()
@@ -50,8 +53,10 @@ func main() {
 			logger.Fatalf("init jwt manager: %v", err)
 		}
 		logger.Info("JWT manager initialized")
+	} else if cfg.App.Env == "production" {
+		logger.Fatal("JWT keys not found; refusing to start without auth in production")
 	} else {
-		logger.Warn("JWT keys not found - running without auth")
+		logger.Warn("JWT keys not found - running without auth (dev only)")
 	}
 
 	invoiceRepo := repository.NewInvoiceRepo(pool)
@@ -66,13 +71,12 @@ func main() {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	})
-	app.Use(recover.New())
+	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok", "service": "invoice"})
-	})
+	app.Get("/health", sharedHealth.Handler("invoice",
+		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
-	authMW := authMiddleware(jwtManager, logger)
+	authMW := sharedMW.AuthMiddleware(jwtManager)
 
 	invoices := app.Group("/api/v1/invoices", authMW)
 	invoices.Post("/", invoiceHandler.CreateInvoice)
@@ -124,31 +128,9 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Info("shutting down invoice service...")
-	app.Shutdown()
-}
-
-func authMiddleware(jwtMgr *sharedAuth.JWTManager, logger *zap.SugaredLogger) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "missing authorization header"})
-		}
-
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenStr == authHeader {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "invalid authorization format"})
-		}
-
-		if jwtMgr == nil {
-			return c.Status(500).JSON(fiber.Map{"success": false, "error": "JWT not configured"})
-		}
-
-		claims, err := jwtMgr.ValidateToken(tokenStr)
-		if err != nil {
-			return c.Status(401).JSON(fiber.Map{"success": false, "error": "invalid or expired token"})
-		}
-
-		c.Locals("claims", claims)
-		return c.Next()
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
+		logger.Errorf("invoice service shutdown: %v", err)
 	}
 }

@@ -42,7 +42,7 @@ func (h *VendorHandler) CreateVendor(c *fiber.Ctx) error {
 
 	vendor, err := h.svc.CreateVendor(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, vendor)
 }
@@ -78,7 +78,7 @@ func (h *VendorHandler) UpdateVendor(c *fiber.Ctx) error {
 
 	vendor, err := h.svc.UpdateVendor(c.Context(), id, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, vendor)
 }
@@ -96,7 +96,7 @@ func (h *VendorHandler) DeleteVendor(c *fiber.Ctx) error {
 		if strings.Contains(err.Error(), "foreign key") || strings.Contains(err.Error(), "violates") {
 			return response.Conflict(c, "cannot delete vendor: has associated bills or payments")
 		}
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "vendor deleted"})
 }
@@ -110,7 +110,7 @@ func (h *VendorHandler) ListVendors(c *fiber.Ctx) error {
 
 	vendors, total, err := h.svc.ListVendors(c.Context(), claims.OrgID, vendorType, search, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, vendors, int64(total), page, limit)
 }
@@ -139,7 +139,7 @@ func (h *VendorHandler) CreateBill(c *fiber.Ctx) error {
 
 	bill, err := h.svc.CreateBill(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, bill)
 }
@@ -175,7 +175,7 @@ func (h *VendorHandler) UpdateBill(c *fiber.Ctx) error {
 
 	bill, err := h.svc.UpdateBill(c.Context(), id, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, bill)
 }
@@ -214,7 +214,7 @@ func (h *VendorHandler) ListBills(c *fiber.Ctx) error {
 
 	bills, total, err := h.svc.ListBills(c.Context(), claims.OrgID, vendorID, packageID, status, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, bills, int64(total), page, limit)
 }
@@ -223,7 +223,7 @@ func (h *VendorHandler) GetOverdueBills(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	bills, err := h.svc.GetOverdueBills(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, bills)
 }
@@ -233,7 +233,7 @@ func (h *VendorHandler) GetBillsDueSoon(c *fiber.Ctx) error {
 	days, _ := strconv.Atoi(c.Query("days", "7"))
 	bills, err := h.svc.GetBillsDueSoon(c.Context(), claims.OrgID, days)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, bills)
 }
@@ -250,7 +250,7 @@ func (h *VendorHandler) GetDebtSummary(c *fiber.Ctx) error {
 
 	summary, err := h.svc.GetDebtSummary(c.Context(), claims.OrgID, vendorID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, summary)
 }
@@ -263,7 +263,7 @@ func (h *VendorHandler) GetPackageBillSummary(c *fiber.Ctx) error {
 	}
 	summary, err := h.svc.GetPackageBillSummary(c.Context(), claims.OrgID, packageID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, summary)
 }
@@ -289,7 +289,7 @@ func (h *VendorHandler) CreatePayment(c *fiber.Ctx) error {
 
 	payment, err := h.svc.CreatePayment(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, payment)
 }
@@ -329,7 +329,7 @@ func (h *VendorHandler) ListPaymentsByBill(c *fiber.Ctx) error {
 
 	payments, err := h.svc.ListPaymentsByBill(c.Context(), billID, claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, payments)
 }
@@ -345,7 +345,7 @@ func (h *VendorHandler) ListPaymentsByVendor(c *fiber.Ctx) error {
 
 	payments, total, err := h.svc.ListPaymentsByVendor(c.Context(), vendorID, claims.OrgID, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, payments, int64(total), page, limit)
 }

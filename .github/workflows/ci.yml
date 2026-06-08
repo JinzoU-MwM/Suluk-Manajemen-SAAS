@@ -19,8 +19,32 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: go vet
+        run: go vet ./...
+
       - name: Run Go tests
         run: go test ./...
+
+  go-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: gosec security scan
+        uses: securego/gosec@master
+        with:
+          args: ./...
 
   frontend-test:
     runs-on: ubuntu-latest

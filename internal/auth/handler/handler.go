@@ -33,7 +33,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	user, org, tokens, err := h.svc.Register(c.Context(), req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 
 	return response.Created(c, fiber.Map{
@@ -115,7 +115,7 @@ func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
 
 	user, err := h.svc.UpdateUser(c.Context(), claims.UserID, req.Name, req.Phone)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, sanitizeUser(user))
 }
@@ -133,7 +133,7 @@ func (h *AuthHandler) CreateOrganization(c *fiber.Ctx) error {
 
 	org, err := h.svc.CreateOrganization(c.Context(), claims.UserID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, org)
 }
@@ -157,7 +157,7 @@ func (h *AuthHandler) AddTeamMember(c *fiber.Ctx) error {
 
 	member, err := h.svc.AddTeamMember(c.Context(), claims.OrgID, req.UserID, claims.UserID, req.Role)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, member)
 }
@@ -170,7 +170,7 @@ func (h *AuthHandler) RemoveTeamMember(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.RemoveTeamMember(c.Context(), claims.OrgID, userID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "member removed"})
 }
@@ -190,7 +190,7 @@ func (h *AuthHandler) UpdateMemberRole(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.UpdateMemberRole(c.Context(), claims.OrgID, userID, req.Role); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "role updated"})
 }
@@ -199,7 +199,7 @@ func (h *AuthHandler) ListTeamMembers(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	members, err := h.svc.ListTeamMembers(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, members)
 }
@@ -208,7 +208,7 @@ func (h *AuthHandler) ListUsersByOrg(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	users, err := h.svc.ListUsersByOrg(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	sanitized := make([]fiber.Map, len(users))
 	for i, u := range users {
@@ -227,7 +227,7 @@ func (h *AuthHandler) InviteMember(c *fiber.Ctx) error {
 
 	invite, err := h.svc.InviteMember(c.Context(), claims.OrgID, claims.UserID, req.Email, req.Role)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, invite)
 }
@@ -242,7 +242,7 @@ func (h *AuthHandler) AcceptInvite(c *fiber.Ctx) error {
 
 	member, err := h.svc.AcceptInvite(c.Context(), req.Token, claims.UserID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, member)
 }
@@ -265,7 +265,7 @@ func (h *AuthHandler) ListNotifications(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	notifications, count, err := h.svc.GetNotifications(c.Context(), claims.OrgID, claims.UserID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, model.NotificationsResponse{
 		Notifications: notifications,
@@ -288,7 +288,7 @@ func (h *AuthHandler) MarkNotificationRead(c *fiber.Ctx) error {
 func (h *AuthHandler) MarkAllNotificationsRead(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	if err := h.svc.MarkAllNotificationsRead(c.Context(), claims.OrgID, claims.UserID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "all notifications marked as read"})
 }
@@ -312,7 +312,7 @@ func (h *AuthHandler) GetActivity(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	logs, err := h.svc.GetActivity(c.Context(), claims.UserID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"activities": logs})
 }
@@ -394,7 +394,7 @@ func (h *AuthHandler) SendPhoneOtp(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid request body")
 	}
 	if err := h.svc.SendPhoneOtp(c.Context(), req.PhoneNumber); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "otp sent"})
 }

@@ -34,7 +34,7 @@ func (h *AuthHandler) ListTickets(c *fiber.Ctx) error {
 
 	tickets, total, err := h.svc.ListTickets(c.Context(), claims.OrgID, status, page, pageSize)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{
 		"tickets": tickets,
@@ -52,7 +52,7 @@ func (h *AuthHandler) GetTicketMessages(c *fiber.Ctx) error {
 
 	result, err := h.svc.GetTicketWithMessages(c.Context(), ticketID, claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	if result == nil {
 		return response.NotFound(c, "ticket not found")

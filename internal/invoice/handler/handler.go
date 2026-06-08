@@ -56,7 +56,7 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrDuplicateNumber) {
 			return response.Conflict(c, "duplicate invoice number, please retry")
 		}
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, inv)
 }
@@ -94,7 +94,7 @@ func (h *InvoiceHandler) ListInvoices(c *fiber.Ctx) error {
 
 	invoices, total, err := h.svc.ListInvoices(c.Context(), claims.OrgID, status, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, invoices, int64(total), page, limit)
 }
@@ -108,7 +108,7 @@ func (h *InvoiceHandler) GetInvoicesByJamaah(c *fiber.Ctx) error {
 
 	invoices, err := h.svc.GetInvoicesByJamaah(c.Context(), claims.OrgID, jamaahID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, invoices)
 }
@@ -127,7 +127,7 @@ func (h *InvoiceHandler) UpdateInvoice(c *fiber.Ctx) error {
 
 	inv, err := h.svc.UpdateInvoice(c.Context(), id, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, inv)
 }
@@ -148,7 +148,7 @@ func (h *InvoiceHandler) CancelInvoice(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.CancelInvoice(c.Context(), id, claims.OrgID, req.Reason); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "invoice cancelled"})
 }
@@ -170,7 +170,7 @@ func (h *InvoiceHandler) CreatePaymentSchedules(c *fiber.Ctx) error {
 
 	schedules, err := h.svc.CreatePaymentSchedules(c.Context(), claims.OrgID, invoiceID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, schedules)
 }
@@ -184,7 +184,7 @@ func (h *InvoiceHandler) GetPaymentSchedules(c *fiber.Ctx) error {
 
 	schedules, err := h.svc.GetPaymentSchedules(c.Context(), claims.OrgID, invoiceID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, schedules)
 }
@@ -212,7 +212,7 @@ func (h *InvoiceHandler) RecordPayment(c *fiber.Ctx) error {
 
 	payment, inv, err := h.svc.RecordPayment(c.Context(), claims.OrgID, claims.UserID, invoiceID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, fiber.Map{"payment": payment, "invoice": inv})
 }
@@ -226,7 +226,7 @@ func (h *InvoiceHandler) GetPayments(c *fiber.Ctx) error {
 
 	payments, err := h.svc.GetPayments(c.Context(), claims.OrgID, invoiceID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, payments)
 }
@@ -235,7 +235,7 @@ func (h *InvoiceHandler) GetSummary(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	summary, err := h.svc.GetSummary(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, summary)
 }
@@ -248,7 +248,7 @@ func (h *InvoiceHandler) GetPackageRevenue(c *fiber.Ctx) error {
 	}
 	summary, err := h.svc.GetPackageRevenue(c.Context(), claims.OrgID, packageID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, summary)
 }
@@ -257,7 +257,7 @@ func (h *InvoiceHandler) GetBalances(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	balances, err := h.svc.GetBalances(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, balances)
 }
@@ -270,7 +270,7 @@ func (h *InvoiceHandler) GetMonthlyRevenue(c *fiber.Ctx) error {
 	}
 	data, err := h.svc.GetMonthlyRevenue(c.Context(), claims.OrgID, months)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, data)
 }
@@ -283,7 +283,7 @@ func (h *InvoiceHandler) ListByPackage(c *fiber.Ctx) error {
 	}
 	invoices, err := h.svc.ListInvoicesByPackage(c.Context(), claims.OrgID, packageID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, invoices)
 }

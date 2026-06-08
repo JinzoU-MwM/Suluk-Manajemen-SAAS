@@ -20,6 +20,9 @@ import (
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
+	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
+	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 )
 
 func main() {
@@ -30,7 +33,9 @@ func main() {
 		cfg.Server.Port, _ = strconv.Atoi(p)
 	}
 
+	cfg.Validate()
 	logger := sharedLogger.New(cfg.App.Env)
+	sharedResponse.SetLogger(logger)
 	logger.Infof("starting ai/ocr service on :%d", cfg.Server.Port)
 
 	ctx := context.Background()
@@ -50,8 +55,10 @@ func main() {
 			logger.Fatalf("init jwt manager: %v", err)
 		}
 		logger.Info("JWT manager initialized")
+	} else if cfg.App.Env == "production" {
+		logger.Fatal("JWT keys not found; refusing to start without auth in production")
 	} else {
-		logger.Warn("JWT keys not found - running without auth")
+		logger.Warn("JWT keys not found - running without auth (dev only)")
 	}
 
 	aiocrRepo := repository.NewAIOCRRepo(pool)
@@ -65,11 +72,10 @@ func main() {
 		WriteTimeout: 60 * time.Second,
 		BodyLimit:    50 * 1024 * 1024,
 	})
-	app.Use(recover.New())
+	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok", "service": "aiocr"})
-	})
+	app.Get("/health", sharedHealth.Handler("aiocr",
+		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
 	authMW := authMiddleware(jwtManager, logger)
 
@@ -105,7 +111,11 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Info("shutting down ai/ocr service...")
-	app.Shutdown()
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
+		logger.Errorf("ai-ocr service shutdown: %v", err)
+	}
 }
 
 func authMiddleware(jwtMgr *sharedAuth.JWTManager, logger *zap.SugaredLogger) fiber.Handler {

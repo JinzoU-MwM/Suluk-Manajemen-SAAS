@@ -19,7 +19,7 @@ func (h *JamaahHandler) ListRooms(c *fiber.Ctx) error {
 	}
 	rooms, err := h.svc.ListRooms(c.Context(), claims.OrgID, groupID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"rooms": rooms})
 }
@@ -63,7 +63,7 @@ func (h *JamaahHandler) AutoRooming(c *fiber.Ctx) error {
 	}
 	rooms, err := h.svc.AutoRooming(c.Context(), claims.OrgID, groupID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"rooms": rooms, "message": "auto-rooming completed"})
 }
@@ -75,7 +75,7 @@ func (h *JamaahHandler) ClearAutoRooming(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid group id")
 	}
 	if err := h.svc.ClearAutoRooming(c.Context(), claims.OrgID, groupID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "auto-rooming cleared"})
 }
@@ -95,7 +95,7 @@ func (h *JamaahHandler) AssignMemberToRoom(c *fiber.Ctx) error {
 		memberID = c.Params("memberId")
 	}
 	if err := h.svc.AssignMemberToRoom(c.Context(), claims.OrgID, roomID, memberID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"assigned": true})
 }
@@ -107,7 +107,7 @@ func (h *JamaahHandler) UnassignMember(c *fiber.Ctx) error {
 	}
 	memberID := c.Params("memberId")
 	if err := h.svc.UnassignMember(c.Context(), roomID, memberID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"unassigned": true})
 }
@@ -128,7 +128,7 @@ func (h *JamaahHandler) ShareGroup(c *fiber.Ctx) error {
 	}
 	sm, err := h.svc.ShareGroup(c.Context(), claims.OrgID, groupID, req.Pin, req.ExpiresInDays)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"token": sm.Token, "expires_at": sm.ExpiresAt})
 }
@@ -140,7 +140,7 @@ func (h *JamaahHandler) RevokeShare(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid group id")
 	}
 	if err := h.svc.RevokeShare(c.Context(), claims.OrgID, groupID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"revoked": true})
 }

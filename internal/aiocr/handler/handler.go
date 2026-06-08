@@ -33,7 +33,7 @@ func (h *AIOCRHandler) CreateScanJob(c *fiber.Ctx) error {
 
 	job, err := h.svc.CreateScanJob(c.Context(), claims.OrgID, claims.UserID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, job)
 }
@@ -60,7 +60,7 @@ func (h *AIOCRHandler) ListScanJobs(c *fiber.Ctx) error {
 
 	jobs, total, err := h.svc.ListScanJobs(c.Context(), claims.OrgID, status, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, jobs, int64(total), page, limit)
 }
@@ -88,7 +88,7 @@ func (h *AIOCRHandler) GetScanResultsByJob(c *fiber.Ctx) error {
 
 	results, err := h.svc.GetScanResultsByJob(c.Context(), claims.OrgID, jobID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, results)
 }
@@ -97,7 +97,7 @@ func (h *AIOCRHandler) GetCacheStats(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	stats, err := h.svc.GetCacheStats(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, stats)
 }
@@ -105,7 +105,7 @@ func (h *AIOCRHandler) GetCacheStats(c *fiber.Ctx) error {
 func (h *AIOCRHandler) ClearCache(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	if err := h.svc.ClearCache(c.Context(), claims.OrgID); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "cache cleared"})
 }
@@ -119,7 +119,7 @@ func (h *AIOCRHandler) NormalizeToSiskopatuh(c *fiber.Ctx) error {
 
 	result, err := h.svc.NormalizeToSiskopatuh(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, result)
 }
@@ -133,7 +133,7 @@ func (h *AIOCRHandler) ExportSiskopatuhExcel(c *fiber.Ctx) error {
 
 	excelData, err := h.svc.ExportSiskopatuhExcel(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 
 	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -157,7 +157,7 @@ func (h *AIOCRHandler) CreateExportTemplate(c *fiber.Ctx) error {
 
 	t, err := h.svc.CreateExportTemplate(c.Context(), claims.OrgID, claims.UserID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, t)
 }
@@ -166,7 +166,7 @@ func (h *AIOCRHandler) ListExportTemplates(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	templates, err := h.svc.ListExportTemplates(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, templates)
 }

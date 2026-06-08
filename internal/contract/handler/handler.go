@@ -24,7 +24,7 @@ func (h *ContractHandler) ListTemplates(c *fiber.Ctx) error {
 	includeInactive := c.Query("include_inactive") == "true"
 	templates, err := h.svc.ListTemplates(c.Context(), claims.OrgID, includeInactive)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, templates)
 }
@@ -59,7 +59,7 @@ func (h *ContractHandler) CreateTemplate(c *fiber.Ctx) error {
 	}
 	tpl, err := h.svc.CreateTemplate(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, tpl)
 }
@@ -83,7 +83,7 @@ func (h *ContractHandler) UpdateTemplate(c *fiber.Ctx) error {
 	}
 	tpl, err = h.svc.UpdateTemplate(c.Context(), id, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, tpl)
 }
@@ -121,7 +121,7 @@ func (h *ContractHandler) PreviewTemplate(c *fiber.Ctx) error {
 	}
 	preview, err := h.svc.PreviewTemplate(c.Context(), req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, preview)
 }
@@ -156,7 +156,7 @@ func (h *ContractHandler) ListInstances(c *fiber.Ctx) error {
 	status := c.Query("status")
 	contracts, err := h.svc.ListInstances(c.Context(), claims.OrgID, status)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, contracts)
 }
@@ -172,7 +172,7 @@ func (h *ContractHandler) GetInstance(c *fiber.Ctx) error {
 		return response.NotFound(c, "contract instance not found")
 	}
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, contract)
 }
@@ -183,7 +183,7 @@ func (h *ContractHandler) GetPublicContract(c *fiber.Ctx) error {
 		return response.NotFound(c, "contract link not found")
 	}
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, contract)
 }

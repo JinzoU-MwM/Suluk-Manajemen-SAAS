@@ -42,7 +42,7 @@ func (h *PackageHandler) CreatePackage(c *fiber.Ctx) error {
 
 	pkg, err := h.svc.CreatePackage(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, pkg)
 }
@@ -69,7 +69,7 @@ func (h *PackageHandler) ListPackages(c *fiber.Ctx) error {
 
 	packages, total, err := h.svc.ListPackages(c.Context(), claims.OrgID, status, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, packages, int64(total), page, limit)
 }
@@ -99,7 +99,7 @@ func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
 
 	pkg, err := h.svc.UpdatePackage(c.Context(), id, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, pkg)
 }
@@ -146,7 +146,7 @@ func (h *PackageHandler) UpdatePackageStatus(c *fiber.Ctx) error {
 
 	pkg, err := h.svc.UpdatePackageStatus(c.Context(), id, claims.OrgID, req.Status)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, pkg)
 }
@@ -213,7 +213,7 @@ func (h *PackageHandler) CreatePricingTier(c *fiber.Ctx) error {
 
 	tier, err := h.svc.CreatePricingTier(c.Context(), packageID, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, tier)
 }
@@ -244,7 +244,7 @@ func (h *PackageHandler) UpdatePricingTier(c *fiber.Ctx) error {
 
 	tier, err = h.svc.UpdatePricingTier(c.Context(), tierID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, tier)
 }
@@ -301,7 +301,7 @@ func (h *PackageHandler) CreateCostComponent(c *fiber.Ctx) error {
 
 	cc, err := h.svc.CreateCostComponent(c.Context(), packageID, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, cc)
 }
@@ -332,7 +332,7 @@ func (h *PackageHandler) UpdateCostComponent(c *fiber.Ctx) error {
 
 	cc, err = h.svc.UpdateCostComponent(c.Context(), ccID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, cc)
 }

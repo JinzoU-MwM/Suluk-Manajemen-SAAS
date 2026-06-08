@@ -4,7 +4,32 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/zap"
 )
+
+// pkgLogger is set once at startup via SetLogger so Internal() can log the real
+// error server-side while returning only a generic message to the client.
+var pkgLogger *zap.SugaredLogger
+
+// SetLogger wires the package logger used by Internal(). Call once per service at startup.
+func SetLogger(l *zap.SugaredLogger) { pkgLogger = l }
+
+// Internal logs the underlying error (server-side) and returns a generic 500 to
+// the client, avoiding leakage of DB/internal details. Prefer this over
+// InternalError(c, err.Error()).
+func Internal(c *fiber.Ctx, err error) error {
+	if pkgLogger != nil && err != nil {
+		pkgLogger.Errorw("internal_error",
+			"method", c.Method(),
+			"path", c.Path(),
+			"error", err.Error(),
+		)
+	}
+	return c.Status(http.StatusInternalServerError).JSON(APIResponse{
+		Success: false,
+		Error:   "terjadi kesalahan pada server",
+	})
+}
 
 type APIResponse struct {
 	Success bool        `json:"success"`

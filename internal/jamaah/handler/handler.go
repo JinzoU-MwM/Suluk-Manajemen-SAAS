@@ -33,7 +33,7 @@ func (h *JamaahHandler) CreateProfile(c *fiber.Ctx) error {
 
 	profile, err := h.svc.CreateProfile(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, profile)
 }
@@ -66,7 +66,7 @@ func (h *JamaahHandler) UpdateProfile(c *fiber.Ctx) error {
 
 	profile, err := h.svc.UpdateProfile(c.Context(), id, claims.OrgID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, profile)
 }
@@ -91,7 +91,7 @@ func (h *JamaahHandler) ListProfiles(c *fiber.Ctx) error {
 
 	profiles, total, err := h.svc.ListProfiles(c.Context(), claims.OrgID, search, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, profiles, int64(total), page, limit)
 }
@@ -144,7 +144,7 @@ func (h *JamaahHandler) RegisterToPackage(c *fiber.Ctx) error {
 
 	reg, err := h.svc.RegisterToPackage(c.Context(), claims.OrgID, claims.UserID, jamaahID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, reg)
 }
@@ -185,7 +185,7 @@ func (h *JamaahHandler) UpdatePipelineStatus(c *fiber.Ctx) error {
 
 	reg, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, jamaahID, packageID, req.PipelineStatus)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, reg)
 }
@@ -219,7 +219,7 @@ func (h *JamaahHandler) ListByPackage(c *fiber.Ctx) error {
 
 	profiles, total, err := h.svc.ListByPackage(c.Context(), claims.OrgID, packageID, status, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Paginated(c, profiles, int64(total), page, limit)
 }
@@ -241,7 +241,7 @@ func (h *JamaahHandler) AddNote(c *fiber.Ctx) error {
 
 	note, err := h.svc.AddNote(c.Context(), jamaahID, claims.OrgID, claims.UserID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, note)
 }
@@ -257,7 +257,7 @@ func (h *JamaahHandler) ListNotes(c *fiber.Ctx) error {
 
 	notes, err := h.svc.ListNotes(c.Context(), claims.OrgID, jamaahID, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, notes)
 }
@@ -282,7 +282,7 @@ func (h *JamaahHandler) AddFollowUp(c *fiber.Ctx) error {
 
 	fu, err := h.svc.AddFollowUp(c.Context(), claims.OrgID, claims.UserID, jamaahID, req)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, fu)
 }
@@ -295,7 +295,7 @@ func (h *JamaahHandler) ListFollowUps(c *fiber.Ctx) error {
 
 	followups, err := h.svc.ListFollowUps(c.Context(), claims.OrgID, completed, page, limit)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, followups)
 }
@@ -340,7 +340,7 @@ func (h *JamaahHandler) UploadDocument(c *fiber.Ctx) error {
 
 	doc, err := h.svc.UploadDocument(c.Context(), claims.OrgID, jamaahID, req, fileURL, fileName, fileSize)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, doc)
 }
@@ -354,7 +354,7 @@ func (h *JamaahHandler) ListDocuments(c *fiber.Ctx) error {
 
 	docs, err := h.svc.ListDocuments(c.Context(), claims.OrgID, jamaahID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, docs)
 }
@@ -372,7 +372,7 @@ func (h *JamaahHandler) UpdateDocumentStatus(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.UpdateDocumentStatus(c.Context(), claims.OrgID, docID, req.Status, &claims.UserID, req.Notes); err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "document status updated"})
 }
@@ -381,7 +381,7 @@ func (h *JamaahHandler) DashboardAlerts(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	alerts, err := h.svc.GetDashboardAlerts(c.Context(), claims.OrgID)
 	if err != nil {
-		return response.InternalError(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.OK(c, alerts)
 }
