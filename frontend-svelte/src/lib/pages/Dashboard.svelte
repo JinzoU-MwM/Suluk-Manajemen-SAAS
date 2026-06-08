@@ -329,6 +329,17 @@
       {:else if ownerError}
         <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{ownerError}</div>
       {:else if ownerDash}
+        <!-- Partial data warning: some upstream services failed -->
+        {#if ownerDash.partial}
+          <div class="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <AlertTriangle class="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            <div>
+              <p class="text-sm font-bold">Sebagian data keuangan belum dapat dimuat.</p>
+              <p class="text-xs text-amber-700">Beberapa layanan sedang tidak tersedia, jadi angka di bawah mungkin belum lengkap. Coba muat ulang beberapa saat lagi.</p>
+            </div>
+          </div>
+        {/if}
+
         <!-- Financial summary cards -->
         {#if summaryCards.length > 0}
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">

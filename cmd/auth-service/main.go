@@ -67,7 +67,9 @@ func main() {
 
 	authRepo := repository.NewAuthRepo(pool)
 	authRepo.StartCleanupScheduler(ctx)
-	authService := service.NewAuthService(authRepo, jwtManager, rdb)
+	jamaahAddr := os.Getenv("JAMAAH_SERVICE_ADDR")
+	invoiceAddr := os.Getenv("INVOICE_SERVICE_ADDR")
+	authService := service.NewAuthService(authRepo, jwtManager, rdb, jamaahAddr, invoiceAddr)
 	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{

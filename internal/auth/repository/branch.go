@@ -66,29 +66,6 @@ func (r *AuthRepo) GetOrganization(ctx context.Context, id uuid.UUID) (interface
 	return map[string]interface{}{"id": orgID, "name": name, "slug": slug}, nil
 }
 
-// Consolidated dashboard stats across all branches.
-//
-// IMPORTANT: each service owns a separate database (auth -> jamaah_auth,
-// jamaah -> jamaah_crm, invoice -> jamaah_invoice; see cmd/migration getDBName).
-// The auth pool can therefore only read tables in jamaah_auth. The previous
-// implementation queried jamaah_profiles and invoices from this pool, which
-// always errored ("relation does not exist") and — because the errors were
-// discarded — silently returned zeros. We now return only the branch count,
-// which genuinely lives in this database. total_jamaah / total_revenue /
-// total_invoices must be aggregated per-branch via HTTP from jamaah-service and
-// invoice-service (see FinanceService.GetOwnerDashboard for the fan-out pattern).
-func (r *AuthRepo) GetConsolidatedStats(ctx context.Context, parentOrgID uuid.UUID) (map[string]interface{}, error) {
-	var totalBranches int64
-	if err := r.pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM organizations WHERE parent_org_id = $1 AND is_branch = TRUE`,
-		parentOrgID).Scan(&totalBranches); err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{
-		"total_branches": totalBranches,
-		"total_jamaah":   0,
-		"total_revenue":  0,
-		"total_invoices": 0,
-	}, nil
-}
+// Consolidated multi-branch totals are aggregated over HTTP in the service layer
+// (AuthService.GetConsolidatedStats) because each service owns a separate
+// database — jamaah_profiles and invoices are not reachable from this pool.

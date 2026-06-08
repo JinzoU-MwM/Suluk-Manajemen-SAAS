@@ -180,6 +180,12 @@ type OwnerDashboard struct {
 	Alerts           DashboardAlerts    `json:"alerts"`
 	RevenueChart     []MonthlyRevenue   `json:"revenue_chart"`
 	RecentInvoices   []InvoiceOverview  `json:"recent_invoices,omitempty"`
+	// Partial is true when one or more upstream services failed and the figures
+	// below are incomplete (zeros for the failed sources rather than real data).
+	// DegradedSources names which sources failed so the UI can warn the owner
+	// instead of silently showing wrong totals.
+	Partial         bool     `json:"partial"`
+	DegradedSources []string `json:"degraded_sources,omitempty"`
 }
 
 type DashboardSummary struct {

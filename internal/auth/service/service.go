@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,16 +19,22 @@ import (
 )
 
 type AuthService struct {
-	repo     *repository.AuthRepo
-	jwt      *sharedAuth.JWTManager
-	redis    *sharedRedis.Client
+	repo        *repository.AuthRepo
+	jwt         *sharedAuth.JWTManager
+	redis       *sharedRedis.Client
+	jamaahAddr  string
+	invoiceAddr string
+	httpClient  *http.Client
 }
 
-func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis *sharedRedis.Client) *AuthService {
+func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis *sharedRedis.Client, jamaahAddr, invoiceAddr string) *AuthService {
 	return &AuthService{
-		repo:  repo,
-		jwt:   jwt,
-		redis: redis,
+		repo:        repo,
+		jwt:         jwt,
+		redis:       redis,
+		jamaahAddr:  jamaahAddr,
+		invoiceAddr: invoiceAddr,
+		httpClient:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
 

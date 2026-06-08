@@ -123,6 +123,8 @@ services:
       POSTGRES_PASSWORD: Jamaah123!
       POSTGRES_SSLMODE: disable
       REDIS_ADDR: redis:6379
+      JAMAAH_SERVICE_ADDR: jamaah-service:50053
+      INVOICE_SERVICE_ADDR: invoice-service:50054
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m

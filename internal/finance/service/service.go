@@ -267,17 +267,12 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 	}()
 
 	go func() {
-		data, err := s.fetchFromService(ctx, s.packageAddr, "/api/v1/packages?status=open&page=1&page_size=50", authToken)
+		list, total, err := s.fetchOpenPackages(ctx, authToken)
 		if err != nil {
 			pkgCh <- packageListResult{err: err}
 			return
 		}
-		var pl struct {
-			Data  []packageOverviewResponse `json:"data"`
-			Total int                       `json:"total"`
-		}
-		json.Unmarshal(data, &pl)
-		pkgCh <- packageListResult{list: pl.Data, total: pl.Total}
+		pkgCh <- packageListResult{list: list, total: total}
 	}()
 
 	go func() {
@@ -311,20 +306,30 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 		vendDueCh <- vendorDueResult{count: len(bills)}
 	}()
 
-	// Collect fan-out results
+	// Collect fan-out results. Any failed source is recorded in `degraded` so the
+	// response signals partial data instead of silently reporting zeros.
+	var degraded []string
+
 	invRes := <-invCh
 	if invRes.err == nil {
 		dash.Summary.TotalRevenue = invRes.sum.TotalPaid
 		dash.Summary.TotalPiutang = invRes.sum.TotalRemaining
 		dash.Summary.OverdueInvoices = invRes.sum.OverdueCount
+	} else {
+		degraded = append(degraded, "invoices")
 	}
 
 	vendSumRes := <-vendSumCh
 	if vendSumRes.err == nil {
 		dash.Summary.TotalDebt = vendSumRes.outstanding
+	} else {
+		degraded = append(degraded, "vendor_debt")
 	}
 
 	pkgRes := <-pkgCh
+	if pkgRes.err != nil {
+		degraded = append(degraded, "packages")
+	}
 	if pkgRes.err == nil {
 		dash.Summary.TotalPackages = pkgRes.total
 
@@ -395,12 +400,16 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 		dash.Alerts.PassportExpiringSoon = alertRes.passportSoon
 		dash.Alerts.OverdueFollowUps = alertRes.overdueFollowUp
 		dash.Alerts.IncompleteDocuments = alertRes.incompleteDocs
+	} else {
+		degraded = append(degraded, "jamaah_alerts")
 	}
 	dash.Alerts.OverduePayments = int(dash.Summary.OverdueInvoices)
 
 	vendDueRes := <-vendDueCh
 	if vendDueRes.err == nil {
 		dash.Alerts.VendorBillsDueSoon = vendDueRes.count
+	} else {
+		degraded = append(degraded, "vendor_bills_due")
 	}
 
 	// Gross profit = revenue collected - local operating expenses
@@ -416,6 +425,13 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 		if json.Unmarshal(revenueChartData, &monthly) == nil {
 			dash.RevenueChart = monthly
 		}
+	} else {
+		degraded = append(degraded, "revenue_chart")
+	}
+
+	if len(degraded) > 0 {
+		dash.Partial = true
+		dash.DegradedSources = degraded
 	}
 
 	return dash, nil
@@ -745,6 +761,36 @@ func marginPercent(profit, revenue int64) float64 {
 		return 0
 	}
 	return float64(profit) * 100 / float64(revenue)
+}
+
+// fetchOpenPackages pages through all open packages instead of capping at a
+// single page, so the owner dashboard's active_packages and total stay
+// consistent for orgs with many open packages.
+func (s *FinanceService) fetchOpenPackages(ctx context.Context, authToken string) ([]packageOverviewResponse, int, error) {
+	const pageSize = 100
+	const maxPages = 50 // safety cap (5000 packages)
+	var all []packageOverviewResponse
+	total := 0
+	for page := 1; page <= maxPages; page++ {
+		path := fmt.Sprintf("/api/v1/packages?status=open&page=%d&page_size=%d", page, pageSize)
+		data, err := s.fetchFromService(ctx, s.packageAddr, path, authToken)
+		if err != nil {
+			return nil, 0, err
+		}
+		var pl struct {
+			Data  []packageOverviewResponse `json:"data"`
+			Total int                       `json:"total"`
+		}
+		if err := json.Unmarshal(data, &pl); err != nil {
+			return nil, 0, err
+		}
+		total = pl.Total
+		all = append(all, pl.Data...)
+		if len(pl.Data) == 0 || len(all) >= total {
+			break
+		}
+	}
+	return all, total, nil
 }
 
 func (s *FinanceService) fetchFromService(ctx context.Context, addr, path, authToken string) (json.RawMessage, error) {
