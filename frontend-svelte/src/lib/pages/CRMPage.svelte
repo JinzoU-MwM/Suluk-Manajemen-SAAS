@@ -3,11 +3,13 @@
   import {
     Plus, Search, LayoutGrid, List,
     Phone, ChevronRight, UserCircle, Loader2,
+    Users, CheckCircle, CreditCard, Clock,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Pager from '../components/Pager.svelte';
+  import Avatar from '../components/Avatar.svelte';
   import { showToast, mapError } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR } from '../utils/formatting.js';
   import { ApiService } from '../services/api.js';
@@ -67,6 +69,14 @@
   let filtered = $derived(
     filterStatus === 'all' ? jamaah : jamaah.filter(j => j.pipeline_status === filterStatus)
   );
+
+  // Summary tiles (Suluk design). Counts are over the loaded page; total is server-side.
+  let statTiles = $derived([
+    { label: 'Total Jamaah', value: total, icon: Users, accent: '#1B7F5A' },
+    { label: 'Lunas', value: jamaah.filter(j => ['lunas', 'berangkat'].includes(j.pipeline_status)).length, icon: CheckCircle, accent: '#1B7F5A' },
+    { label: 'Masih Cicilan', value: jamaah.filter(j => ['cicilan', 'dp'].includes(j.pipeline_status)).length, icon: CreditCard, accent: '#2563a8' },
+    { label: 'Prospek', value: jamaah.filter(j => ['prospek', 'survey', 'booking'].includes(j.pipeline_status)).length, icon: Clock, accent: '#C99A2E' },
+  ]);
 
   onMount(loadJamaah);
 
@@ -152,6 +162,17 @@
   }
 </script>
 
+{#snippet statTile(t)}
+  {@const TIcon = t.icon}
+  <div class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
+    <div class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl" style="background:{t.accent}18;color:{t.accent}">
+      <TIcon class="h-5 w-5" />
+    </div>
+    <p class="tabular text-2xl font-extrabold tracking-tight text-[#10211c]" style="font-variant-numeric:tabular-nums">{t.value}</p>
+    <p class="mt-0.5 text-[13px] font-medium text-slate-500">{t.label}</p>
+  </div>
+{/snippet}
+
 <div class="flex h-screen flex-col">
   <!-- Header -->
   <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
@@ -221,6 +242,9 @@
   <!-- Table view -->
   {#if viewMode === 'table'}
     <div class="flex-1 overflow-auto">
+      <div class="grid grid-cols-2 gap-4 p-6 pb-0 sm:grid-cols-4">
+        {#each statTiles as t}{@render statTile(t)}{/each}
+      </div>
       {#if isLoading}
         <div class="space-y-3 p-6">
           {#each [1,2,3,4] as _}
@@ -239,11 +263,11 @@
         <table class="w-full">
           <thead class="sticky top-0 bg-slate-50">
             <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <th class="px-6 py-3">Nama</th>
+              <th class="px-6 py-3">Jamaah</th>
               <th class="hidden px-4 py-3 md:table-cell">Paket</th>
+              <th class="hidden px-4 py-3 lg:table-cell">Pembayaran</th>
               <th class="px-4 py-3">Status</th>
               <th class="px-4 py-3 text-right">Sisa Tagihan</th>
-              <th class="hidden px-4 py-3 lg:table-cell">Paspor</th>
               <th class="px-4 py-3"></th>
             </tr>
           </thead>
@@ -252,18 +276,31 @@
               <tr class="group bg-white transition-colors hover:bg-primary-50/30">
                 <td class="px-6 py-3.5">
                   <div class="flex items-center gap-3">
-                    <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl {j.gender === 'P' ? 'bg-pink-100' : 'bg-blue-100'} text-sm font-bold {j.gender === 'P' ? 'text-pink-600' : 'text-blue-600'}">
-                      {j.name.charAt(0)}
-                    </div>
+                    <Avatar name={j.name} size={38} />
                     <div class="min-w-0">
-                      <p class="truncate text-sm font-semibold text-slate-800">{j.name}</p>
-                      <p class="truncate text-xs text-slate-400">{j.phone || '—'}</p>
+                      <p class="truncate text-sm font-bold text-[#10211c]">{j.name}</p>
+                      <p class="truncate text-xs text-slate-400">{j.nik || j.phone || '—'}</p>
                     </div>
                   </div>
                 </td>
                 <td class="hidden px-4 py-3.5 md:table-cell">
-                  <p class="text-sm text-slate-600">{j.package_name || '—'}</p>
+                  <p class="text-sm font-medium text-slate-600">{j.package_name || '—'}</p>
                   {#if j.room_type}<p class="text-xs text-slate-400">{j.room_type}</p>{/if}
+                </td>
+                <td class="hidden px-4 py-3.5 lg:table-cell">
+                  {#if j.total_invoice > 0}
+                    <div class="min-w-[140px]">
+                      <div class="mb-1 flex justify-between text-xs">
+                        <span class="tabular font-bold text-[#10211c]" style="font-variant-numeric:tabular-nums">{formatIDR(j.paid)}</span>
+                        <span class="tabular text-slate-400" style="font-variant-numeric:tabular-nums">{formatIDR(j.total_invoice)}</span>
+                      </div>
+                      <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div class="h-full rounded-full {j.sisa_tagihan <= 0 ? 'bg-primary-600' : 'bg-gold-500'}" style:width={`${Math.min(100, Math.round((j.paid / j.total_invoice) * 100))}%`}></div>
+                      </div>
+                    </div>
+                  {:else}
+                    <span class="text-xs text-slate-400">—</span>
+                  {/if}
                 </td>
                 <td class="px-4 py-3.5">
                   <StatusBadge status={j.pipeline_status} size="xs" />
@@ -272,16 +309,9 @@
                   {#if j.sisa_tagihan > 0}
                     <span class="text-sm font-semibold text-red-600">{formatIDR(j.sisa_tagihan)}</span>
                   {:else if j.total_invoice > 0}
-                    <span class="text-sm font-semibold text-emerald-600">Lunas</span>
+                    <span class="text-sm font-semibold text-primary-600">Lunas</span>
                   {:else}
                     <span class="text-sm text-slate-400">—</span>
-                  {/if}
-                </td>
-                <td class="hidden px-4 py-3.5 lg:table-cell">
-                  {#if j.passport_no}
-                    <span class="text-xs text-slate-600">{j.passport_no}</span>
-                  {:else}
-                    <span class="text-xs text-slate-400">Belum ada</span>
                   {/if}
                 </td>
                 <td class="px-4 py-3.5 text-right">
