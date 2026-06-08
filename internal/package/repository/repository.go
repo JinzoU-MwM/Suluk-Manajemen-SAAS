@@ -46,15 +46,15 @@ func (r *PackageRepo) CreatePackage(ctx context.Context, pkg *model.Package) err
 	return nil
 }
 
-func (r *PackageRepo) GetPackageByID(ctx context.Context, id uuid.UUID) (*model.Package, error) {
+func (r *PackageRepo) GetPackageByID(ctx context.Context, id, orgID uuid.UUID) (*model.Package, error) {
 	pkg := &model.Package{}
 	query := `SELECT id, org_id, name, slug, description, package_type, departure_date, return_date,
 		duration_days, total_seats, reserved_seats, airline, flight_number_go, flight_number_return,
 		hotel_makkah_name, hotel_makkah_stars, hotel_makkah_nights, hotel_makkah_distance,
 		hotel_madinah_name, hotel_madinah_stars, hotel_madinah_nights, hotel_madinah_distance,
 		itinerary, is_published, status, created_at, updated_at
-		FROM packages WHERE id = $1`
-	err := r.pool.QueryRow(ctx, query, id).Scan(
+		FROM packages WHERE id = $1 AND org_id = $2`
+	err := r.pool.QueryRow(ctx, query, id, orgID).Scan(
 		&pkg.ID, &pkg.OrgID, &pkg.Name, &pkg.Slug, &pkg.Description, &pkg.PackageType,
 		&pkg.DepartureDate, &pkg.ReturnDate, &pkg.DurationDays, &pkg.TotalSeats, &pkg.ReservedSeats,
 		&pkg.Airline, &pkg.FlightNumberGo, &pkg.FlightNumberReturn,
@@ -73,16 +73,42 @@ func (r *PackageRepo) GetPackageByID(ctx context.Context, id uuid.UUID) (*model.
 	return pkg, nil
 }
 
-func (r *PackageRepo) GetPackageBySlug(ctx context.Context, slug string) (*model.Package, error) {
+func (r *PackageRepo) GetPackageBySlug(ctx context.Context, slug string, orgID uuid.UUID) (*model.Package, error) {
 	var id uuid.UUID
-	err := r.pool.QueryRow(ctx, `SELECT id FROM packages WHERE slug = $1`, slug).Scan(&id)
+	err := r.pool.QueryRow(ctx, `SELECT id FROM packages WHERE slug = $1 AND org_id = $2`, slug, orgID).Scan(&id)
 	if err == pgx.ErrNoRows {
 		return nil, ErrPackageNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	return r.GetPackageByID(ctx, id)
+	return r.GetPackageByID(ctx, id, orgID)
+}
+
+func (r *PackageRepo) GetPackageBySlugPublic(ctx context.Context, slug string) (*model.Package, error) {
+	pkg := &model.Package{}
+	query := `SELECT id, org_id, name, slug, description, package_type, departure_date, return_date,
+		duration_days, total_seats, reserved_seats, airline, flight_number_go, flight_number_return,
+		hotel_makkah_name, hotel_makkah_stars, hotel_makkah_nights, hotel_makkah_distance,
+		hotel_madinah_name, hotel_madinah_stars, hotel_madinah_nights, hotel_madinah_distance,
+		itinerary, is_published, status, created_at, updated_at
+		FROM packages WHERE slug = $1 AND is_published = TRUE`
+	err := r.pool.QueryRow(ctx, query, slug).Scan(
+		&pkg.ID, &pkg.OrgID, &pkg.Name, &pkg.Slug, &pkg.Description, &pkg.PackageType,
+		&pkg.DepartureDate, &pkg.ReturnDate, &pkg.DurationDays, &pkg.TotalSeats, &pkg.ReservedSeats,
+		&pkg.Airline, &pkg.FlightNumberGo, &pkg.FlightNumberReturn,
+		&pkg.HotelMakkahName, &pkg.HotelMakkahStars, &pkg.HotelMakkahNights, &pkg.HotelMakkahDistance,
+		&pkg.HotelMadinahName, &pkg.HotelMadinahStars, &pkg.HotelMadinahNights, &pkg.HotelMadinahDistance,
+		&pkg.Itinerary, &pkg.IsPublished, &pkg.Status, &pkg.CreatedAt, &pkg.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, ErrPackageNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get package by slug: %w", err)
+	}
+	pkg.PricingTiers, _ = r.GetPricingTiers(ctx, pkg.ID)
+	return pkg, nil
 }
 
 func (r *PackageRepo) ListPackages(ctx context.Context, orgID uuid.UUID, status string, offset, limit int) ([]model.Package, int, error) {
@@ -144,13 +170,13 @@ func (r *PackageRepo) UpdatePackage(ctx context.Context, pkg *model.Package) err
 		hotel_makkah_name = $11, hotel_makkah_stars = $12, hotel_makkah_nights = $13, hotel_makkah_distance = $14,
 		hotel_madinah_name = $15, hotel_madinah_stars = $16, hotel_madinah_nights = $17, hotel_madinah_distance = $18,
 		itinerary = $19, is_published = $20, status = $21, updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND org_id = $22`
 	result, err := r.pool.Exec(ctx, query,
 		pkg.ID, pkg.Name, pkg.Description, pkg.PackageType, pkg.DepartureDate, pkg.ReturnDate,
 		pkg.TotalSeats, pkg.Airline, pkg.FlightNumberGo, pkg.FlightNumberReturn,
 		pkg.HotelMakkahName, pkg.HotelMakkahStars, pkg.HotelMakkahNights, pkg.HotelMakkahDistance,
 		pkg.HotelMadinahName, pkg.HotelMadinahStars, pkg.HotelMadinahNights, pkg.HotelMadinahDistance,
-		pkg.Itinerary, pkg.IsPublished, pkg.Status,
+		pkg.Itinerary, pkg.IsPublished, pkg.Status, pkg.OrgID,
 	)
 	if err != nil {
 		return fmt.Errorf("update package: %w", err)
@@ -161,8 +187,8 @@ func (r *PackageRepo) UpdatePackage(ctx context.Context, pkg *model.Package) err
 	return nil
 }
 
-func (r *PackageRepo) DeletePackage(ctx context.Context, id uuid.UUID) error {
-	result, err := r.pool.Exec(ctx, `DELETE FROM packages WHERE id = $1`, id)
+func (r *PackageRepo) DeletePackage(ctx context.Context, id, orgID uuid.UUID) error {
+	result, err := r.pool.Exec(ctx, `DELETE FROM packages WHERE id = $1 AND org_id = $2`, id, orgID)
 	if err != nil {
 		return fmt.Errorf("delete package: %w", err)
 	}
@@ -172,8 +198,8 @@ func (r *PackageRepo) DeletePackage(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (r *PackageRepo) UpdatePackageStatus(ctx context.Context, id uuid.UUID, status string) error {
-	result, err := r.pool.Exec(ctx, `UPDATE packages SET status = $2, updated_at = NOW() WHERE id = $1`, id, status)
+func (r *PackageRepo) UpdatePackageStatus(ctx context.Context, id, orgID uuid.UUID, status string) error {
+	result, err := r.pool.Exec(ctx, `UPDATE packages SET status = $2, updated_at = NOW() WHERE id = $1 AND org_id = $3`, id, status, orgID)
 	if err != nil {
 		return err
 	}
@@ -183,9 +209,9 @@ func (r *PackageRepo) UpdatePackageStatus(ctx context.Context, id uuid.UUID, sta
 	return nil
 }
 
-func (r *PackageRepo) UpdateReservedSeats(ctx context.Context, id uuid.UUID, delta int) error {
-	query := `UPDATE packages SET reserved_seats = reserved_seats + $2, updated_at = NOW() WHERE id = $1`
-	result, err := r.pool.Exec(ctx, query, id, delta)
+func (r *PackageRepo) UpdateReservedSeats(ctx context.Context, id, orgID uuid.UUID, delta int) error {
+	query := `UPDATE packages SET reserved_seats = reserved_seats + $2, updated_at = NOW() WHERE id = $1 AND org_id = $3`
+	result, err := r.pool.Exec(ctx, query, id, delta, orgID)
 	if err != nil {
 		return err
 	}
@@ -336,8 +362,8 @@ func (r *PackageRepo) DeleteCostComponent(ctx context.Context, id uuid.UUID) err
 	return nil
 }
 
-func (r *PackageRepo) GetProfitProjection(ctx context.Context, id uuid.UUID) (*model.PackageProfitProjection, error) {
-	pkg, err := r.GetPackageByID(ctx, id)
+func (r *PackageRepo) GetProfitProjection(ctx context.Context, id, orgID uuid.UUID) (*model.PackageProfitProjection, error) {
+	pkg, err := r.GetPackageByID(ctx, id, orgID)
 	if err != nil {
 		return nil, err
 	}

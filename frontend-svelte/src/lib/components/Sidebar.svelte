@@ -1,5 +1,6 @@
 <script>
   import {
+    Ban,
     BarChart3,
     BookOpen,
     Briefcase,
@@ -78,6 +79,8 @@
         { id: "contracts", label: "E-Kontrak", icon: FileText, page: "contracts" },
         { id: "stock", label: "Persediaan", icon: Briefcase, page: "stock" },
         { id: "payroll", label: "Penggajian", icon: Wallet, page: "payroll" },
+        { id: "cancellation", label: "Pembatalan", icon: Ban, page: "cancellation" },
+        { id: "export", label: "Export Laporan", icon: FileText, page: "export" },
       ],
     },
     {

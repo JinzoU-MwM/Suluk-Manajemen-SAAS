@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
     return {
         async register(email, password, name) {
@@ -9,7 +16,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ email, password, name }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async login(email, password) {
@@ -19,7 +26,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ email, password }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async logout() {
@@ -28,7 +35,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getMe() {
@@ -38,8 +45,8 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            const data = await response.json();
-            cacheSet('auth:me', data, 30000); // 30s TTL
+            const data = unwrapData(await response.json());
+            cacheSet('auth:me', data, 30000);
             return data;
         },
 
@@ -50,8 +57,8 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            const data = await response.json();
-            cacheSet('sub:status', data, 20000); // 20s TTL
+            const data = unwrapData(await response.json());
+            cacheSet('sub:status', data, 20000);
             return data;
         },
 
@@ -62,17 +69,17 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ payment_ref: paymentRef }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updateProfile(updates) {
-            const response = await apiFetch(`${API_URL}/auth/profile`, {
-                method: 'PATCH',
+            const response = await apiFetch(`${API_URL}/auth/me`, {
+                method: 'PUT',
                 headers: authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(updates),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async changePassword(currentPassword, newPassword) {
@@ -82,7 +89,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getActivity() {
@@ -90,7 +97,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async deleteAccount(password) {
@@ -100,7 +107,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ password }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async verifyEmail(email, otp) {
@@ -110,7 +117,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ email, otp }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async resendOtp(email) {
@@ -120,7 +127,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ email }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async forgotPassword(email) {
@@ -130,7 +137,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ email }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async resetPassword(email, code, newPassword) {
@@ -140,7 +147,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ email, code, new_password: newPassword }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async sendPhoneOtp(phoneNumber) {
@@ -150,7 +157,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ phone_number: phoneNumber }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async verifyPhone(phoneNumber, otp) {
@@ -160,7 +167,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify({ phone_number: phoneNumber, otp }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getTrialStatus() {
@@ -170,8 +177,8 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            const data = await response.json();
-            cacheSet('sub:trial', data, 30000); // 30s TTL
+            const data = unwrapData(await response.json());
+            cacheSet('sub:trial', data, 30000);
             return data;
         },
 
@@ -181,7 +188,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getPricing() {
@@ -189,7 +196,7 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
     };
 }

@@ -213,6 +213,9 @@
   let AgentsPage = $state(null);
   let DocumentsPage = $state(null);
   let ContractsPage = $state(null);
+  let CancellationPage = $state(null);
+  let PayrollPage = $state(null);
+  let ExportPage = $state(null);
 
   async function ensurePage(page) {
     if (page === "dashboard" && !DashboardPage) {
@@ -263,6 +266,14 @@
       DocumentsPage = (await import("./lib/pages/DocumentsPage.svelte")).default;
     } else if (page === "contracts" && !ContractsPage) {
       ContractsPage = (await import("./lib/pages/ContractsPage.svelte")).default;
+    } else if (page === "cancellation" && !CancellationPage) {
+      CancellationPage = (await import("./lib/pages/CancellationPage.svelte")).default;
+    } else if (page === "payroll" && !PayrollPage) {
+      PayrollPage = (await import("./lib/pages/PayrollPage.svelte")).default;
+    } else if (page === "export" && !ExportPage) {
+      ExportPage = (await import("./lib/pages/ExportPage.svelte")).default;
+    } else if (page === "stock" && !InventoryPage) {
+      InventoryPage = (await import("./lib/pages/InventoryPage.svelte")).default;
     }
   }
 
@@ -437,8 +448,6 @@
     // Clean up any leftover dark mode from previous versions
     document.documentElement.classList.remove("dark");
     localStorage.removeItem("darkMode");
-    // Drop legacy bearer token storage; cookie session is authoritative.
-    localStorage.removeItem("token");
 
     // If already on public page (set by getInitialPageAndTokens), skip auth flow
     if (currentPage === "mutawwif" || currentPage === "registration" || currentPage === "package" || currentPage === "contract-sign") {
@@ -492,17 +501,17 @@
     }
 
     try {
-      // Validate cookie session and hydrate user data in parallel.
-      const [me, sub, groupsData, trial] = await Promise.all([
-        ApiService.getMe(),
-        ApiService.getSubscriptionStatus(),
-        ApiService.listGroups(),
-        ApiService.getTrialStatus().catch(() => null),
-      ]);
+      const me = await ApiService.getMe();
       user = me;
       localStorage.setItem("user", JSON.stringify(me));
+
+      const [sub, groupsData, trial] = await Promise.all([
+        ApiService.getSubscriptionStatus().catch(() => null),
+        ApiService.listGroups().catch(() => ({ groups: [] })),
+        ApiService.getTrialStatus().catch(() => null),
+      ]);
       subscription = sub;
-      groups = groupsData.groups || [];
+      groups = groupsData?.groups || [];
       trialAvailable = trial?.trial_available ?? false;
       currentPage = currentPage === "super-admin" ? "super-admin" : "dashboard";
     } catch {
@@ -557,7 +566,7 @@
     user = null;
     subscription = null;
     groups = [];
-    localStorage.removeItem("token");
+    localStorage.removeItem("access_token");
     localStorage.removeItem("user");
     currentPage = "landing";
   }
@@ -593,6 +602,8 @@
     // v2
     "packages", "crm", "invoices", "finance", "vendors", "agents", "documents",
     "contracts", "stock", "payroll",
+    // v3
+    "cancellation", "export",
   ]);
 
   let showSidebar = $derived(SIDEBAR_PAGES.has(currentPage));
@@ -895,6 +906,30 @@
               onUpgrade={() => handlePageChange("profile:upgrade")}
               onTrial={() => handlePageChange("profile:upgrade")}
             />
+          {/if}
+        {:else if currentPage === "cancellation"}
+          {#if CancellationPage}
+            <CancellationPage onNavigate={handlePageChange} {user} />
+          {:else}
+            <div class="p-6 text-slate-500">Loading pembatalan...</div>
+          {/if}
+        {:else if currentPage === "payroll"}
+          {#if PayrollPage}
+            <PayrollPage onNavigate={handlePageChange} {user} />
+          {:else}
+            <div class="p-6 text-slate-500">Loading penggajian...</div>
+          {/if}
+        {:else if currentPage === "export"}
+          {#if ExportPage}
+            <ExportPage onNavigate={handlePageChange} {user} />
+          {:else}
+            <div class="p-6 text-slate-500">Loading export...</div>
+          {/if}
+        {:else if currentPage === "stock"}
+          {#if InventoryPage}
+            <InventoryPage isOpen={true} onClose={() => handlePageChange("dashboard")} groups={groups} {isPro} />
+          {:else}
+            <div class="p-6 text-slate-500">Loading inventory...</div>
           {/if}
         {/if}
       </div>

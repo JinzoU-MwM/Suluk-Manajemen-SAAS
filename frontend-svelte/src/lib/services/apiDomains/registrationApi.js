@@ -1,16 +1,23 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export const registrationApi = {
     async getPublicPackage(slug) {
         const response = await apiFetch(`/public/packages/${slug}`);
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async getRegistrationInfo(token) {
         const response = await apiFetch(`${API_URL}/registration/public/${token}`);
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async submitRegistration(token, formData) {
@@ -19,7 +26,7 @@ export const registrationApi = {
             body: formData,
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async getRegistrationLink(groupId) {
@@ -27,7 +34,7 @@ export const registrationApi = {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async generateRegistrationLink(groupId, expiresInDays = 30) {
@@ -37,7 +44,7 @@ export const registrationApi = {
             body: JSON.stringify({ group_id: groupId, expires_in_days: expiresInDays }),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async revokeRegistrationLink(groupId) {
@@ -46,7 +53,7 @@ export const registrationApi = {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async getPendingMembers(groupId) {
@@ -54,7 +61,7 @@ export const registrationApi = {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async approvePendingMember(pendingId) {
@@ -63,7 +70,7 @@ export const registrationApi = {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async rejectPendingMember(pendingId) {
@@ -72,6 +79,6 @@ export const registrationApi = {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 };

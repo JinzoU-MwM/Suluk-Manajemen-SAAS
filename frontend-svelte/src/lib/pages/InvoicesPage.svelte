@@ -8,6 +8,8 @@
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import IDRInput from '../components/IDRInput.svelte';
   import { showToast } from '../services/toast.svelte.js';
+  import { invoiceApi } from '../services/apiDomains/invoiceApi.js';
+  import { ApiService, authHeaders } from '../services/api.js';
 
   let { onNavigate, user = null } = $props();
 
@@ -62,10 +64,31 @@
   async function loadInvoices() {
     isLoading = true;
     try {
-      await new Promise(r => setTimeout(r, 500));
-      invoices = MOCK_INVOICES;
-    } catch {
-      showToast('Gagal memuat invoice', 'error');
+      const [invoiceData, jamaahData, packageData] = await Promise.all([
+        invoiceApi.listInvoices({ status: filterStatus === 'all' ? '' : filterStatus }),
+        ApiService.listJamaah({ pageSize: 1000 }).catch(() => ({ jamaah: [] })),
+        ApiService.listPackages({ pageSize: 1000 }).catch(() => ({ packages: [] })),
+      ]);
+
+      const rawInvoices = invoiceData.invoices || invoiceData || [];
+      const jamaahList = jamaahData.jamaah || jamaahData.data || jamaahData || [];
+      const packageList = packageData.packages || packageData.data || packageData || [];
+
+      const jamaahMap = new Map(jamaahList.map(j => [j.id, j.nama || j.nama_paspor || j.name || 'Tanpa Nama']));
+      const packageMap = new Map(packageList.map(p => [p.id, p.name || 'Tanpa Nama']));
+
+      invoices = rawInvoices.map(inv => ({
+        ...inv,
+        invoice_no: inv.invoice_number || inv.invoice_no,
+        total: inv.total_amount ?? inv.total,
+        paid: inv.amount_paid ?? inv.paid,
+        remaining: inv.amount_remaining ?? inv.remaining,
+        jamaah_name: inv.jamaah_name || jamaahMap.get(inv.jamaah_id) || 'Jamaah',
+        package_name: inv.package_name || packageMap.get(inv.package_id) || 'Paket Umroh',
+      }));
+    } catch (e) {
+      showToast('Gagal memuat invoice: ' + e.message, 'error');
+      invoices = [];
     } finally {
       isLoading = false;
     }
@@ -91,59 +114,52 @@
       showToast('Masukkan nominal pembayaran', 'warning');
       return;
     }
+    if (!selectedInvoice) return;
     try {
-      // TODO: ApiService.recordPayment(selectedInvoice.id, { amount: payAmount, method: payMethod, date: payDate, ref: payRef, note: payNote })
+      await invoiceApi.recordPayment(selectedInvoice.id, {
+        amount: payAmount,
+        payment_method: payMethod,
+        paid_at: payDate,
+        reference_number: payRef,
+        notes: payNote,
+      });
       showToast('Pembayaran berhasil dicatat', 'success');
       showPaymentModal = false;
       drawerOpen = false;
+      payAmount = 0;
+      payRef = '';
+      payNote = '';
       await loadInvoices();
     } catch (e) {
-      showToast('Gagal mencatat pembayaran', 'error');
+      showToast(e.message || 'Gagal mencatat pembayaran', 'error');
     }
   }
 
-  const MOCK_INVOICES = [
-    {
-      id: 1, invoice_no: 'INV/2026/0310/0001', jamaah_name: 'Ahmad Fauzi',
-      package_name: 'Umroh Reguler Ramadan 2026', room_type: 'Quad',
-      total: 22500000, paid: 22500000, remaining: 0,
-      status: 'lunas', is_overdue: false,
-      due_date: '2026-02-01',
-      payments: [
-        { id: 1, date: '2026-01-10', amount: 10000000, method: 'Transfer Bank', ref: 'TRF001' },
-        { id: 2, date: '2026-01-25', amount: 12500000, method: 'Transfer Bank', ref: 'TRF002' },
-      ],
-    },
-    {
-      id: 2, invoice_no: 'INV/2026/0310/0002', jamaah_name: 'Siti Rahayu',
-      package_name: 'Umroh Reguler Ramadan 2026', room_type: 'Double',
-      total: 29000000, paid: 10000000, remaining: 19000000,
-      status: 'sebagian', is_overdue: true,
-      due_date: '2026-02-15',
-      payments: [
-        { id: 3, date: '2026-01-20', amount: 10000000, method: 'Transfer Bank', ref: 'TRF003' },
-      ],
-    },
-    {
-      id: 3, invoice_no: 'INV/2026/0415/0001', jamaah_name: 'Budi Santoso',
-      package_name: 'Umroh Plus VIP April 2026', room_type: 'Triple',
-      total: 40000000, paid: 0, remaining: 40000000,
-      status: 'belum bayar', is_overdue: false,
-      due_date: '2026-03-01',
-      payments: [],
-    },
-    {
-      id: 4, invoice_no: 'INV/2026/0310/0004', jamaah_name: 'Fatimah Zahra',
-      package_name: 'Umroh Reguler Ramadan 2026', room_type: 'Quad',
-      total: 22500000, paid: 15000000, remaining: 7500000,
-      status: 'sebagian', is_overdue: false,
-      due_date: '2026-03-01',
-      payments: [
-        { id: 4, date: '2026-02-01', amount: 8000000, method: 'QRIS', ref: '' },
-        { id: 5, date: '2026-02-20', amount: 7000000, method: 'Tunai', ref: '' },
-      ],
-    },
-  ];
+  async function downloadInvoicePDF(inv) {
+    if (!inv) return;
+    try {
+      showToast('Menyiapkan kwitansi PDF...');
+      const url = `/api/invoices/${inv.id}/pdf`;
+      const res = await fetch(url, { headers: authHeaders() });
+      if (!res.ok) {
+        const err = await res.text();
+        showToast(err || 'Gagal mengunduh PDF', 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `invoice_${inv.invoice_no || inv.invoice_number || inv.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+      showToast('Kwitansi PDF berhasil diunduh');
+    } catch (e) {
+      showToast('Gagal mengunduh: ' + e.message, 'error');
+    }
+  }
 </script>
 
 <div class="flex h-screen flex-col">
@@ -356,6 +372,7 @@
         <div class="flex gap-3">
           <button
             type="button"
+            onclick={() => downloadInvoicePDF(selectedInvoice)}
             class="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           >
             <Download class="h-4 w-4" />
@@ -381,8 +398,9 @@
           <IDRInput label="Nominal" bind:value={payAmount} required />
 
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-slate-700">Metode</label>
+            <label for="pay-method" class="text-sm font-medium text-slate-700">Metode</label>
             <select
+              id="pay-method"
               bind:value={payMethod}
               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
             >
@@ -393,8 +411,9 @@
           </div>
 
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-slate-700">Tanggal</label>
+            <label for="pay-date" class="text-sm font-medium text-slate-700">Tanggal</label>
             <input
+              id="pay-date"
               type="date"
               bind:value={payDate}
               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
@@ -402,8 +421,9 @@
           </div>
 
           <div class="flex flex-col gap-1">
-            <label class="text-sm font-medium text-slate-700">No. Referensi (opsional)</label>
+            <label for="pay-ref" class="text-sm font-medium text-slate-700">No. Referensi (opsional)</label>
             <input
+              id="pay-ref"
               type="text"
               bind:value={payRef}
               placeholder="Nomor bukti transfer..."

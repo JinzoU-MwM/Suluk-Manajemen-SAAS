@@ -251,7 +251,7 @@
     },
     {
       name: "Pro",
-      price: "Rp 299.000",
+      price: "Rp 80.000",
       period: "/bulan",
       note: "Untuk travel menengah aktif",
       cta: "Coba Pro 14 Hari Gratis",
@@ -271,7 +271,7 @@
     },
     {
       name: "Business",
-      price: "Rp 599.000",
+      price: "Rp 200.000",
       period: "/bulan",
       note: "Untuk travel besar & multi-cabang",
       cta: "Pilih Business",
@@ -323,7 +323,7 @@
 
 <div class="landing">
   <!-- NAV -->
-  <header class="fixed inset-x-0 top-0 z-50 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
+  <header class="fixed inset-x-0 top-0 z-40 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="flex h-16 items-center justify-between lg:h-20">
         <a href="/" class="flex items-center" aria-label="Jamaah.in home">
@@ -332,13 +332,13 @@
 
         <nav class="hidden items-center gap-8 md:flex" aria-label="Navigasi utama">
           {#each navItems as item}
-            <a href={item.href} class="text-sm font-semibold text-slate-600 transition-colors hover:text-primary-600">{item.label}</a>
+            <a href={item.href} class="text-sm font-semibold text-slate-600 transition-colors hover:text-primary-600 focus-visible:outline-2 focus-visible:outline-primary-500">{item.label}</a>
           {/each}
         </nav>
 
         <div class="hidden items-center gap-3 md:flex">
-          <button type="button" onclick={onGoToLogin} class="px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:text-primary-600">Masuk</button>
-          <button type="button" onclick={onGoToRegister} class="rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/25 transition-all hover:-translate-y-0.5 hover:from-primary-700 hover:to-primary-600">
+          <button type="button" onclick={onGoToLogin} class="px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:text-primary-600 focus-visible:outline-2 focus-visible:outline-primary-500">Masuk</button>
+          <button type="button" onclick={onGoToRegister} class="rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/25 transition-all hover:-translate-y-0.5 hover:from-primary-700 hover:to-primary-600 focus-visible:outline-2 focus-visible:outline-primary-500">
             Coba 14 Hari Gratis
           </button>
         </div>
@@ -356,8 +356,8 @@
             {/each}
           </nav>
           <div class="mt-4 grid grid-cols-2 gap-3">
-            <button type="button" onclick={() => { closeMobileMenu(); onGoToLogin(); }} class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Masuk</button>
-            <button type="button" onclick={() => { closeMobileMenu(); onGoToRegister(); }} class="rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white">Coba Gratis</button>
+            <button type="button" onclick={() => { closeMobileMenu(); onGoToLogin(); }} class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-primary-500">Masuk</button>
+            <button type="button" onclick={() => { closeMobileMenu(); onGoToRegister(); }} class="rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-primary-500">Coba Gratis</button>
           </div>
         </div>
       {/if}
@@ -370,7 +370,7 @@
     <div class="absolute bottom-20 right-10 h-96 w-96 rounded-full bg-emerald-200/20 blur-[110px]"></div>
 
     <!-- Floating cards -->
-    <div class="absolute right-16 top-28 z-10 hidden animate-float lg:flex">
+    <div class="absolute right-8 top-24 z-10 hidden animate-float xl:flex">
       <div class="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 shadow-xl shadow-primary-500/8">
         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600">
           <TrendingUp class="h-5 w-5 text-white" />
@@ -381,7 +381,7 @@
         </div>
       </div>
     </div>
-    <div class="absolute bottom-36 right-24 z-10 hidden animate-float-delay lg:flex">
+    <div class="absolute bottom-32 right-20 z-10 hidden animate-float-delay xl:flex">
       <div class="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 shadow-xl shadow-rose-500/8">
         <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-rose-600">
           <AlertCircle class="h-5 w-5 text-white" />
@@ -392,7 +392,7 @@
         </div>
       </div>
     </div>
-    <div class="absolute left-14 bottom-48 z-10 hidden animate-float lg:flex" style="animation-delay: 3s">
+    <div class="absolute left-12 bottom-44 z-10 hidden animate-float-delay-3s xl:flex">
       <div class="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 shadow-xl shadow-emerald-500/8">
         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600">
           <ScanLine class="h-5 w-5 text-white" />
@@ -415,10 +415,10 @@
         Bukan sekadar tools input data — Jamaah.in adalah sistem administrasi bisnis lengkap khusus PPIU Indonesia. Invoice otomatis, P&L per trip real-time, CRM jamaah, dan 12 modul terintegrasi dalam satu platform.
       </p>
       <div class="mb-10 flex flex-wrap justify-center gap-4">
-        <button type="button" onclick={onGoToRegister} class="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 px-8 py-4 text-sm font-semibold text-white shadow-xl shadow-primary-500/25 transition-all hover:-translate-y-1 hover:from-primary-700 hover:to-primary-600">
+        <button type="button" onclick={onGoToRegister} class="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-500 px-8 py-4 text-sm font-semibold text-white shadow-xl shadow-primary-500/25 transition-all hover:-translate-y-1 hover:from-primary-700 hover:to-primary-600 focus-visible:outline-2 focus-visible:outline-primary-500">
           Mulai Trial 14 Hari Gratis <ArrowRight class="h-5 w-5 transition-transform group-hover:translate-x-1" />
         </button>
-        <a href="#fitur" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-8 py-4 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:-translate-y-1 hover:bg-slate-50">
+        <a href="#fitur" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-8 py-4 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:-translate-y-1 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-primary-500">
           <Zap class="h-5 w-5 text-primary-500" /> Lihat 12 Modul
         </a>
       </div>
@@ -429,7 +429,7 @@
       </div>
 
       <!-- Dashboard preview -->
-      <div class="relative mx-auto mt-16 max-w-4xl">
+      <div class="relative mx-auto mt-16 hidden max-w-4xl sm:block">
         <div class="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/12">
           <div class="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-5 py-3">
             <span class="h-3 w-3 rounded-full bg-red-400"></span>
@@ -508,7 +508,7 @@
   </section>
 
   <!-- STATS STRIP -->
-  <section class="border-y border-slate-100 bg-white py-10">
+  <section class="border-y border-slate-100 bg-slate-50/70 py-10">
     <div class="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-4 text-center sm:grid-cols-4 sm:px-6 lg:px-8">
       {#each stats as item}
         <div>
@@ -677,13 +677,11 @@
       <div class="mx-auto grid max-w-6xl items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
         {#each plans as plan}
           <div class={`feature-shine relative flex flex-col rounded-2xl bg-white p-7 transition-all duration-300 ${plan.featured ? "border-2 border-primary-300 shadow-xl shadow-primary-500/12 md:-translate-y-2" : "border border-slate-200 shadow-sm hover:shadow-lg"}`}>
-            {#if plan.badge}
-              <div class="mb-4 flex">
+            <div class="min-h-[28px] mb-4 flex">
+              {#if plan.badge}
                 <span class={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold text-white ${plan.featured ? "bg-gradient-to-r from-primary-600 to-primary-500" : "bg-gradient-to-r from-emerald-500 to-emerald-600"}`}>{plan.badge}</span>
-              </div>
-            {:else}
-              <div class="mb-4 h-7"></div>
-            {/if}
+              {/if}
+            </div>
 
             <h3 class="text-base font-bold text-slate-900">{plan.name}</h3>
             <p class="mt-1 text-xs text-slate-500">{plan.note}</p>
@@ -714,7 +712,7 @@
       </div>
 
       <p class="mt-8 text-center text-sm text-slate-400">
-        Paket tahunan tersedia — Pro Rp 2.990.000/thn dan Business Rp 5.990.000/thn (hemat ~2 bulan).
+        Paket tahunan tersedia — Pro Rp 800.000/thn (hemat 17%) dan Business Rp 2.000.000/thn.
         <br class="hidden sm:inline" />AI Scanner credits terpisah dari subscription.
       </p>
     </div>
@@ -729,8 +727,8 @@
       <div class="space-y-3">
         {#each faqs as faq, i}
           <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white transition-all hover:border-primary-100">
-            <button type="button" onclick={() => (openFaq = openFaq === i ? -1 : i)} class="flex w-full items-center justify-between gap-4 px-6 py-5 text-left">
-              <span class="text-sm font-semibold text-slate-900">{faq.q}</span>
+            <button type="button" onclick={() => (openFaq = openFaq === i ? -1 : i)} class="flex w-full items-center justify-between gap-4 px-6 py-5 text-left focus-visible:outline-2 focus-visible:outline-primary-500">
+              <span class="text-sm font-semibold text-slate-900 transition-colors hover:text-primary-600">{faq.q}</span>
               <ChevronDown class={`h-5 w-5 flex-shrink-0 text-slate-400 transition-transform ${openFaq === i ? "rotate-180" : ""}`} />
             </button>
             {#if openFaq === i}
@@ -757,10 +755,10 @@
         Daftar dalam 30 detik. Tidak perlu kartu kredit. Tidak perlu training panjang — onboarding &lt; 30 menit dan langsung bisa pakai.
       </p>
       <div class="flex flex-wrap justify-center gap-4">
-        <button type="button" onclick={onGoToRegister} class="group inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-sm font-semibold text-primary-700 shadow-xl transition-all hover:-translate-y-1 hover:bg-primary-50">
+        <button type="button" onclick={onGoToRegister} class="group inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-sm font-semibold text-primary-700 shadow-xl transition-all hover:-translate-y-1 hover:bg-primary-50 focus-visible:outline-2 focus-visible:outline-white">
           Daftar Gratis Sekarang <ArrowRight class="h-5 w-5 transition-transform group-hover:translate-x-1" />
         </button>
-        <button type="button" onclick={onGoToLogin} class="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-8 py-4 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:-translate-y-1 hover:bg-white/20">
+        <button type="button" onclick={onGoToLogin} class="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-8 py-4 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:-translate-y-1 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-white">
           Sudah punya akun? Masuk
         </button>
       </div>
@@ -777,9 +775,9 @@
           </div>
           <p class="mb-4 text-sm leading-relaxed">Sistem administrasi bisnis travel umroh & haji khusus untuk PPIU Indonesia.</p>
           <div class="flex gap-3">
-            <a href="/" aria-label="Instagram" class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 transition-colors hover:bg-primary-600"><Instagram class="h-4 w-4" /></a>
-            <a href="/" aria-label="YouTube" class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 transition-colors hover:bg-primary-600"><Youtube class="h-4 w-4" /></a>
-            <a href="/" aria-label="WhatsApp" class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 transition-colors hover:bg-primary-600"><MessageCircle class="h-4 w-4" /></a>
+            <button type="button" aria-label="Instagram" class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 transition-colors hover:bg-primary-600"><Instagram class="h-4 w-4" /></button>
+            <button type="button" aria-label="YouTube" class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 transition-colors hover:bg-primary-600"><Youtube class="h-4 w-4" /></button>
+            <button type="button" aria-label="WhatsApp" class="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 transition-colors hover:bg-primary-600"><MessageCircle class="h-4 w-4" /></button>
           </div>
         </div>
 
@@ -832,6 +830,7 @@
     color: #0f172a;
     min-height: 100vh;
     overflow-x: hidden;
+    scroll-behavior: smooth;
   }
 
   .gradient-text {
@@ -865,12 +864,16 @@
     100% { background-position: 0% 50%; }
   }
 
-  :global(.animate-float) {
+  .animate-float {
     animation: float 6s ease-in-out infinite;
   }
 
-  :global(.animate-float-delay) {
+  .animate-float-delay {
     animation: float 6s ease-in-out 2s infinite;
+  }
+
+  .animate-float-delay-3s {
+    animation: float 6s ease-in-out 4s infinite;
   }
 
   @keyframes float {

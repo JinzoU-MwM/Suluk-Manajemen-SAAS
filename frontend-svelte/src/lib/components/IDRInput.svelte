@@ -5,6 +5,7 @@
    * Displays formatted: "Rp 25.000.000"
    */
   let {
+    id = 'idr-input-' + Math.random().toString(36).substring(2, 9),
     value = $bindable(0),
     label = '',
     placeholder = '0',
@@ -49,7 +50,7 @@
 
 <div class="flex flex-col gap-1 {extraClass}">
   {#if label}
-    <label class="text-sm font-medium text-slate-700">
+    <label for={id} class="text-sm font-medium text-slate-700">
       {label}{#if required}<span class="ml-0.5 text-red-500">*</span>{/if}
     </label>
   {/if}
@@ -57,6 +58,7 @@
   <div class="relative flex items-center">
     <span class="pointer-events-none absolute left-3 text-sm font-medium text-slate-400">Rp</span>
     <input
+      {id}
       type="text"
       inputmode="numeric"
       value={displayValue}

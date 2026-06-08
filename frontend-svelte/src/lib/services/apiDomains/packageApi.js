@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export function createPackageApi({ cacheInvalidate }) {
     return {
         async listPackages({ status = '', page = 1, pageSize = 100 } = {}) {
@@ -14,7 +21,7 @@ export function createPackageApi({ cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getPackage(packageId) {
@@ -22,7 +29,7 @@ export function createPackageApi({ cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async createPackage(data) {
@@ -33,7 +40,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updatePackage(packageId, data) {
@@ -44,7 +51,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async deletePackage(packageId) {
@@ -54,7 +61,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updatePackageStatus(packageId, status) {
@@ -65,7 +72,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async createPricingTier(packageId, data) {
@@ -76,7 +83,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updatePricingTier(packageId, tierId, data) {
@@ -87,7 +94,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async deletePricingTier(packageId, tierId) {
@@ -97,7 +104,7 @@ export function createPackageApi({ cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate?.('packages:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
     };
 }

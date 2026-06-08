@@ -1,68 +1,448 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: jamaah-postgres
+    container_name: suluk-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: Jamaah123!
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./scripts/init-dbs.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - suluk_pgdata:/var/lib/postgresql/data
+      - ../scripts/init-dbs.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jamaah"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - suluk-network
 
   redis:
     image: redis:7-alpine
-    container_name: jamaah-redis
+    container_name: suluk-redis
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6381:6379"
     volumes:
-      - redisdata:/data
+      - suluk_redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - suluk-network
 
   nats:
     image: nats:2-alpine
-    container_name: jamaah-nats
+    container_name: suluk-nats
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4222:4222"
-      - "127.0.0.1:8222:8222"
+      - "127.0.0.1:4223:4222"
+      - "127.0.0.1:8223:8222"
     command: ["--jetstream", "--store_dir", "/data", "--http_port", "8222"]
     volumes:
-      - natsdata:/data
+      - suluk_natsdata:/data
+    networks:
+      - suluk-network
 
   minio:
     image: minio/minio
-    container_name: jamaah-minio
+    container_name: suluk-minio
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:9002:9000"
+      - "127.0.0.1:9003:9001"
     volumes:
-      - miniodata:/data
+      - suluk_miniodata:/data
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - suluk-network
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: api-gateway
+    container_name: suluk-api-gateway
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      GATEWAY_PORT: "8080"
+      AUTH_SERVICE_ADDR: auth-service:50051
+      PACKAGE_SERVICE_ADDR: package-service:50052
+      JAMAAH_SERVICE_ADDR: jamaah-service:50053
+      INVOICE_SERVICE_ADDR: invoice-service:50054
+      FINANCE_SERVICE_ADDR: finance-service:50055
+      AIOCR_SERVICE_ADDR: ai-ocr-service:50056
+      VENDOR_SERVICE_ADDR: vendor-service:50057
+      CONTRACT_SERVICE_ADDR: contract-service:50058
+      INVENTORY_SERVICE_ADDR: inventory-service:50059
+      PAYROLL_SERVICE_ADDR: payroll-service:50060
+      AGENT_SERVICE_ADDR: agent-service:50061
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:8005,http://localhost:8007,https://test.jni.my.id"
+      APP_ENV: production
+    depends_on:
+      - auth-service
+      - package-service
+      - jamaah-service
+      - invoice-service
+      - finance-service
+      - ai-ocr-service
+      - vendor-service
+      - contract-service
+    networks:
+      - suluk-network
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: auth-service
+    container_name: suluk-auth-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      AUTH_SERVICE_PORT: "50051"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  package-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: package-service
+    container_name: suluk-package-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      PACKAGE_SERVICE_PORT: "50052"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  jamaah-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: jamaah-service
+    container_name: suluk-jamaah-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      JAMAAH_SERVICE_PORT: "50053"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: jamaah-docs
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  invoice-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: invoice-service
+    container_name: suluk-invoice-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      INVOICE_SERVICE_PORT: "50054"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  finance-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: finance-service
+    container_name: suluk-finance-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      FINANCE_SERVICE_PORT: "50055"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      INVOICE_SERVICE_ADDR: invoice-service:50054
+      VENDOR_SERVICE_ADDR: vendor-service:50057
+      PACKAGE_SERVICE_ADDR: package-service:50052
+      JAMAAH_SERVICE_ADDR: jamaah-service:50053
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  ai-ocr-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: ai-ocr-service
+    container_name: suluk-ai-ocr-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      AIOCR_SERVICE_PORT: "50056"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: jamaah-docs
+      GEMINI_API_KEY: ""
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  vendor-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: vendor-service
+    container_name: suluk-vendor-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      VENDOR_SERVICE_PORT: "50057"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  contract-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: contract-service
+    container_name: suluk-contract-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      CONTRACT_SERVICE_PORT: "50058"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  inventory-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: inventory-service
+    container_name: suluk-inventory-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      INVENTORY_SERVICE_PORT: "50059"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  payroll-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: payroll-service
+    container_name: suluk-payroll-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      PAYROLL_SERVICE_PORT: "50060"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  agent-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: agent-service
+    container_name: suluk-agent-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      AGENT_SERVICE_PORT: "50061"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: Jamaah123!
+      POSTGRES_SSLMODE: disable
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: Dockerfile.frontend
+    container_name: suluk-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8007:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - suluk-network
 
 volumes:
-  pgdata:
-  redisdata:
-  natsdata:
-  miniodata:
+  suluk_pgdata:
+  suluk_redisdata:
+  suluk_natsdata:
+  suluk_miniodata:
+
+networks:
+  suluk-network:
+    driver: bridge

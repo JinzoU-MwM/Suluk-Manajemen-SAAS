@@ -5,20 +5,42 @@ import { mapError } from './toast.svelte.js';
 export const API_URL = '/api';
 
 /**
- * Create request headers.
- * Auth is carried by HttpOnly cookie session.
+ * Read the stored JWT access token.
+ */
+function getToken() {
+    if (typeof window === 'undefined') return null;
+    try {
+        return localStorage.getItem('access_token');
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Create request headers with JWT Bearer token.
  */
 export function authHeaders(extra = {}) {
-    return { ...extra };
+    const token = getToken();
+    const headers = { ...extra };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
 }
 
 /**
  * Cookie-aware fetch for API requests.
  */
 export function apiFetch(url, options = {}) {
+    const token = getToken();
+    const headers = { ...(options.headers || {}) };
+    if (token && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
     return fetch(url, {
         credentials: 'include',
         ...options,
+        headers,
     });
 }
 

@@ -8,6 +8,12 @@ import { paymentApi } from './apiDomains/paymentApi.js';
 import { documentExcelApi } from './apiDomains/documentExcelApi.js';
 import { supportTicketApi } from './apiDomains/supportTicketApi.js';
 import { registrationApi } from './apiDomains/registrationApi.js';
+import { createVendorApi } from './apiDomains/vendorApi.js';
+import { createJamaahApi } from './apiDomains/jamaahApi.js';
+import { createRefundApi } from './apiDomains/refundApi.js';
+import { createPayrollApi } from './apiDomains/payrollApi.js';
+import { createAgentApi } from './apiDomains/agentApi.js';
+import { exportLinks } from './apiDomains/exportApi.js';
 
 export { API_URL, authHeaders };
 
@@ -51,6 +57,12 @@ Object.assign(
     createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }),
     createContentApi({ cacheGet, cacheSet }),
     createPackageApi({ cacheInvalidate }),
+    createVendorApi({ cacheInvalidate }),
+    createJamaahApi({ cacheInvalidate }),
+    createRefundApi({ cacheInvalidate }),
+    createPayrollApi({ cacheInvalidate }),
+    createAgentApi({ cacheInvalidate }),
+    exportLinks,
     contractApi,
     paymentApi,
     documentExcelApi,

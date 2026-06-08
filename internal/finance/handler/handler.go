@@ -177,6 +177,21 @@ func (h *FinanceHandler) GetPnL(c *fiber.Ctx) error {
 	return response.OK(c, pnl)
 }
 
+func (h *FinanceHandler) GetOwnerDashboard(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+
+	if claims.Role != "owner" && claims.Role != "admin" {
+		return response.Forbidden(c, "only owner and admin can access dashboard")
+	}
+
+	authToken := c.Get("Authorization")
+	dash, err := h.svc.GetOwnerDashboard(c.Context(), claims.OrgID, authToken)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, dash)
+}
+
 func isValidCategory(s string) bool {
 	for _, v := range model.ValidExpenseCategories() {
 		if s == v {

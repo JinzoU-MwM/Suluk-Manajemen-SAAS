@@ -48,7 +48,7 @@ func main() {
 	})
 
 	app.Use(recover.New())
-	allowedOrigins := getEnv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8005")
+	allowedOrigins := getEnv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8005,https://test.jni.my.id")
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
@@ -68,13 +68,16 @@ func main() {
 		"invoice":  getEnv("INVOICE_SERVICE_ADDR", "localhost:50054"),
 		"finance":  getEnv("FINANCE_SERVICE_ADDR", "localhost:50055"),
 		"aiocr":    getEnv("AIOCR_SERVICE_ADDR", "localhost:50056"),
-		"vendor":   getEnv("VENDOR_SERVICE_ADDR", "localhost:50057"),
-		"contract": getEnv("CONTRACT_SERVICE_ADDR", "localhost:50058"),
+		"vendor":    getEnv("VENDOR_SERVICE_ADDR", "localhost:50057"),
+		"contract":  getEnv("CONTRACT_SERVICE_ADDR", "localhost:50058"),
+		"inventory": getEnv("INVENTORY_SERVICE_ADDR", "localhost:50059"),
+		"payroll":   getEnv("PAYROLL_SERVICE_ADDR", "localhost:50060"),
+		"agent":     getEnv("AGENT_SERVICE_ADDR", "localhost:50061"),
 	}
 
 	api := app.Group("/api/v1")
 
-	// Auth service: auth, orgs, and invite routes
+	// Auth service: auth, orgs, invite, and notifications
 	setupProxy(api, "/auth", services["auth"])
 	setupProxy(api, "/orgs", services["auth"])
 	setupProxy(api, "/invite", services["auth"])
@@ -87,12 +90,16 @@ func main() {
 
 	// Jamaah/CRM service
 	setupProxy(api, "/jamaah", services["jamaah"])
+	setupProxy(api, "/registration", services["jamaah"])
+	setupProxy(api, "/analytics", services["jamaah"])
 
 	// Invoice service
 	setupProxy(api, "/invoices", services["invoice"])
+	setupProxy(api, "/refunds", services["invoice"])
 
 	// Finance service
 	setupProxy(api, "/finance", services["finance"])
+	setupProxy(api, "/dashboard", services["finance"])
 
 	// Vendor & Biaya Operasional service
 	setupProxy(api, "/vendors", services["vendor"])
@@ -101,9 +108,43 @@ func main() {
 	setupProxy(api, "/contracts", services["contract"])
 	setupPublicProxy(app, "/public/contracts", services["contract"])
 
+	// Inventory service
+	setupProxy(api, "/inventory", services["inventory"])
+
+	// Payroll service
+	setupProxy(api, "/payroll", services["payroll"])
+
+	// Agent & Commission service
+	setupProxy(api, "/agents", services["agent"])
+	setupProxy(api, "/commissions", services["agent"])
+
 	// AI/OCR service: scan jobs/results + export templates
 	setupProxy(api, "/scan", services["aiocr"])
 	setupProxy(api, "/export-templates", services["aiocr"])
+
+	// Group & Rooming operations
+	setupProxy(api, "/groups", services["jamaah"])
+	setupProxy(api, "/rooming", services["jamaah"])
+	setupProxy(api, "/shared", services["jamaah"])
+
+	// Team, Subscription, Notifications, Support
+	setupProxy(api, "/team", services["auth"])
+	setupProxy(api, "/subscription", services["auth"])
+	setupProxy(api, "/notifications", services["auth"])
+	setupProxy(api, "/tickets", services["auth"])
+
+	// Documents & Itineraries
+	setupProxy(api, "/documents", services["jamaah"])
+	setupProxy(api, "/itineraries", services["jamaah"])
+
+	// Super Admin routes (delegated to ai-ocr for AI cache, auth for users)
+	setupProxy(api, "/super-admin", services["aiocr"])
+
+	// Payment & OCR processing
+	setupProxy(api, "/payment", services["invoice"])
+	setupProxy(api, "/ocr", services["aiocr"])
+	setupProxy(api, "/process-documents", services["aiocr"])
+	setupProxy(api, "/generate-excel", services["aiocr"])
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

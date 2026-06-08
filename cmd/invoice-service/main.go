@@ -58,6 +58,9 @@ func main() {
 	invoiceService := service.NewInvoiceService(invoiceRepo)
 	invoiceHandler := handler.NewInvoiceHandler(invoiceService)
 
+	refundSvc := service.NewRefundService(invoiceRepo)
+	refundHandler := handler.NewRefundHandler(refundSvc)
+
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-invoice-service",
 		ReadTimeout:  10 * time.Second,
@@ -88,6 +91,25 @@ func main() {
 
 	invoices.Post("/:id/payments", invoiceHandler.RecordPayment)
 	invoices.Get("/:id/payments", invoiceHandler.GetPayments)
+	invoices.Get("/:id/pdf", invoiceHandler.ExportInvoicePDF)
+
+	payment := app.Group("/api/v1/payment", authMW)
+	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)
+	payment.Get("/status/:id", invoiceHandler.CheckPaymentStatus)
+
+	refunds := app.Group("/api/v1/refunds", authMW)
+	refunds.Get("/policies", refundHandler.ListPolicies)
+	refunds.Post("/policies", refundHandler.CreatePolicy)
+	refunds.Put("/policies/:id", refundHandler.UpdatePolicy)
+	refunds.Delete("/policies/:id", refundHandler.DeletePolicy)
+	refunds.Get("/", refundHandler.ListRefunds)
+	refunds.Get("/by-invoice/:id", refundHandler.GetRefundsByInvoice)
+	refunds.Get("/:id", refundHandler.GetRefund)
+	refunds.Put("/:id/approve", refundHandler.ApproveRefund)
+	refunds.Put("/:id/process", refundHandler.ProcessRefund)
+	refunds.Put("/:id/complete", refundHandler.CompleteRefund)
+	refunds.Put("/:id/reject", refundHandler.RejectRefund)
+	invoices.Post("/:id/refund", refundHandler.InitiateRefund)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

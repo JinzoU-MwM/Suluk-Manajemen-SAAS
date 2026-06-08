@@ -113,15 +113,19 @@ func (s *PackageService) CreatePackage(ctx context.Context, orgID uuid.UUID, req
 		}
 	}
 
-	return s.repo.GetPackageByID(ctx, pkg.ID)
+	return s.repo.GetPackageByID(ctx, pkg.ID, orgID)
 }
 
-func (s *PackageService) GetPackage(ctx context.Context, id uuid.UUID) (*model.Package, error) {
-	return s.repo.GetPackageByID(ctx, id)
+func (s *PackageService) GetPackage(ctx context.Context, id, orgID uuid.UUID) (*model.Package, error) {
+	return s.repo.GetPackageByID(ctx, id, orgID)
 }
 
-func (s *PackageService) GetPackageBySlug(ctx context.Context, slug string) (*model.Package, error) {
-	return s.repo.GetPackageBySlug(ctx, slug)
+func (s *PackageService) GetPackageBySlug(ctx context.Context, slug string, orgID uuid.UUID) (*model.Package, error) {
+	return s.repo.GetPackageBySlug(ctx, slug, orgID)
+}
+
+func (s *PackageService) GetPackageBySlugPublic(ctx context.Context, slug string) (*model.Package, error) {
+	return s.repo.GetPackageBySlugPublic(ctx, slug)
 }
 
 func (s *PackageService) ListPackages(ctx context.Context, orgID uuid.UUID, status string, page, limit int) ([]model.Package, int, error) {
@@ -135,8 +139,8 @@ func (s *PackageService) ListPackages(ctx context.Context, orgID uuid.UUID, stat
 	return s.repo.ListPackages(ctx, orgID, status, offset, limit)
 }
 
-func (s *PackageService) UpdatePackage(ctx context.Context, id uuid.UUID, req model.UpdatePackageRequest) (*model.Package, error) {
-	pkg, err := s.repo.GetPackageByID(ctx, id)
+func (s *PackageService) UpdatePackage(ctx context.Context, id, orgID uuid.UUID, req model.UpdatePackageRequest) (*model.Package, error) {
+	pkg, err := s.repo.GetPackageByID(ctx, id, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -210,22 +214,22 @@ func (s *PackageService) UpdatePackage(ctx context.Context, id uuid.UUID, req mo
 	if err := s.repo.UpdatePackage(ctx, pkg); err != nil {
 		return nil, err
 	}
-	return s.repo.GetPackageByID(ctx, id)
+	return s.repo.GetPackageByID(ctx, id, orgID)
 }
 
-func (s *PackageService) DeletePackage(ctx context.Context, id uuid.UUID) error {
-	return s.repo.DeletePackage(ctx, id)
+func (s *PackageService) DeletePackage(ctx context.Context, id, orgID uuid.UUID) error {
+	return s.repo.DeletePackage(ctx, id, orgID)
 }
 
-func (s *PackageService) UpdatePackageStatus(ctx context.Context, id uuid.UUID, status string) (*model.Package, error) {
-	if err := s.repo.UpdatePackageStatus(ctx, id, status); err != nil {
+func (s *PackageService) UpdatePackageStatus(ctx context.Context, id, orgID uuid.UUID, status string) (*model.Package, error) {
+	if err := s.repo.UpdatePackageStatus(ctx, id, orgID, status); err != nil {
 		return nil, err
 	}
-	return s.repo.GetPackageByID(ctx, id)
+	return s.repo.GetPackageByID(ctx, id, orgID)
 }
 
-func (s *PackageService) GetPackageQuota(ctx context.Context, id uuid.UUID) (*model.PackageQuota, error) {
-	pkg, err := s.repo.GetPackageByID(ctx, id)
+func (s *PackageService) GetPackageQuota(ctx context.Context, id, orgID uuid.UUID) (*model.PackageQuota, error) {
+	pkg, err := s.repo.GetPackageByID(ctx, id, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -236,12 +240,12 @@ func (s *PackageService) GetPackageQuota(ctx context.Context, id uuid.UUID) (*mo
 	}, nil
 }
 
-func (s *PackageService) GetProfitProjection(ctx context.Context, id uuid.UUID) (*model.PackageProfitProjection, error) {
-	return s.repo.GetProfitProjection(ctx, id)
+func (s *PackageService) GetProfitProjection(ctx context.Context, id, orgID uuid.UUID) (*model.PackageProfitProjection, error) {
+	return s.repo.GetProfitProjection(ctx, id, orgID)
 }
 
-func (s *PackageService) CreatePricingTier(ctx context.Context, packageID uuid.UUID, req model.CreatePricingTierRequest) (*model.PricingTier, error) {
-	if _, err := s.repo.GetPackageByID(ctx, packageID); err != nil {
+func (s *PackageService) CreatePricingTier(ctx context.Context, packageID, orgID uuid.UUID, req model.CreatePricingTierRequest) (*model.PricingTier, error) {
+	if _, err := s.repo.GetPackageByID(ctx, packageID, orgID); err != nil {
 		return nil, err
 	}
 	tier := &model.PricingTier{
@@ -298,8 +302,8 @@ func (s *PackageService) GetCostComponent(ctx context.Context, ccID uuid.UUID) (
 	return s.repo.GetCostComponentByID(ctx, ccID)
 }
 
-func (s *PackageService) CreateCostComponent(ctx context.Context, packageID uuid.UUID, req model.CreateCostComponentRequest) (*model.CostComponent, error) {
-	if _, err := s.repo.GetPackageByID(ctx, packageID); err != nil {
+func (s *PackageService) CreateCostComponent(ctx context.Context, packageID, orgID uuid.UUID, req model.CreateCostComponentRequest) (*model.CostComponent, error) {
+	if _, err := s.repo.GetPackageByID(ctx, packageID, orgID); err != nil {
 		return nil, err
 	}
 cc := &model.CostComponent{

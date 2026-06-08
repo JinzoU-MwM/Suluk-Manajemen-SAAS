@@ -247,21 +247,189 @@ func (h *AuthHandler) AcceptInvite(c *fiber.Ctx) error {
 	return response.Created(c, member)
 }
 
+func (h *AuthHandler) CancelInvite(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	inviteID, err := uuid.Parse(c.Params("inviteId"))
+	if err != nil {
+		return response.BadRequest(c, "invalid invite id")
+	}
+	if err := h.svc.CancelInvite(c.Context(), inviteID, claims.OrgID); err != nil {
+		return response.NotFound(c, "invite not found or already processed")
+	}
+	return response.OK(c, fiber.Map{"message": "invite cancelled"})
+}
+
+// ── Notifications ─────────────────────────────────────────
+
+func (h *AuthHandler) ListNotifications(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	notifications, count, err := h.svc.GetNotifications(c.Context(), claims.OrgID, claims.UserID)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, model.NotificationsResponse{
+		Notifications: notifications,
+		Count:         count,
+	})
+}
+
+func (h *AuthHandler) MarkNotificationRead(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.BadRequest(c, "invalid notification id")
+	}
+	if err := h.svc.MarkNotificationRead(c.Context(), id, claims.UserID); err != nil {
+		return response.NotFound(c, "notification not found")
+	}
+	return response.OK(c, fiber.Map{"message": "notification marked as read"})
+}
+
+func (h *AuthHandler) MarkAllNotificationsRead(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	if err := h.svc.MarkAllNotificationsRead(c.Context(), claims.OrgID, claims.UserID); err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "all notifications marked as read"})
+}
+
+func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.ChangePassword(c.Context(), claims.UserID, req.CurrentPassword, req.NewPassword); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "password changed"})
+}
+
+func (h *AuthHandler) GetActivity(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	logs, err := h.svc.GetActivity(c.Context(), claims.UserID)
+	if err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"activities": logs})
+}
+
+func (h *AuthHandler) DeleteAccount(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.DeleteAccount(c.Context(), claims.UserID, req.Password); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "account deleted"})
+}
+
+func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
+	var req struct {
+		Email string `json:"email"`
+		Otp   string `json:"otp"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.VerifyEmail(c.Context(), req.Email, req.Otp); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "email verified"})
+}
+
+func (h *AuthHandler) ResendOtp(c *fiber.Ctx) error {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.ResendOtp(c.Context(), req.Email); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "otp sent"})
+}
+
+func (h *AuthHandler) ForgotPassword(c *fiber.Ctx) error {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.ForgotPassword(c.Context(), req.Email); err != nil {
+		return response.OK(c, fiber.Map{"message": "if the email exists, a reset link has been sent"})
+	}
+	return response.OK(c, fiber.Map{"message": "if the email exists, a reset link has been sent"})
+}
+
+func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
+	var req struct {
+		Email       string `json:"email"`
+		Code        string `json:"code"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.ResetPassword(c.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "password reset successful"})
+}
+
+func (h *AuthHandler) SendPhoneOtp(c *fiber.Ctx) error {
+	var req struct {
+		PhoneNumber string `json:"phone_number"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.SendPhoneOtp(c.Context(), req.PhoneNumber); err != nil {
+		return response.InternalError(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "otp sent"})
+}
+
+func (h *AuthHandler) VerifyPhone(c *fiber.Ctx) error {
+	var req struct {
+		PhoneNumber string `json:"phone_number"`
+		Otp         string `json:"otp"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.VerifyPhone(c.Context(), req.PhoneNumber, req.Otp); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "phone verified"})
+}
+
 func sanitizeUser(u *model.User) fiber.Map {
 	return sanitizeUserMap(u)
 }
 
 func sanitizeUserMap(u *model.User) fiber.Map {
 	m := fiber.Map{
-		"id":             u.ID,
-		"email":          u.Email,
-		"name":           u.Name,
-		"phone":          u.Phone,
-		"phone_verified": u.PhoneVerified,
-		"role":           u.Role,
-		"is_active":      u.IsActive,
-		"created_at":     u.CreatedAt,
-		"updated_at":     u.UpdatedAt,
+		"id":              u.ID,
+		"email":           u.Email,
+		"name":            u.Name,
+		"email_verified":  u.EmailVerified,
+		"phone":           u.Phone,
+		"phone_verified":  u.PhoneVerified,
+		"role":            u.Role,
+		"is_active":       u.IsActive,
+		"is_super_admin":  u.IsSuperAdmin,
+		"created_at":      u.CreatedAt,
+		"updated_at":      u.UpdatedAt,
 	}
 	return m
 }

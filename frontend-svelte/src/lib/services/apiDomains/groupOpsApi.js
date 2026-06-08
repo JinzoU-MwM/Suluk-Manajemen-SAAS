@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
     return {
         async listGroups() {
@@ -9,8 +16,8 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            const data = await response.json();
-            cacheSet('groups:list', data, 30000); // 30s TTL
+            const data = unwrapData(await response.json());
+            cacheSet('groups:list', data, 30000);
             return data;
         },
 
@@ -22,7 +29,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate('groups:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getGroup(groupId) {
@@ -32,8 +39,8 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            const data = await response.json();
-            cacheSet(`groups:${groupId}`, data, 30000); // 30s TTL
+            const data = unwrapData(await response.json());
+            cacheSet(`groups:${groupId}`, data, 30000);
             return data;
         },
 
@@ -44,7 +51,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify(data),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async deleteGroup(groupId) {
@@ -54,7 +61,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate('groups:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async addGroupMembers(groupId, members) {
@@ -65,7 +72,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate('groups:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updateGroupMember(groupId, memberId, data) {
@@ -75,7 +82,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify(data),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async deleteGroupMember(groupId, memberId) {
@@ -85,33 +92,33 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             });
             if (!response.ok) throw new Error(await parseError(response));
             cacheInvalidate('groups:');
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
-        async getInventoryForecast(groupId) {
-            const response = await apiFetch(`${API_URL}/inventory/forecast/${groupId}`, {
+        async getInventoryForecast(packageId) {
+            const response = await apiFetch(`${API_URL}/inventory/forecast/${packageId}`, {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
-        async getFulfillmentStatus(groupId) {
-            const response = await apiFetch(`${API_URL}/inventory/fulfillment/${groupId}`, {
+        async getFulfillmentStatus(packageId) {
+            const response = await apiFetch(`${API_URL}/inventory/fulfillment/${packageId}`, {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
-        async markMembersReceived(groupId, memberIds) {
-            const response = await apiFetch(`${API_URL}/inventory/fulfillment/${groupId}/mark-received`, {
+        async markMembersReceived(packageId, memberIds) {
+            const response = await apiFetch(`${API_URL}/inventory/fulfillment/${packageId}/mark-received`, {
                 method: 'POST',
                 headers: authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ member_ids: memberIds, items_received: ['koper', 'baju'] }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updateMemberOperational(memberId, bajuSize, familyId) {
@@ -121,15 +128,15 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ baju_size: bajuSize, family_id: familyId }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getRoomingSummary(groupId) {
-            const response = await apiFetch(`${API_URL}/rooming/summary/${groupId}`, {
+            const response = await apiFetch(`${API_URL}/rooming/group/${groupId}`, {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getGroupRooms(groupId) {
@@ -137,7 +144,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async createRoom(groupId, roomNumber, genderType = 'male', roomType = 'quad', capacity = 4) {
@@ -147,7 +154,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ room_number: roomNumber, gender_type: genderType, room_type: roomType, capacity }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async deleteRoom(roomId) {
@@ -156,7 +163,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async autoRooming(groupId, roomCapacity = 4) {
@@ -166,7 +173,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ room_capacity: roomCapacity }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async clearAutoRooming(groupId) {
@@ -175,7 +182,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async assignMemberToRoom(memberId, roomId) {
@@ -185,7 +192,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ member_id: memberId, room_id: roomId }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async unassignMember(memberId) {
@@ -194,26 +201,26 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async shareGroup(groupId, pin, expiresInDays = 30) {
-            const response = await apiFetch(`${API_URL}/groups/${groupId}/share`, {
+            const response = await apiFetch(`${API_URL}/shared/groups/${groupId}/share`, {
                 method: 'POST',
                 headers: authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ pin, expires_in_days: expiresInDays }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async revokeShare(groupId) {
-            const response = await apiFetch(`${API_URL}/groups/${groupId}/share`, {
+            const response = await apiFetch(`${API_URL}/shared/groups/${groupId}/share`, {
                 method: 'DELETE',
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getSharedManifest(sharedToken, pin) {
@@ -223,7 +230,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ pin }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async getTeam() {
@@ -231,7 +238,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async createOrganization(name) {
@@ -241,7 +248,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ name }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async inviteTeamMember(email, role = 'viewer') {
@@ -251,7 +258,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ email, role }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async joinTeam(token) {
@@ -260,7 +267,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async updateTeamMemberRole(memberId, role) {
@@ -270,7 +277,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 body: JSON.stringify({ role }),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async removeTeamMember(memberId) {
@@ -279,7 +286,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
 
         async cancelTeamInvite(inviteId) {
@@ -288,7 +295,7 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
         },
     };
 }

@@ -57,7 +57,9 @@
     isLoading = true;
     try {
       const result = await ApiService.login(email, password);
-      localStorage.removeItem("token");
+      if (result.access_token) {
+        localStorage.setItem("access_token", result.access_token);
+      }
       localStorage.setItem("user", JSON.stringify(result.user));
       onLoginSuccess(result.user);
     } catch (err) {
@@ -113,7 +115,7 @@
     try {
       const result = await ApiService.verifyEmail(verifyEmail_addr, otpCode);
       if (result.access_token) {
-        localStorage.removeItem("token");
+        localStorage.setItem("access_token", result.access_token);
         localStorage.setItem("user", JSON.stringify(result.user));
         onLoginSuccess(result.user);
       } else {

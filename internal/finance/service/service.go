@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,15 +21,17 @@ type FinanceService struct {
 	invoiceAddr string
 	vendorAddr  string
 	packageAddr string
+	jamaahAddr  string
 	httpClient  *http.Client
 }
 
-func NewFinanceService(repo *repository.FinanceRepo, invoiceAddr, vendorAddr, packageAddr string) *FinanceService {
+func NewFinanceService(repo *repository.FinanceRepo, invoiceAddr, vendorAddr, packageAddr, jamaahAddr string) *FinanceService {
 	return &FinanceService{
 		repo:        repo,
 		invoiceAddr: invoiceAddr,
 		vendorAddr:  vendorAddr,
 		packageAddr: packageAddr,
+		jamaahAddr:  jamaahAddr,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -185,6 +188,237 @@ type packageSnapshot struct {
 	ReservedSeats  int                    `json:"reserved_seats"`
 	PricingTiers   []packagePricingTier   `json:"pricing_tiers"`
 	CostComponents []packageCostComponent `json:"cost_components"`
+}
+
+type packageOverviewResponse struct {
+	ID             uuid.UUID `json:"id"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	DepartureDate  *string   `json:"departure_date,omitempty"`
+	TotalSeats     int       `json:"total_seats"`
+	ReservedSeats  int       `json:"reserved_seats"`
+}
+
+type invoiceSummaryResponse struct {
+	TotalInvoices   int64 `json:"total_invoices"`
+	TotalAmount     int64 `json:"total_amount"`
+	TotalPaid       int64 `json:"total_paid"`
+	TotalRemaining  int64 `json:"total_remaining"`
+	OutstandingCount int64 `json:"outstanding_count"`
+	OverdueCount    int64 `json:"overdue_count"`
+}
+
+func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID, authToken string) (*model.OwnerDashboard, error) {
+	dash := &model.OwnerDashboard{}
+
+	// --- Fan-out: fetch invoice summary, vendor summary, packages, alerts, vendor due concurrently ---
+	type invoiceResult struct {
+		sum invoiceSummaryResponse
+		err error
+	}
+	type vendorSumResult struct {
+		outstanding int64
+		err         error
+	}
+	type packageListResult struct {
+		list  []packageOverviewResponse
+		total int
+		err   error
+	}
+	type alertsResult struct {
+		passportSoon    int
+		overdueFollowUp int
+		incompleteDocs  int
+		err             error
+	}
+	type vendorDueResult struct {
+		count int
+		err   error
+	}
+
+	invCh := make(chan invoiceResult, 1)
+	vendSumCh := make(chan vendorSumResult, 1)
+	pkgCh := make(chan packageListResult, 1)
+	alertsCh := make(chan alertsResult, 1)
+	vendDueCh := make(chan vendorDueResult, 1)
+
+	go func() {
+		data, err := s.fetchFromService(ctx, s.invoiceAddr, "/api/v1/invoices/summary", authToken)
+		if err != nil {
+			invCh <- invoiceResult{err: err}
+			return
+		}
+		var r invoiceSummaryResponse
+		json.Unmarshal(data, &r)
+		invCh <- invoiceResult{sum: r}
+	}()
+
+	go func() {
+		data, err := s.fetchFromService(ctx, s.vendorAddr, "/api/v1/vendors/bills/summary", authToken)
+		if err != nil {
+			vendSumCh <- vendorSumResult{err: err}
+			return
+		}
+		var v struct {
+			TotalOutstandingIDR int64 `json:"total_outstanding_idr"`
+		}
+		json.Unmarshal(data, &v)
+		vendSumCh <- vendorSumResult{outstanding: v.TotalOutstandingIDR}
+	}()
+
+	go func() {
+		data, err := s.fetchFromService(ctx, s.packageAddr, "/api/v1/packages?status=open&page=1&page_size=50", authToken)
+		if err != nil {
+			pkgCh <- packageListResult{err: err}
+			return
+		}
+		var pl struct {
+			Data  []packageOverviewResponse `json:"data"`
+			Total int                       `json:"total"`
+		}
+		json.Unmarshal(data, &pl)
+		pkgCh <- packageListResult{list: pl.Data, total: pl.Total}
+	}()
+
+	go func() {
+		data, err := s.fetchFromService(ctx, s.jamaahAddr, "/api/v1/jamaah/dashboard/alerts", authToken)
+		if err != nil {
+			alertsCh <- alertsResult{err: err}
+			return
+		}
+		var al struct {
+			PassportExpiring90 []any `json:"passport_expiring_90"`
+			PassportExpiring30 []any `json:"passport_expiring_30"`
+			OverdueFollowUps   []any `json:"overdue_follow_ups"`
+			IncompleteDocs     []any `json:"incomplete_docs"`
+		}
+		json.Unmarshal(data, &al)
+		alertsCh <- alertsResult{
+			passportSoon:    len(al.PassportExpiring30) + len(al.PassportExpiring90),
+			overdueFollowUp: len(al.OverdueFollowUps),
+			incompleteDocs:  len(al.IncompleteDocs),
+		}
+	}()
+
+	go func() {
+		data, err := s.fetchFromService(ctx, s.vendorAddr, "/api/v1/vendors/bills/due-soon?days=7", authToken)
+		if err != nil {
+			vendDueCh <- vendorDueResult{err: err}
+			return
+		}
+		var bills []any
+		json.Unmarshal(data, &bills)
+		vendDueCh <- vendorDueResult{count: len(bills)}
+	}()
+
+	// Collect fan-out results
+	invRes := <-invCh
+	if invRes.err == nil {
+		dash.Summary.TotalRevenue = invRes.sum.TotalPaid
+		dash.Summary.TotalPiutang = invRes.sum.TotalRemaining
+		dash.Summary.OverdueInvoices = invRes.sum.OverdueCount
+	}
+
+	vendSumRes := <-vendSumCh
+	if vendSumRes.err == nil {
+		dash.Summary.TotalDebt = vendSumRes.outstanding
+	}
+
+	pkgRes := <-pkgCh
+	if pkgRes.err == nil {
+		dash.Summary.TotalPackages = pkgRes.total
+
+		// Fan-out per-package revenue calls (bounded: max 10 concurrent)
+		type pkgRevResult struct {
+			idx      int
+			overview model.PackageOverview
+		}
+		sem := make(chan struct{}, 10)
+		resultsCh := make(chan pkgRevResult, len(pkgRes.list))
+		var wg sync.WaitGroup
+
+		for i, p := range pkgRes.list {
+			wg.Add(1)
+			go func(idx int, pkg packageOverviewResponse) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				ov := model.PackageOverview{
+					ID:            pkg.ID,
+					Name:          pkg.Name,
+					Status:        pkg.Status,
+					TotalSeats:    pkg.TotalSeats,
+					ReservedSeats: pkg.ReservedSeats,
+				}
+				if pkg.DepartureDate != nil {
+					t := *pkg.DepartureDate
+					if len(t) >= 10 {
+						ov.DepartureDate = &t
+					}
+				}
+
+				revData, revErr := s.fetchFromService(ctx, s.invoiceAddr,
+					fmt.Sprintf("/api/v1/invoices/package/%s/revenue", pkg.ID), authToken)
+				if revErr == nil {
+					var rev struct {
+						TotalAmount    int64 `json:"total_amount"`
+						TotalPaid      int64 `json:"total_paid"`
+						TotalRemaining int64 `json:"total_remaining"`
+					}
+					if json.Unmarshal(revData, &rev) == nil {
+						ov.Revenue = rev.TotalAmount
+						ov.Paid = rev.TotalPaid
+						ov.Remaining = rev.TotalRemaining
+						if rev.TotalAmount > 0 {
+							ov.PaymentPct = float64(rev.TotalPaid) * 100 / float64(rev.TotalAmount)
+						}
+					}
+				}
+				resultsCh <- pkgRevResult{idx: idx, overview: ov}
+			}(i, p)
+		}
+
+		wg.Wait()
+		close(resultsCh)
+
+		// Reassemble in original order
+		ordered := make([]model.PackageOverview, len(pkgRes.list))
+		for r := range resultsCh {
+			ordered[r.idx] = r.overview
+		}
+		dash.ActivePackages = ordered
+	}
+
+	alertRes := <-alertsCh
+	if alertRes.err == nil {
+		dash.Alerts.PassportExpiringSoon = alertRes.passportSoon
+		dash.Alerts.OverdueFollowUps = alertRes.overdueFollowUp
+		dash.Alerts.IncompleteDocuments = alertRes.incompleteDocs
+	}
+	dash.Alerts.OverduePayments = int(dash.Summary.OverdueInvoices)
+
+	vendDueRes := <-vendDueCh
+	if vendDueRes.err == nil {
+		dash.Alerts.VendorBillsDueSoon = vendDueRes.count
+	}
+
+	// Gross profit = revenue collected - local operating expenses
+	expenseData, err := s.repo.GetSummary(ctx, orgID, nil)
+	if err == nil {
+		dash.Summary.GrossProfitMonth = dash.Summary.TotalRevenue - expenseData.TotalAmountIDR
+	}
+
+	// Populate RevenueChart: last 6 months from invoice service
+	revenueChartData, err := s.fetchFromService(ctx, s.invoiceAddr, "/api/v1/invoices/revenue/monthly?months=6", authToken)
+	if err == nil {
+		var monthly []model.MonthlyRevenue
+		if json.Unmarshal(revenueChartData, &monthly) == nil {
+			dash.RevenueChart = monthly
+		}
+	}
+
+	return dash, nil
 }
 
 type packagePricingTier struct {

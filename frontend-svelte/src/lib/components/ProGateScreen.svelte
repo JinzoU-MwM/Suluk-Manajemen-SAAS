@@ -73,7 +73,7 @@
 
             <button type="button" onclick={onUpgrade} class="gate-btn-upgrade">
                 <Crown class="h-4 w-4" />
-                Upgrade ke Pro - Rp 80.000/bulan
+                Upgrade ke Pro - Rp 299.000/bulan
             </button>
         </div>
     </div>

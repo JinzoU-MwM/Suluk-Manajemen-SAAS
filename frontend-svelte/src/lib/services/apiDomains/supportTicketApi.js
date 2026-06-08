@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export const supportTicketApi = {
     async createTicket(subject, message, priority = 'medium') {
         const response = await apiFetch(`${API_URL}/tickets`, {
@@ -8,14 +15,14 @@ export const supportTicketApi = {
             body: JSON.stringify({ subject, message, priority }),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async listMyTickets(filters = {}) {
-        const { skip = 0, limit = 20, status } = filters;
+        const { page = 1, pageSize = 20, status } = filters;
         const params = new URLSearchParams({
-            skip: String(skip),
-            limit: String(limit),
+            page: String(page),
+            page_size: String(pageSize),
         });
         if (status) params.append('status', status);
 
@@ -23,24 +30,24 @@ export const supportTicketApi = {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async getMyTicketDetail(ticketId) {
-        const response = await apiFetch(`${API_URL}/tickets/${ticketId}`, {
+        const response = await apiFetch(`${API_URL}/tickets/${ticketId}/messages`, {
             headers: authHeaders(),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 
     async replyToTicket(ticketId, content) {
-        const response = await apiFetch(`${API_URL}/tickets/${ticketId}/reply`, {
+        const response = await apiFetch(`${API_URL}/tickets/${ticketId}/messages`, {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ content }),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        return await response.json();
+        return unwrapData(await response.json());
     },
 };

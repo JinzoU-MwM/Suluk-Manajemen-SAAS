@@ -224,16 +224,16 @@
 
                         <div class="price-box">
                             {#if selectedPlan === "annual"}
-                                <p class="price-amount">Rp 800.000</p>
+                                <p class="price-amount">Rp 2.990.000</p>
                                 <p class="price-period">per tahun</p>
                                 <p class="price-alt">
-                                    Hemat Rp 160.000 (Rp 66.700/bulan)
+                                    Hemat Rp 598.000 (~Rp 249.000/bulan)
                                 </p>
                             {:else}
-                                <p class="price-amount">Rp 80.000</p>
+                                <p class="price-amount">Rp 299.000</p>
                                 <p class="price-period">per bulan</p>
                                 <p class="price-alt">
-                                    atau Rp 800.000/tahun (hemat 17%)
+                                    atau Rp 2.990.000/tahun (hemat ~17%)
                                 </p>
                             {/if}
                         </div>
@@ -339,8 +339,8 @@
                                     Memproses...
                                 {:else}
                                     {selectedPlan === "annual"
-                                        ? "Bayar Rp 800.000/tahun"
-                                        : "Bayar Rp 80.000/bulan"}
+                                        ? "Bayar Rp 2.990.000/tahun"
+                                        : "Bayar Rp 299.000/bulan"}
                                 {/if}
                             </button>
                         {/if}

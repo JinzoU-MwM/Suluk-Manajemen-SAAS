@@ -99,6 +99,58 @@ func main() {
 
 	jamaah.Get("/by-package/:pkgId", jamaahHandler.ListByPackage)
 
+	analytics := app.Group("/api/v1/analytics", authMW)
+	analytics.Get("/dashboard", jamaahHandler.GetAnalyticsDashboard)
+
+	itineraries := app.Group("/api/v1/itineraries", authMW)
+	itineraries.Get("/:groupId", jamaahHandler.GetItinerary)
+	itineraries.Post("/:groupId", jamaahHandler.CreateItinerary)
+	itineraries.Put("/:groupId/:itemId", jamaahHandler.UpdateItinerary)
+	itineraries.Delete("/:groupId/:itemId", jamaahHandler.DeleteItinerary)
+
+	documents := app.Group("/api/v1/documents", authMW)
+	documents.Get("/:groupId/:type", jamaahHandler.GetDocumentUrl)
+
+	rooming := app.Group("/api/v1/rooming", authMW)
+	rooming.Get("/group/:groupId", jamaahHandler.ListRooms)
+	rooming.Post("/group/:groupId", jamaahHandler.CreateRoom)
+	rooming.Delete("/:roomId", jamaahHandler.DeleteRoom)
+	rooming.Post("/auto/:groupId", jamaahHandler.AutoRooming)
+	rooming.Delete("/auto/:groupId", jamaahHandler.ClearAutoRooming)
+	rooming.Post("/assign", jamaahHandler.AssignMemberToRoom)
+	rooming.Post("/unassign/:memberId", jamaahHandler.UnassignMember)
+
+	shared := app.Group("/api/v1/shared", authMW)
+	shared.Post("/groups/:groupId/share", jamaahHandler.ShareGroup)
+	shared.Delete("/groups/:groupId/share", jamaahHandler.RevokeShare)
+
+	sharedPub := app.Group("/api/v1/shared")
+	sharedPub.Post("/manifest/:token", jamaahHandler.GetSharedManifest)
+
+	groups := app.Group("/api/v1/groups", authMW)
+	groups.Get("/", jamaahHandler.ListGroups)
+	groups.Post("/", jamaahHandler.CreateGroup)
+	groups.Get("/:groupId", jamaahHandler.GetGroup)
+	groups.Put("/:groupId", jamaahHandler.UpdateGroup)
+	groups.Delete("/:groupId", jamaahHandler.DeleteGroup)
+	groups.Post("/:groupId/members", jamaahHandler.AddGroupMembers)
+	groups.Put("/:groupId/members/:memberId", jamaahHandler.UpdateGroupMember)
+	groups.Delete("/:groupId/members/:memberId", jamaahHandler.DeleteGroupMember)
+
+	// Registration — public endpoints (no auth)
+	regPublic := app.Group("/api/v1/registration/public")
+	regPublic.Get("/:token", jamaahHandler.PublicRegistrationInfo)
+	regPublic.Post("/:token", jamaahHandler.PublicRegistrationSubmit)
+
+	// Registration — admin endpoints (auth required)
+	registration := app.Group("/api/v1/registration", authMW)
+	registration.Post("/generate", jamaahHandler.GenerateLink)
+	registration.Get("/link/:groupId", jamaahHandler.GetActiveLink)
+	registration.Delete("/link/:groupId", jamaahHandler.RevokeLink)
+	registration.Get("/pending/:groupId", jamaahHandler.ListPendingRegistrations)
+	registration.Post("/pending/:pendingId/approve", jamaahHandler.ApproveRegistration)
+	registration.Post("/pending/:pendingId/reject", jamaahHandler.RejectRegistration)
+
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
 			logger.Fatalf("jamaah service listen: %v", err)

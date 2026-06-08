@@ -799,8 +799,9 @@
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div class="sm:col-span-2">
-        <label class="mb-1 block text-sm font-medium text-slate-700">Nama Paket</label>
+        <label for="p-name" class="mb-1 block text-sm font-medium text-slate-700">Nama Paket</label>
         <input
+          id="p-name"
           type="text"
           bind:value={formState.name}
           placeholder="Contoh: Umroh Reguler Ramadan 2027"
@@ -809,8 +810,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Jenis Paket</label>
+        <label for="p-type" class="mb-1 block text-sm font-medium text-slate-700">Jenis Paket</label>
         <select
+          id="p-type"
           bind:value={formState.packageType}
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         >
@@ -821,8 +823,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Status</label>
+        <label for="p-status" class="mb-1 block text-sm font-medium text-slate-700">Status</label>
         <select
+          id="p-status"
           bind:value={formState.status}
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         >
@@ -833,8 +836,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Tanggal Berangkat</label>
+        <label for="p-dep-date" class="mb-1 block text-sm font-medium text-slate-700">Tanggal Berangkat</label>
         <input
+          id="p-dep-date"
           type="date"
           bind:value={formState.departureDate}
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
@@ -842,8 +846,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Tanggal Pulang</label>
+        <label for="p-ret-date" class="mb-1 block text-sm font-medium text-slate-700">Tanggal Pulang</label>
         <input
+          id="p-ret-date"
           type="date"
           bind:value={formState.returnDate}
           class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
@@ -851,8 +856,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Total Kursi</label>
+        <label for="p-seats" class="mb-1 block text-sm font-medium text-slate-700">Total Kursi</label>
         <input
+          id="p-seats"
           type="number"
           min="1"
           bind:value={formState.totalSeats}
@@ -861,8 +867,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Maskapai</label>
+        <label for="p-airline" class="mb-1 block text-sm font-medium text-slate-700">Maskapai</label>
         <input
+          id="p-airline"
           type="text"
           bind:value={formState.airline}
           placeholder="Contoh: Saudi Airlines"
@@ -871,8 +878,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Flight Berangkat</label>
+        <label for="p-flight-go" class="mb-1 block text-sm font-medium text-slate-700">Flight Berangkat</label>
         <input
+          id="p-flight-go"
           type="text"
           bind:value={formState.flightNumberGo}
           placeholder="Contoh: SV812"
@@ -881,8 +889,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Flight Pulang</label>
+        <label for="p-flight-ret" class="mb-1 block text-sm font-medium text-slate-700">Flight Pulang</label>
         <input
+          id="p-flight-ret"
           type="text"
           bind:value={formState.flightNumberReturn}
           placeholder="Contoh: SV813"
@@ -891,8 +900,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Hotel Makkah</label>
+        <label for="p-hotel-mak" class="mb-1 block text-sm font-medium text-slate-700">Hotel Makkah</label>
         <input
+          id="p-hotel-mak"
           type="text"
           bind:value={formState.hotelMakkahName}
           placeholder="Contoh: Hilton Makkah"
@@ -901,8 +911,9 @@
       </div>
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">Hotel Madinah</label>
+        <label for="p-hotel-mad" class="mb-1 block text-sm font-medium text-slate-700">Hotel Madinah</label>
         <input
+          id="p-hotel-mad"
           type="text"
           bind:value={formState.hotelMadinahName}
           placeholder="Contoh: Anwar Al Madinah"
@@ -911,8 +922,9 @@
       </div>
 
       <div class="sm:col-span-2">
-        <label class="mb-1 block text-sm font-medium text-slate-700">Deskripsi Paket</label>
+        <label for="p-desc" class="mb-1 block text-sm font-medium text-slate-700">Deskripsi Paket</label>
         <textarea
+          id="p-desc"
           rows="4"
           bind:value={formState.description}
           placeholder="Ringkasan itinerary, fasilitas, atau catatan paket"

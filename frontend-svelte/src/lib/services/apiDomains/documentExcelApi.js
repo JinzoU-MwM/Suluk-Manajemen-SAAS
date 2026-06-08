@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export const documentExcelApi = {
     /**
      * Get OCR runtime/provider/cache status (auth required)
@@ -14,7 +21,7 @@ export const documentExcelApi = {
                 throw new Error(await parseError(response));
             }
 
-            return await response.json();
+            return unwrapData(await response.json());
         } catch (error) {
             if (error.message.includes('fetch')) {
                 throw new Error(`Failed to get OCR status: ${error.message}`);
@@ -55,7 +62,7 @@ export const documentExcelApi = {
                 throw new Error(await parseError(response));
             }
 
-            return await response.json();
+            return unwrapData(await response.json());
         } catch (error) {
             if (error.message.includes('fetch')) {
                 throw new Error(`Connection failed: ${error.message}. Is the backend running?`);
@@ -68,7 +75,8 @@ export const documentExcelApi = {
      * Stream progress updates via SSE
      */
     streamProgress(sessionId, onProgress) {
-        const eventSource = new EventSource(`${API_URL}/progress/${sessionId}`);
+        const progressUrl = `/progress/${sessionId}`;
+        const eventSource = new EventSource(progressUrl);
 
         eventSource.addEventListener('progress', (e) => {
             try {

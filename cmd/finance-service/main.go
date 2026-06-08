@@ -58,7 +58,8 @@ func main() {
 	invoiceAddr := getEnv("INVOICE_SERVICE_ADDR", "localhost:50054")
 	vendorAddr := getEnv("VENDOR_SERVICE_ADDR", "localhost:50057")
 	packageAddr := getEnv("PACKAGE_SERVICE_ADDR", "localhost:50052")
-	financeService := service.NewFinanceService(financeRepo, invoiceAddr, vendorAddr, packageAddr)
+	jamaahAddr := getEnv("JAMAAH_SERVICE_ADDR", "localhost:50053")
+	financeService := service.NewFinanceService(financeRepo, invoiceAddr, vendorAddr, packageAddr, jamaahAddr)
 	financeHandler := handler.NewFinanceHandler(financeService)
 
 	app := fiber.New(fiber.Config{
@@ -87,6 +88,13 @@ func main() {
 
 	pnl := finance.Group("/pnl")
 	pnl.Get("/:pkgId", financeHandler.GetPnL)
+
+	export := finance.Group("/export")
+	export.Get("/pnl", financeHandler.ExportPnL)
+	export.Get("/expenses", financeHandler.ExportExpenses)
+
+	dashboard := app.Group("/api/v1/dashboard", authMW)
+	dashboard.Get("/owner", financeHandler.GetOwnerDashboard)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

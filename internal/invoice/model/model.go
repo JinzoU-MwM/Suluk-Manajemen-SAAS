@@ -166,3 +166,102 @@ type PackageRevenueSummary struct {
 	BelumBayarCount int       `json:"belum_bayar_count"`
 	BatalCount      int       `json:"batal_count"`
 }
+
+type RefundStatus string
+
+const (
+	RefundStatusPending   RefundStatus = "pending"
+	RefundStatusApproved  RefundStatus = "approved"
+	RefundStatusProcessed RefundStatus = "processed"
+	RefundStatusCompleted RefundStatus = "completed"
+	RefundStatusRejected  RefundStatus = "rejected"
+)
+
+type RefundPolicy struct {
+	ID          uuid.UUID `json:"id" db:"id"`
+	OrgID       uuid.UUID `json:"org_id" db:"org_id"`
+	Name        string    `json:"name" db:"name"`
+	DaysBefore  int       `json:"days_before" db:"days_before"`
+	RefundPct   float64   `json:"refund_pct" db:"refund_pct"`
+	Description string    `json:"description" db:"description"`
+	IsActive    bool      `json:"is_active" db:"is_active"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type Refund struct {
+	ID         uuid.UUID   `json:"id" db:"id"`
+	OrgID      uuid.UUID   `json:"org_id" db:"org_id"`
+	InvoiceID  uuid.UUID   `json:"invoice_id" db:"invoice_id"`
+	Amount     int64       `json:"amount" db:"amount"`
+	RefundPct  float64     `json:"refund_pct" db:"refund_pct"`
+	Reason     string      `json:"reason" db:"reason"`
+	Status     string      `json:"status" db:"status"`
+	ApprovedBy *uuid.UUID  `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt *time.Time  `json:"approved_at,omitempty" db:"approved_at"`
+	ProcessedAt *time.Time `json:"processed_at,omitempty" db:"processed_at"`
+	Notes      string      `json:"notes" db:"notes"`
+	CreatedAt  time.Time   `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at" db:"updated_at"`
+}
+
+type CreateRefundPolicyRequest struct {
+	Name        string  `json:"name"`
+	DaysBefore  int     `json:"days_before"`
+	RefundPct   float64 `json:"refund_pct"`
+	Description string  `json:"description"`
+}
+
+type UpdateRefundPolicyRequest struct {
+	Name        *string  `json:"name,omitempty"`
+	DaysBefore  *int     `json:"days_before,omitempty"`
+	RefundPct   *float64 `json:"refund_pct,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	IsActive    *bool    `json:"is_active,omitempty"`
+}
+
+type InitiateRefundRequest struct {
+	Amount    int64  `json:"amount"`
+	RefundPct float64 `json:"refund_pct"`
+	Reason    string `json:"reason"`
+	Notes     string `json:"notes"`
+}
+
+type RefundActionRequest struct {
+	Notes string `json:"notes"`
+}
+
+type RefundListResponse struct {
+	Refunds []Refund `json:"refunds"`
+	Total   int64    `json:"total"`
+}
+
+type PaymentOrder struct {
+	ID          uuid.UUID  `json:"id" db:"id"`
+	OrgID       uuid.UUID  `json:"org_id" db:"org_id"`
+	UserID      uuid.UUID  `json:"user_id" db:"user_id"`
+	PlanType    string     `json:"plan_type" db:"plan_type"`
+	Amount      int64      `json:"amount" db:"amount"`
+	Status      string     `json:"status" db:"status"`
+	RedirectURL *string    `json:"redirect_url,omitempty" db:"redirect_url"`
+	GatewayRef  *string    `json:"gateway_ref,omitempty" db:"gateway_ref"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+type CreatePaymentOrderRequest struct {
+	PlanType string `json:"plan_type"`
+}
+
+type PaymentOrderResponse struct {
+	OrderID     string `json:"order_id"`
+	RedirectURL string `json:"redirect_url"`
+	Status      string `json:"status"`
+	Amount      int64  `json:"amount"`
+}
+
+type PaymentStatusResponse struct {
+	OrderID string `json:"order_id"`
+	Status  string `json:"status"`
+	Amount  int64  `json:"amount"`
+}

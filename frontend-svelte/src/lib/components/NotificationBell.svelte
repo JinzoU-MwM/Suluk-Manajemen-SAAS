@@ -28,6 +28,26 @@
         }
     }
 
+    async function markAllRead() {
+        try {
+            await ApiService.markAllNotificationsRead();
+            notifications = notifications.map(n => ({ ...n, is_read: true }));
+            count = 0;
+        } catch {
+            // silent
+        }
+    }
+
+    async function handleNotificationClick(n) {
+        if (!n.is_read) {
+            try {
+                await ApiService.markNotificationRead(n.id);
+            } catch { /* silent */ }
+        }
+        if (n.group_id && onNavigate) onNavigate('scanner');
+        showPanel = false;
+    }
+
     onMount(() => {
         loadNotifications();
         // Refresh every 5 minutes
@@ -115,18 +135,10 @@
                     {#each notifications as n}
                         {@const Icon = getSeverityIcon(n.severity)}
                         <div
-                            class="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
-                            onclick={() => {
-                                if (n.group_id && onNavigate)
-                                    onNavigate("scanner");
-                                showPanel = false;
-                            }}
+                            class="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors {n.is_read ? 'opacity-60' : ''}"
+                            onclick={() => handleNotificationClick(n)}
                             onkeydown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                    if (n.group_id && onNavigate)
-                                        onNavigate("scanner");
-                                    showPanel = false;
-                                }
+                                if (e.key === "Enter" || e.key === " ") handleNotificationClick(n);
                             }}
                             role="button"
                             tabindex="0"
@@ -160,13 +172,20 @@
             </div>
 
             {#if count > 0}
-                <div class="px-4 py-2 border-t border-slate-100 bg-slate-50">
+                <div class="px-4 py-2 border-t border-slate-100 bg-slate-50 flex justify-between">
+                    <button
+                        type="button"
+                        onclick={markAllRead}
+                        class="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                        Tandai sudah dibaca
+                    </button>
                     <button
                         type="button"
                         onclick={loadNotifications}
-                        class="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                        class="text-xs text-slate-500 hover:text-slate-700"
                     >
-                        🔄 Muat ulang
+                        Muat ulang
                     </button>
                 </div>
             {/if}

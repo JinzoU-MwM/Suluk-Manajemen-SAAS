@@ -5,3 +5,7 @@ CREATE DATABASE jamaah_invoice;
 CREATE DATABASE jamaah_finance;
 CREATE DATABASE jamaah_aiocr;
 CREATE DATABASE jamaah_vendor;
+CREATE DATABASE jamaah_contract;
+CREATE DATABASE jamaah_inventory;
+CREATE DATABASE jamaah_payroll;
+CREATE DATABASE jamaah_agent;

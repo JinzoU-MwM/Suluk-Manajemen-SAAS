@@ -48,17 +48,14 @@ func (h *PackageHandler) CreatePackage(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) GetPackage(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
 
-	pkg, err := h.svc.GetPackage(c.Context(), id)
+	pkg, err := h.svc.GetPackage(c.Context(), id, claims.OrgID)
 	if err != nil {
-		return response.NotFound(c, "package not found")
-	}
-	claims := c.Locals("claims").(*sharedAuth.Claims)
-	if pkg.OrgID != claims.OrgID {
 		return response.NotFound(c, "package not found")
 	}
 	return response.OK(c, pkg)
@@ -87,8 +84,8 @@ func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), id)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), id, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 
@@ -100,7 +97,7 @@ func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
 		return response.Forbidden(c, "only owner can publish package")
 	}
 
-	pkg, err = h.svc.UpdatePackage(c.Context(), id, req)
+	pkg, err := h.svc.UpdatePackage(c.Context(), id, claims.OrgID, req)
 	if err != nil {
 		return response.InternalError(c, err.Error())
 	}
@@ -117,11 +114,11 @@ func (h *PackageHandler) DeletePackage(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), id)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), id, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
-	if err := h.svc.DeletePackage(c.Context(), id); err != nil {
+	if err := h.svc.DeletePackage(c.Context(), id, claims.OrgID); err != nil {
 		return response.NotFound(c, "package not found")
 	}
 	return response.OK(c, fiber.Map{"message": "package deleted"})
@@ -137,8 +134,8 @@ func (h *PackageHandler) UpdatePackageStatus(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), id)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), id, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 
@@ -147,7 +144,7 @@ func (h *PackageHandler) UpdatePackageStatus(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid request body")
 	}
 
-	pkg, err = h.svc.UpdatePackageStatus(c.Context(), id, req.Status)
+	pkg, err := h.svc.UpdatePackageStatus(c.Context(), id, claims.OrgID, req.Status)
 	if err != nil {
 		return response.InternalError(c, err.Error())
 	}
@@ -160,11 +157,11 @@ func (h *PackageHandler) GetPackageQuota(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), id)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), id, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
-	quota, err := h.svc.GetPackageQuota(c.Context(), id)
+	quota, err := h.svc.GetPackageQuota(c.Context(), id, claims.OrgID)
 	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
@@ -177,11 +174,11 @@ func (h *PackageHandler) GetProfitProjection(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), id)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), id, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
-	proj, err := h.svc.GetProfitProjection(c.Context(), id)
+	proj, err := h.svc.GetProfitProjection(c.Context(), id, claims.OrgID)
 	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
@@ -198,8 +195,8 @@ func (h *PackageHandler) CreatePricingTier(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), packageID)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), packageID, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 
@@ -214,7 +211,7 @@ func (h *PackageHandler) CreatePricingTier(c *fiber.Ctx) error {
 		return response.BadRequest(c, "price must be at least 1")
 	}
 
-	tier, err := h.svc.CreatePricingTier(c.Context(), packageID, req)
+	tier, err := h.svc.CreatePricingTier(c.Context(), packageID, claims.OrgID, req)
 	if err != nil {
 		return response.InternalError(c, err.Error())
 	}
@@ -235,8 +232,8 @@ func (h *PackageHandler) UpdatePricingTier(c *fiber.Ctx) error {
 	if err != nil || tier == nil {
 		return response.NotFound(c, "tier not found")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), tier.PackageID)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), tier.PackageID, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 
@@ -266,8 +263,8 @@ func (h *PackageHandler) DeletePricingTier(c *fiber.Ctx) error {
 	if err != nil || tier == nil {
 		return response.NotFound(c, "tier not found")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), tier.PackageID)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), tier.PackageID, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 	if err := h.svc.DeletePricingTier(c.Context(), tierID); err != nil {
@@ -286,8 +283,8 @@ func (h *PackageHandler) CreateCostComponent(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), packageID)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), packageID, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 
@@ -302,7 +299,7 @@ func (h *PackageHandler) CreateCostComponent(c *fiber.Ctx) error {
 		return response.BadRequest(c, "category is required")
 	}
 
-	cc, err := h.svc.CreateCostComponent(c.Context(), packageID, req)
+	cc, err := h.svc.CreateCostComponent(c.Context(), packageID, claims.OrgID, req)
 	if err != nil {
 		return response.InternalError(c, err.Error())
 	}
@@ -323,8 +320,8 @@ func (h *PackageHandler) UpdateCostComponent(c *fiber.Ctx) error {
 	if err != nil || cc == nil {
 		return response.NotFound(c, "cost component not found")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), cc.PackageID)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), cc.PackageID, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 
@@ -354,8 +351,8 @@ func (h *PackageHandler) DeleteCostComponent(c *fiber.Ctx) error {
 	if err != nil || cc == nil {
 		return response.NotFound(c, "cost component not found")
 	}
-	pkg, err := h.svc.GetPackage(c.Context(), cc.PackageID)
-	if err != nil || pkg.OrgID != claims.OrgID {
+	_, err = h.svc.GetPackage(c.Context(), cc.PackageID, claims.OrgID)
+	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
 	if err := h.svc.DeleteCostComponent(c.Context(), ccID); err != nil {
@@ -366,7 +363,7 @@ func (h *PackageHandler) DeleteCostComponent(c *fiber.Ctx) error {
 
 func (h *PackageHandler) GetPublicPackage(c *fiber.Ctx) error {
 	slug := c.Params("slug")
-	pkg, err := h.svc.GetPackageBySlug(c.Context(), slug)
+	pkg, err := h.svc.GetPackageBySlugPublic(c.Context(), slug)
 	if err != nil {
 		return response.NotFound(c, "package not found")
 	}

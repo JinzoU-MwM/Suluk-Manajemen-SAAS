@@ -87,6 +87,16 @@ func main() {
 	authPrivate.Post("/logout", authHandler.Logout)
 	authPrivate.Get("/me", authHandler.GetMe)
 	authPrivate.Put("/me", authHandler.UpdateMe)
+	authPrivate.Post("/change-password", authHandler.ChangePassword)
+	authPrivate.Get("/activity", authHandler.GetActivity)
+	authPrivate.Delete("/account", authHandler.DeleteAccount)
+	authPrivate.Post("/send-phone-otp", authHandler.SendPhoneOtp)
+	authPrivate.Post("/verify-phone", authHandler.VerifyPhone)
+
+	authPublic.Post("/verify-email", authHandler.VerifyEmail)
+	authPublic.Post("/resend-otp", authHandler.ResendOtp)
+	authPublic.Post("/forgot-password", authHandler.ForgotPassword)
+	authPublic.Post("/reset-password", authHandler.ResetPassword)
 
 	orgs := app.Group("/api/v1/orgs", authMiddleware(jwtManager, logger))
 	orgs.Post("/", authHandler.CreateOrganization)
@@ -97,6 +107,36 @@ func main() {
 	orgs.Delete("/members/:userId", authHandler.RemoveTeamMember)
 	orgs.Put("/members/:userId/role", authHandler.UpdateMemberRole)
 	orgs.Post("/invite", authHandler.InviteMember)
+	orgs.Post("/branches", authHandler.CreateBranch)
+	orgs.Get("/branches", authHandler.ListBranches)
+	orgs.Get("/dashboard/consolidated", authHandler.GetConsolidatedDashboard)
+
+	subscription := app.Group("/api/v1/subscription", authMiddleware(jwtManager, logger))
+	subscription.Get("/status", authHandler.GetSubscriptionStatus)
+	subscription.Post("/upgrade", authHandler.UpgradeToPro)
+	subscription.Get("/trial-status", authHandler.GetTrialStatus)
+	subscription.Post("/activate-trial", authHandler.ActivateTrial)
+	subscription.Get("/pricing", authHandler.GetPricing)
+
+	notifications := app.Group("/api/v1/notifications", authMiddleware(jwtManager, logger))
+	notifications.Get("/", authHandler.ListNotifications)
+	notifications.Put("/:id/read", authHandler.MarkNotificationRead)
+	notifications.Put("/read-all", authHandler.MarkAllNotificationsRead)
+
+	tickets := app.Group("/api/v1/tickets", authMiddleware(jwtManager, logger))
+	tickets.Get("/", authHandler.ListTickets)
+	tickets.Post("/", authHandler.CreateTicket)
+	tickets.Get("/:id/messages", authHandler.GetTicketMessages)
+	tickets.Post("/:id/messages", authHandler.AddTicketMessage)
+
+	team := app.Group("/api/v1/team", authMiddleware(jwtManager, logger))
+	team.Get("/", authHandler.GetOrganization)
+	team.Post("/create", authHandler.CreateOrganization)
+	team.Post("/invite", authHandler.InviteMember)
+	team.Patch("/members/:userId", authHandler.UpdateMemberRole)
+	team.Delete("/members/:userId", authHandler.RemoveTeamMember)
+	team.Post("/join/:token", authHandler.AcceptInvite)
+	team.Delete("/invites/:inviteId", authHandler.CancelInvite)
 
 	app.Post("/api/v1/invite/accept", authMiddleware(jwtManager, logger), authHandler.AcceptInvite)
 

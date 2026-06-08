@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from "../apiCore.js";
 
+function unwrapData(json) {
+    if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export const contractApi = {
   async listContractTemplates(includeInactive = true) {
     const params = new URLSearchParams();
@@ -14,7 +21,7 @@ export const contractApi = {
       },
     );
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async getContractTemplate(templateId) {
@@ -25,7 +32,7 @@ export const contractApi = {
       },
     );
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async createContractTemplate(data) {
@@ -35,7 +42,7 @@ export const contractApi = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async updateContractTemplate(templateId, data) {
@@ -48,7 +55,7 @@ export const contractApi = {
       },
     );
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async deleteContractTemplate(templateId) {
@@ -60,7 +67,7 @@ export const contractApi = {
       },
     );
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async previewContractTemplate(data) {
@@ -70,7 +77,7 @@ export const contractApi = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async listContracts(status = "") {
@@ -85,7 +92,7 @@ export const contractApi = {
       },
     );
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async getContract(contractId) {
@@ -93,7 +100,7 @@ export const contractApi = {
       headers: authHeaders(),
     });
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async createContract(data) {
@@ -103,13 +110,13 @@ export const contractApi = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async getPublicContract(token) {
     const response = await apiFetch(`/public/contracts/${token}`);
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 
   async signPublicContract(token, data) {
@@ -119,6 +126,6 @@ export const contractApi = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error(await parseError(response));
-    return await response.json();
+    return unwrapData(await response.json());
   },
 };

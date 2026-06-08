@@ -132,28 +132,10 @@
       </div>
     {:else if stats}
       <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SummaryCard
-          label="Total Pemasukan"
-          value={formatIDR(stats.pemasukan)}
-          change={stats.pemasukan_change}
-          color="blue"
-        />
-        <SummaryCard
-          label="Total Pengeluaran"
-          value={formatIDR(stats.pengeluaran)}
-          color="slate"
-        />
-        <SummaryCard
-          label="Gross Profit"
-          value={formatIDR(stats.gross_profit)}
-          change={stats.profit_change}
-          color="emerald"
-        />
-        <SummaryCard
-          label="Total Piutang"
-          value={formatIDR(stats.piutang)}
-          color="red"
-        />
+        {@render SummaryCard("Total Pemasukan", formatIDR(stats.pemasukan), stats.pemasukan_change, "blue")}
+        {@render SummaryCard("Total Pengeluaran", formatIDR(stats.pengeluaran), undefined, "slate")}
+        {@render SummaryCard("Gross Profit", formatIDR(stats.gross_profit), stats.profit_change, "emerald")}
+        {@render SummaryCard("Total Piutang", formatIDR(stats.piutang), undefined, "red")}
       </div>
     {/if}
 
@@ -181,8 +163,9 @@
       <!-- P&L per Trip -->
       {#if plData}
         <div class="mb-4">
-          <label class="block mb-1 text-sm font-medium text-slate-600">Pilih Trip</label>
+          <label for="select-trip" class="block mb-1 text-sm font-medium text-slate-600">Pilih Trip</label>
           <select
+            id="select-trip"
             bind:value={selectedTripId}
             class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
           >
@@ -198,10 +181,10 @@
             <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/60">
               <h3 class="mb-4 text-sm font-bold text-slate-700">Pendapatan</h3>
               <div class="space-y-2 text-sm">
-                <PLRow label="Tagihan Jamaah (total invoice)" value={selectedTrip.pendapatan} />
-                <PLRow label="Diskon yang diberikan" value={-selectedTrip.diskon} isNegative />
+                {@render PLRow("Tagihan Jamaah (total invoice)", selectedTrip.pendapatan)}
+                {@render PLRow("Diskon yang diberikan", -selectedTrip.diskon, true)}
                 <div class="border-t border-slate-100 pt-2">
-                  <PLRow label="Total Pendapatan Bersih" value={selectedTrip.pendapatan_bersih} bold />
+                  {@render PLRow("Total Pendapatan Bersih", selectedTrip.pendapatan_bersih, undefined, true)}
                 </div>
               </div>
             </div>
@@ -211,10 +194,10 @@
               <h3 class="mb-4 text-sm font-bold text-slate-700">Pengeluaran</h3>
               <div class="space-y-2 text-sm">
                 {#each Object.entries(selectedTrip.pengeluaran) as [key, val]}
-                  <PLRow label={key.replace(/_/g, ' ')} value={val} isNegative />
+                  {@render PLRow(key.replace(/_/g, ' '), val, true)}
                 {/each}
                 <div class="border-t border-slate-100 pt-2">
-                  <PLRow label="Total Pengeluaran" value={selectedTrip.total_pengeluaran} isNegative bold />
+                  {@render PLRow("Total Pengeluaran", selectedTrip.total_pengeluaran, true, true)}
                 </div>
               </div>
             </div>

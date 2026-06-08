@@ -523,7 +523,7 @@
                                     class="upgrade-btn-full"
                                 >
                                     <Crown class="h-4 w-4" />
-                                    Upgrade ke Pro - Rp80.000/bulan
+                                    Upgrade ke Pro - Rp299.000/bulan
                                 </button>
                                 {#if trialStatus?.can_activate}
                                     <button

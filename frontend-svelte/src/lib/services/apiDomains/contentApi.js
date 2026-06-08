@@ -1,5 +1,12 @@
 import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
 
+function unwrapData(json) {
+    if (json && json.success === true && json.data !== undefined) {
+        return json.data;
+    }
+    return json;
+}
+
 export function createContentApi({ cacheGet, cacheSet }) {
     return {
         async getDashboardStats() {
@@ -9,9 +16,21 @@ export function createContentApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            const data = await response.json();
-            cacheSet('analytics:dashboard', data, 30000); // 30s TTL
-            return data;
+            const result = unwrapData(await response.json());
+            cacheSet('analytics:dashboard', result, 30000);
+            return result;
+        },
+
+        async getOwnerDashboard() {
+            const cached = cacheGet('owner:dashboard');
+            if (cached) return cached;
+            const response = await apiFetch(`${API_URL}/dashboard/owner`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            const result = unwrapData(await response.json());
+            cacheSet('owner:dashboard', result, 15000);
+            return result;
         },
 
         async getItinerary(groupId) {
@@ -60,7 +79,25 @@ export function createContentApi({ cacheGet, cacheSet }) {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return await response.json();
+            return unwrapData(await response.json());
+        },
+
+        async markNotificationRead(id) {
+            const response = await apiFetch(`${API_URL}/notifications/${id}/read`, {
+                method: 'PUT',
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async markAllNotificationsRead() {
+            const response = await apiFetch(`${API_URL}/notifications/read-all`, {
+                method: 'PUT',
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
         },
     };
 }
