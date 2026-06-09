@@ -22,6 +22,15 @@
     let paymentStatus = $state("");
     let paymentError = $state("");
     let paymentPollInterval = null;
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 120; // 120 × 5s ≈ 10 minutes, then give up
+
+    function stopPolling() {
+        if (paymentPollInterval) {
+            clearInterval(paymentPollInterval);
+            paymentPollInterval = null;
+        }
+    }
 
     // Pro Trial
     let trialStatus = $state(null);
@@ -106,26 +115,47 @@
     async function startPayment(tier = "pro", period = "monthly") {
         paymentLoading = true;
         paymentError = "";
+        stopPolling(); // never leak a timer from a previous attempt
+        pollAttempts = 0;
         try {
             const result = await ApiService.createPaymentOrder(tier, period);
             paymentOrderId = result.order_id;
             paymentStatus = "pending";
             window.open(result.payment_url, "_blank");
             paymentPollInterval = setInterval(async () => {
+                pollAttempts++;
                 try {
                     const st =
                         await ApiService.checkPaymentStatus(paymentOrderId);
                     if (st.status === "paid") {
                         paymentStatus = "paid";
-                        clearInterval(paymentPollInterval);
+                        stopPolling();
                         if (onSuccess) {
                             const sub =
                                 await ApiService.getSubscriptionStatus();
                             onSuccess(sub);
                         }
+                        return;
+                    }
+                    if (["failed", "cancelled", "expired"].includes(st.status)) {
+                        paymentStatus = "error";
+                        paymentError =
+                            "Pembayaran dibatalkan atau gagal. Silakan coba lagi.";
+                        stopPolling();
+                        return;
                     }
                 } catch (e) {
-                    /* keep polling */
+                    /* transient error — keep polling until the cap */
+                }
+                // Stop polling forever: give up after the cap so an abandoned
+                // payment tab doesn't poll the backend indefinitely.
+                if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+                    stopPolling();
+                    if (paymentStatus !== "paid") {
+                        paymentStatus = "error";
+                        paymentError =
+                            "Waktu tunggu pembayaran habis. Jika Anda sudah membayar, muat ulang halaman atau klik Cek Status.";
+                    }
                 }
             }, 5000);
         } catch (err) {
@@ -137,7 +167,7 @@
     }
 
     function closeUpgradeModal() {
-        if (paymentPollInterval) clearInterval(paymentPollInterval);
+        stopPolling();
         paymentStatus = "";
         paymentOrderId = "";
         paymentError = "";
@@ -145,7 +175,7 @@
     }
 
     onDestroy(() => {
-        if (paymentPollInterval) clearInterval(paymentPollInterval);
+        stopPolling();
     });
 </script>
 
@@ -322,7 +352,7 @@
                                             );
                                         if (s.status === "paid") {
                                             paymentStatus = "paid";
-                                            clearInterval(paymentPollInterval);
+                                            stopPolling();
                                             if (onSuccess) {
                                                 const sub =
                                                     await ApiService.getSubscriptionStatus();

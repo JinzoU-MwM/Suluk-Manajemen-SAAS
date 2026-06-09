@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -41,7 +42,18 @@ func (s *AuthService) GetSubscriptionStatus(ctx context.Context, orgID uuid.UUID
 	}
 	if sub.ExpiresAt != nil && sub.ExpiresAt.Before(time.Now()) && sub.Status != "cancelled" {
 		sub.Status = "expired"
-		_ = s.repo.UpdateSubscription(ctx, sub)
+		if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
+			// Non-fatal, but log so a persistently failing write is visible.
+			log.Printf("auto-expire subscription (org %s): %v", orgID, err)
+		}
+	}
+	// An expired (or cancelled) subscription must not keep paid-tier limits —
+	// report Gratis limits/rank so quota enforcement downgrades the org. The
+	// original plan name is still surfaced so the UI can prompt a renewal.
+	if sub.Status == "expired" || sub.Status == "cancelled" {
+		resp := statusResponse(plan.Gratis, sub.Status, sub.ExpiresAt)
+		resp.Plan = plan.Normalize(sub.Plan)
+		return resp, nil
 	}
 	return statusResponse(sub.Plan, sub.Status, sub.ExpiresAt), nil
 }
@@ -54,13 +66,17 @@ func (s *AuthService) ActivatePlan(ctx context.Context, orgID uuid.UUID, planNam
 	if !plan.Valid(planName) {
 		return time.Time{}, fmt.Errorf("invalid plan: %s", planName)
 	}
+	canonicalPeriod, ok := plan.NormalizePeriod(period)
+	if !ok {
+		return time.Time{}, fmt.Errorf("invalid period: %s", period)
+	}
 	sub, err := s.repo.GetSubscription(ctx, orgID)
 	if err != nil {
 		return time.Time{}, err
 	}
 	now := time.Now()
 	var expiresAt time.Time
-	if period == plan.PeriodYearly || period == "annual" {
+	if canonicalPeriod == plan.PeriodYearly {
 		expiresAt = now.AddDate(1, 0, 0)
 	} else {
 		expiresAt = now.AddDate(0, 1, 0)
@@ -146,11 +162,18 @@ func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.Act
 // GetBillingInfo returns the org + buyer display fields used on the subscription
 // invoice (PDF), looked up by the invoice-service when rendering the receipt.
 func (s *AuthService) GetBillingInfo(ctx context.Context, orgID, userID uuid.UUID) (orgName, userName, userEmail string, err error) {
-	if user, e := s.repo.GetUserByID(ctx, userID); e == nil && user != nil {
+	user, userErr := s.repo.GetUserByID(ctx, userID)
+	if userErr == nil && user != nil {
 		userName, userEmail = user.Name, user.Email
 	}
-	if org, e := s.repo.GetOrganizationByID(ctx, orgID); e == nil && org != nil {
+	org, orgErr := s.repo.GetOrganizationByID(ctx, orgID)
+	if orgErr == nil && org != nil {
 		orgName = org.Name
+	}
+	// If neither record resolved, surface the failure instead of returning a
+	// blank-name invoice silently.
+	if userName == "" && orgName == "" {
+		return "", "", "", fmt.Errorf("billing info not found for org %s / user %s", orgID, userID)
 	}
 	return orgName, userName, userEmail, nil
 }

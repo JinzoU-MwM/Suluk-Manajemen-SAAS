@@ -80,6 +80,11 @@ func (s *InvoiceService) SubscriptionInvoicePDF(ctx context.Context, orderIDStr,
 	if err != nil {
 		return nil, "", err
 	}
+	// Only paid orders have an invoice/receipt — never render one for a pending
+	// (or otherwise unsettled) order.
+	if order.Status != "paid" {
+		return nil, "", fmt.Errorf("invoice not available: order is not paid")
+	}
 
 	// Best-effort billing names from auth-service.
 	var bi billingInfo

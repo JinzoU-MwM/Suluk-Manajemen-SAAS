@@ -590,6 +590,13 @@
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") === "success" && user) {
       currentPage = "dashboard";
+      // Re-fetch subscription — the Pakasir webhook may have just upgraded the
+      // plan, so the status loaded above can be stale. Without this the user
+      // returns to a dashboard still showing the old (free/expired) tier.
+      try {
+        const freshSub = await ApiService.getSubscriptionStatus();
+        if (freshSub) subscription = freshSub;
+      } catch {}
       // Clean the URL
       window.history.replaceState({}, "", window.location.pathname);
     }

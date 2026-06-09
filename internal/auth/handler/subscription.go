@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"log"
 	"os"
 
@@ -11,6 +12,18 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
 )
+
+// validInternalKey authenticates a service-to-service call against the shared
+// INTERNAL_API_KEY using a constant-time comparison (avoids the timing
+// side-channel of a plain string ==). An unset key fails closed.
+func validInternalKey(c *fiber.Ctx) bool {
+	want := os.Getenv("INTERNAL_API_KEY")
+	if want == "" {
+		return false
+	}
+	got := c.Get("X-Internal-Key")
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
 
 func (h *AuthHandler) GetSubscriptionStatus(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
@@ -60,8 +73,7 @@ func (h *AuthHandler) GetPricing(c *fiber.Ctx) error {
 // called by the invoice-service payment webhook after a verified, paid order.
 // It is guarded by a shared INTERNAL_API_KEY in the X-Internal-Key header.
 func (h *AuthHandler) ActivatePlanInternal(c *fiber.Ctx) error {
-	want := os.Getenv("INTERNAL_API_KEY")
-	if want == "" || c.Get("X-Internal-Key") != want {
+	if !validInternalKey(c) {
 		return response.Unauthorized(c, "invalid internal key")
 	}
 	var req model.ActivatePlanRequest
@@ -88,8 +100,7 @@ func (h *AuthHandler) ActivatePlanInternal(c *fiber.Ctx) error {
 // AuthMiddleware) used by other services to push in-app notifications on key
 // events. Guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header.
 func (h *AuthHandler) CreateNotificationInternal(c *fiber.Ctx) error {
-	want := os.Getenv("INTERNAL_API_KEY")
-	if want == "" || c.Get("X-Internal-Key") != want {
+	if !validInternalKey(c) {
 		return response.Unauthorized(c, "invalid internal key")
 	}
 	var req struct {
@@ -131,8 +142,7 @@ func (h *AuthHandler) CreateNotificationInternal(c *fiber.Ctx) error {
 // called by the invoice-service when rendering the subscription-invoice PDF.
 // Guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header.
 func (h *AuthHandler) BillingInfoInternal(c *fiber.Ctx) error {
-	want := os.Getenv("INTERNAL_API_KEY")
-	if want == "" || c.Get("X-Internal-Key") != want {
+	if !validInternalKey(c) {
 		return response.Unauthorized(c, "invalid internal key")
 	}
 	var req struct {
@@ -142,8 +152,14 @@ func (h *AuthHandler) BillingInfoInternal(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
-	orgID, _ := uuid.Parse(req.OrgID)
-	userID, _ := uuid.Parse(req.UserID)
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		return response.BadRequest(c, "invalid user_id")
+	}
 	orgName, userName, userEmail, err := h.svc.GetBillingInfo(c.Context(), orgID, userID)
 	if err != nil {
 		return response.Internal(c, err)

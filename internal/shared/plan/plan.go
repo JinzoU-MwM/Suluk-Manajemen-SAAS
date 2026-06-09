@@ -129,8 +129,25 @@ func Get(key string) Tier {
 	return Catalog[Normalize(key)]
 }
 
+// NormalizePeriod canonicalizes a billing period to PeriodMonthly or
+// PeriodYearly. Accepts "monthly"/"month"/"" → monthly and
+// "yearly"/"annual"/"year" → yearly. Anything else returns ok=false so callers
+// reject it rather than silently defaulting (which previously let an
+// annually-charged order grant only a one-month expiry). This is the single
+// source of period interpretation shared by pricing and activation.
+func NormalizePeriod(period string) (canonical string, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(period)) {
+	case PeriodMonthly, "month", "":
+		return PeriodMonthly, true
+	case PeriodYearly, "annual", "year":
+		return PeriodYearly, true
+	default:
+		return "", false
+	}
+}
+
 // PriceFor returns the IDR amount for a purchasable tier and period.
-// period accepts "monthly"/"yearly" (and "annual" as an alias for yearly).
+// period accepts the forms understood by NormalizePeriod.
 func PriceFor(key, period string) (int64, error) {
 	t, ok := Catalog[key]
 	if !ok {
@@ -139,12 +156,12 @@ func PriceFor(key, period string) (int64, error) {
 	if !t.Purchasable {
 		return 0, fmt.Errorf("plan %q is not purchasable", key)
 	}
-	switch strings.ToLower(strings.TrimSpace(period)) {
-	case PeriodMonthly, "":
-		return t.MonthlyPrice, nil
-	case PeriodYearly, "annual":
-		return t.AnnualPrice, nil
-	default:
+	canonical, ok := NormalizePeriod(period)
+	if !ok {
 		return 0, fmt.Errorf("invalid period: %q (want monthly or yearly)", period)
 	}
+	if canonical == PeriodYearly {
+		return t.AnnualPrice, nil
+	}
+	return t.MonthlyPrice, nil
 }

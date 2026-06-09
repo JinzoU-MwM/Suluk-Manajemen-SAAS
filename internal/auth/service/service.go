@@ -271,13 +271,32 @@ func (s *AuthService) CreateOrganization(ctx context.Context, userID uuid.UUID, 
 	return org, nil
 }
 
-func (s *AuthService) AddTeamMember(ctx context.Context, orgID, userID, addedBy uuid.UUID, role string) (*model.TeamMember, error) {
-	count, err := s.repo.CountTeamMembers(ctx, orgID)
+// checkSeatLimit returns ErrPlanLimit if the org has already reached its
+// per-tier user cap (plan.MaxUsers). It uses GetSubscriptionStatus so expired
+// subscriptions are evaluated at their downgraded (Gratis) limit, and so both
+// the invite and direct-add paths enforce the SAME cap. Fails open on lookup
+// errors (availability over strictness for an auth dependency).
+func (s *AuthService) checkSeatLimit(ctx context.Context, orgID uuid.UUID) error {
+	status, err := s.GetSubscriptionStatus(ctx, orgID)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	if count >= 50 {
-		return nil, fmt.Errorf("team member limit reached (50)")
+	if status.MaxUsers == plan.Unlimited {
+		return nil
+	}
+	users, err := s.repo.ListUsersByOrg(ctx, orgID)
+	if err != nil {
+		return nil
+	}
+	if len(users) >= status.MaxUsers {
+		return fmt.Errorf("%w: batas pengguna pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah anggota tim", ErrPlanLimit, status.MaxUsers)
+	}
+	return nil
+}
+
+func (s *AuthService) AddTeamMember(ctx context.Context, orgID, userID, addedBy uuid.UUID, role string) (*model.TeamMember, error) {
+	if err := s.checkSeatLimit(ctx, orgID); err != nil {
+		return nil, err
 	}
 
 	member := &model.TeamMember{
@@ -326,17 +345,8 @@ func (s *AuthService) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]mo
 
 func (s *AuthService) InviteMember(ctx context.Context, orgID, invitedBy uuid.UUID, email, role string) (*model.TeamInvite, error) {
 	// Enforce the per-tier seat limit before provisioning a new invite.
-	if sub, err := s.repo.GetSubscription(ctx, orgID); err == nil {
-		planName := plan.Gratis
-		if sub != nil {
-			planName = sub.Plan
-		}
-		maxUsers := plan.Get(planName).MaxUsers
-		if maxUsers != plan.Unlimited {
-			if users, err := s.repo.ListUsersByOrg(ctx, orgID); err == nil && len(users) >= maxUsers {
-				return nil, fmt.Errorf("%w: batas pengguna pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah anggota tim", ErrPlanLimit, maxUsers)
-			}
-		}
+	if err := s.checkSeatLimit(ctx, orgID); err != nil {
+		return nil, err
 	}
 
 	token := generateToken(32)

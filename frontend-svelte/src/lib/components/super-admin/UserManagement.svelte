@@ -14,6 +14,8 @@
     let statusFilter = 'all'; // 'all', 'active', 'inactive'
     let page = 1;
     const limit = 20;
+    let hasMore = false; // whether the server has another page after this one
+    let searchTimer = null;
 
     let showUserModal = false;
     let selectedUser = null;
@@ -38,12 +40,25 @@
             if (!result.ok) throw new Error('Failed to load users');
             const data = await result.json();
             users = data.users || [];
+            // A full page implies there may be another one. (The endpoint returns
+            // no total count, so this is the available signal for Next.)
+            hasMore = users.length === limit;
         } catch (err) {
             error = err.message;
             console.error('Failed to load users:', err);
         } finally {
             loading = false;
         }
+    }
+
+    // Debounced server-side search: reset to page 1 and refetch so search spans
+    // ALL users, not just the rows already on the current page.
+    function handleSearchInput() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            page = 1;
+            loadUsers();
+        }, 350);
     }
 
     function openUserModal(user) {
@@ -137,6 +152,7 @@
                     <input
                         type="text"
                         bind:value={search}
+                        on:input={handleSearchInput}
                         placeholder="Search by email or name..."
                         class="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent w-full sm:w-64"
                     />
@@ -243,19 +259,23 @@
     <!-- Pagination -->
     <div class="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
         <div class="text-sm text-slate-500">
-            Showing {Math.min(filteredUsers.length, limit * page)} of {filteredUsers.length} users
+            {#if users.length === 0}
+                No users
+            {:else}
+                Showing {(page - 1) * limit + 1}–{(page - 1) * limit + users.length} (page {page})
+            {/if}
         </div>
         <div class="flex space-x-2">
             <button
-                on:click={() => page > 1 && (page -= 1, loadUsers())}
+                on:click={() => { if (page > 1) { page -= 1; loadUsers(); } }}
                 disabled={page === 1}
                 class="px-4 py-2 border border-slate-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
             >
                 Previous
             </button>
             <button
-                on:click={() => filteredUsers.length === limit * page && (page += 1, loadUsers())}
-                disabled={filteredUsers.length < limit * page}
+                on:click={() => { if (hasMore) { page += 1; loadUsers(); } }}
+                disabled={!hasMore}
                 class="px-4 py-2 border border-slate-300 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
             >
                 Next

@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/jamaah-in/v2/internal/invoice/model"
+	"github.com/jamaah-in/v2/internal/invoice/service"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
 )
@@ -37,7 +41,13 @@ func (h *InvoiceHandler) PakasirWebhook(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid webhook body")
 	}
 	if err := h.svc.HandlePakasirWebhook(c.Context(), payload); err != nil {
-		return response.BadRequest(c, err.Error())
+		var bad *service.BadWebhookError
+		if errors.As(err, &bad) {
+			return response.BadRequest(c, bad.Error())
+		}
+		// Transient (DB / Pakasir verify / activation) — return 5xx so the
+		// gateway retries the callback instead of dropping it.
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"received": true})
 }
@@ -61,7 +71,10 @@ func (h *InvoiceHandler) CheckPaymentStatus(c *fiber.Ctx) error {
 
 	result, err := h.svc.CheckPaymentStatus(c.Context(), orderID, claims.OrgID)
 	if err != nil {
-		return response.NotFound(c, "payment order not found")
+		if errors.Is(err, pgx.ErrNoRows) {
+			return response.NotFound(c, "payment order not found")
+		}
+		return response.Internal(c, err)
 	}
 	return response.OK(c, result)
 }

@@ -81,6 +81,31 @@ func TestPriceFor(t *testing.T) {
 	}
 }
 
+func TestNormalizePeriod(t *testing.T) {
+	cases := []struct {
+		in     string
+		want   string
+		wantOK bool
+	}{
+		{"monthly", PeriodMonthly, true},
+		{"month", PeriodMonthly, true},
+		{"", PeriodMonthly, true},
+		{" Monthly ", PeriodMonthly, true},
+		{"yearly", PeriodYearly, true},
+		{"annual", PeriodYearly, true},
+		{"year", PeriodYearly, true},
+		{"YEARLY", PeriodYearly, true},
+		{"weekly", "", false},
+		{"bogus", "", false},
+	}
+	for _, c := range cases {
+		got, ok := NormalizePeriod(c.in)
+		if ok != c.wantOK || got != c.want {
+			t.Errorf("NormalizePeriod(%q) = (%q,%v), want (%q,%v)", c.in, got, ok, c.want, c.wantOK)
+		}
+	}
+}
+
 func TestAtLeast(t *testing.T) {
 	if !AtLeast(Bisnis, Pro) {
 		t.Error("bisnis should be at least pro")

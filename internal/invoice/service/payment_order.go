@@ -2,23 +2,37 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"net/url"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jamaah-in/v2/internal/invoice/model"
 	"github.com/jamaah-in/v2/internal/shared/plan"
 )
+
+// BadWebhookError marks a webhook payload as permanently invalid (a client
+// error → HTTP 4xx): the gateway should NOT retry it. Any other error returned
+// from webhook handling is treated as transient (HTTP 5xx) so Pakasir retries.
+type BadWebhookError struct{ msg string }
+
+func (e *BadWebhookError) Error() string { return e.msg }
+
+func errBadWebhook(format string, a ...any) error {
+	return &BadWebhookError{msg: fmt.Sprintf(format, a...)}
+}
 
 // CreatePaymentOrder creates a pending order for a purchasable tier + period,
 // prices it from the shared catalog, and returns the Pakasir checkout URL.
 func (s *InvoiceService) CreatePaymentOrder(ctx context.Context, orgID, userID uuid.UUID, req model.CreatePaymentOrderRequest) (*model.PaymentOrderResponse, error) {
 	planName := plan.Normalize(req.Plan)
-	period := req.PlanType
-	if period == "" {
-		period = plan.PeriodMonthly
-	}
-	if period != plan.PeriodMonthly && period != plan.PeriodYearly {
+	// Normalize the period (the frontend sends "annual" for yearly) so the
+	// canonical "monthly"/"yearly" is stored and priced consistently — a raw
+	// equality check here rejected every annual purchase outright.
+	period, ok := plan.NormalizePeriod(req.PlanType)
+	if !ok {
 		return nil, fmt.Errorf("invalid period: must be monthly or yearly")
 	}
 	amount, err := plan.PriceFor(planName, period)
@@ -92,33 +106,64 @@ func (s *InvoiceService) CheckPaymentStatus(ctx context.Context, orderIDStr stri
 func (s *InvoiceService) HandlePakasirWebhook(ctx context.Context, p model.PakasirWebhookPayload) error {
 	orderID, err := uuid.Parse(p.OrderID)
 	if err != nil {
-		return fmt.Errorf("invalid order_id")
+		return errBadWebhook("invalid order_id")
 	}
+	// Defense-in-depth: reject callbacks for a different project or a non-completed
+	// status before doing any work. The Transaction Detail call below is the
+	// authoritative guard, but these cheap checks drop obvious spoofs/noise.
+	if s.pakasir.ProjectSlug != "" && p.Project != "" && p.Project != s.pakasir.ProjectSlug {
+		return errBadWebhook("project mismatch: %s", p.Project)
+	}
+	if p.Status != "" && p.Status != "completed" {
+		return errBadWebhook("webhook status not completed: %s", p.Status)
+	}
+
 	order, err := s.repo.GetPaymentOrderByID(ctx, orderID)
 	if err != nil {
-		return err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errBadWebhook("unknown order_id")
+		}
+		return err // transient DB error → 5xx → retry
 	}
 	if order.Status == "paid" {
-		return nil // already processed
+		return nil // already fully processed (mark-paid is the final step below)
 	}
 	if p.Amount != order.Amount {
-		return fmt.Errorf("amount mismatch: webhook %d vs order %d", p.Amount, order.Amount)
+		return errBadWebhook("amount mismatch: webhook %d vs order %d", p.Amount, order.Amount)
 	}
 
-	// Independent confirmation against Pakasir (defends against spoofed webhooks).
-	status, err := s.VerifyTransaction(ctx, order.ID.String(), order.Amount)
+	// Authoritative confirmation against Pakasir (webhooks are unsigned). Confirm
+	// both the completed status AND the actual paid amount — the amount in the
+	// webhook body is attacker-controlled, so it cannot be the only amount check.
+	status, paidAmount, err := s.VerifyTransaction(ctx, order.ID.String(), order.Amount)
 	if err != nil {
-		return fmt.Errorf("verify transaction: %w", err)
+		return fmt.Errorf("verify transaction: %w", err) // transient → 5xx → retry
 	}
 	if status != "completed" {
-		return fmt.Errorf("transaction not completed: %s", status)
+		return errBadWebhook("transaction not completed: %s", status)
+	}
+	if paidAmount != order.Amount {
+		return errBadWebhook("verified amount mismatch: paid %d vs order %d", paidAmount, order.Amount)
 	}
 
-	if err := s.repo.MarkPaymentOrderPaid(ctx, order.ID, p.PaymentMethod); err != nil {
+	// Atomically claim the order (single winner under concurrent/duplicate
+	// delivery). A false result means another delivery already processed it.
+	claimed, err := s.repo.MarkPaymentOrderPaid(ctx, order.ID, p.PaymentMethod)
+	if err != nil {
 		return fmt.Errorf("mark paid: %w", err)
 	}
+	if !claimed {
+		return nil
+	}
+
+	// Activate AFTER claiming. If activation fails, roll the order back to
+	// pending so a later Pakasir retry re-attempts it — this avoids the
+	// paid-but-never-activated stuck state (customer charged, org left on free).
 	if err := s.activateSubscription(ctx, order, p.PaymentMethod); err != nil {
-		return fmt.Errorf("activate subscription: %w", err)
+		if rerr := s.repo.RevertPaymentOrderToPending(ctx, order.ID); rerr != nil {
+			log.Printf("CRITICAL: order %s paid but activation AND revert failed — needs reconciliation: activate=%v revert=%v", order.ID, err, rerr)
+		}
+		return fmt.Errorf("activate subscription: %w", err) // transient → 5xx → retry
 	}
 	return nil
 }

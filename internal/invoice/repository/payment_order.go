@@ -56,11 +56,30 @@ func (r *InvoiceRepo) UpdatePaymentOrderStatus(ctx context.Context, orderID, org
 	return err
 }
 
-// MarkPaymentOrderPaid marks an order paid and records the gateway payment method.
-func (r *InvoiceRepo) MarkPaymentOrderPaid(ctx context.Context, orderID uuid.UUID, paymentMethod string) error {
+// MarkPaymentOrderPaid atomically transitions a *pending* order to paid and
+// records the gateway payment method. It returns true only if THIS call
+// performed the transition; a false result means the order was already paid
+// (e.g. a concurrent/duplicate webhook delivery won the race), which lets the
+// caller avoid double-activation.
+func (r *InvoiceRepo) MarkPaymentOrderPaid(ctx context.Context, orderID uuid.UUID, paymentMethod string) (bool, error) {
 	query := `UPDATE payment_orders
 		SET status = 'paid', payment_method = $2, completed_at = NOW(), updated_at = NOW()
-		WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, orderID, paymentMethod)
+		WHERE id = $1 AND status = 'pending'`
+	ct, err := r.pool.Exec(ctx, query, orderID, paymentMethod)
+	if err != nil {
+		return false, err
+	}
+	return ct.RowsAffected() == 1, nil
+}
+
+// RevertPaymentOrderToPending rolls a just-claimed order back to pending so a
+// later webhook retry can re-attempt activation. Used when subscription
+// activation fails after the order was marked paid, to avoid a stuck
+// "paid-but-not-activated" state.
+func (r *InvoiceRepo) RevertPaymentOrderToPending(ctx context.Context, orderID uuid.UUID) error {
+	query := `UPDATE payment_orders
+		SET status = 'pending', completed_at = NULL, updated_at = NOW()
+		WHERE id = $1 AND status = 'paid'`
+	_, err := r.pool.Exec(ctx, query, orderID)
 	return err
 }

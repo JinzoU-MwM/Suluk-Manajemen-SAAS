@@ -30,15 +30,15 @@
             ? Math.max(0, subscription.usage_limit - subscription.usage_count)
             : null,
     );
-    let trialEndsFormatted = $derived(() => {
-        if (!subscription?.trial_ends) return "";
-        const d = new Date(subscription.trial_ends);
-        return d.toLocaleDateString("id-ID", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-        });
-    });
+    let trialEndsFormatted = $derived(
+        subscription?.trial_ends
+            ? new Date(subscription.trial_ends).toLocaleDateString("id-ID", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+              })
+            : "",
+    );
     // Only blocked when the backend explicitly disallows (allowed === false) and
     // the plan isn't pro-or-higher. The status payload omits `allowed`, so the
     // old `!allowed` incorrectly blocked everyone (including Pro).
@@ -87,7 +87,7 @@
                         </div>
                         <div>
                             <p class="text-sm font-medium text-blue-800">
-                                Trial Gratis - Berakhir {trialEndsFormatted()}
+                                Trial Gratis - Berakhir {trialEndsFormatted}
                             </p>
                             <p class="text-xs text-blue-600">
                                 {remaining} scan tersisa dari {subscription.usage_limit}

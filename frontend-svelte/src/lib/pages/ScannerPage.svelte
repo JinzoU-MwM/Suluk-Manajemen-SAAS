@@ -286,7 +286,12 @@
   // Block only when the backend EXPLICITLY disallows access, and never for a
   // pro-or-higher active plan. (The subscription status payload has no `allowed`
   // field, so the old `!allowed` blocked everyone — including Pro.)
-  let isPro = $derived(isProOrHigher(localSubscription?.plan));
+  // Match the app-wide definition (App.svelte / Dashboard): an expired plan is
+  // not Pro, otherwise an expired Pro user would keep the editable table here.
+  let isPro = $derived(
+    isProOrHigher(localSubscription?.plan) &&
+      localSubscription?.status !== "expired",
+  );
   let isBlocked = $derived(
     !isPro && localSubscription?.allowed === false,
   );

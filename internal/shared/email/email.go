@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	stdhtml "html"
 	"io"
 	"mime"
 	"net"
@@ -61,10 +62,25 @@ func (c *Client) Send(ctx context.Context, to, subject, html string) error {
 	if !c.Enabled() {
 		return nil
 	}
+	// Validate the recipient and strip any CRLF from header inputs to prevent
+	// SMTP header injection (a "victim@x.com\r\nBcc: ..." address could otherwise
+	// inject arbitrary headers/body). Normalize `to` to its bare address.
+	addr, err := mail.ParseAddress(to)
+	if err != nil {
+		return fmt.Errorf("invalid recipient address: %w", err)
+	}
+	to = addr.Address
+	subject = stripCRLF(subject)
 	if c.cfg.SMTPHost != "" {
 		return c.sendSMTP(to, subject, html)
 	}
 	return c.sendResend(ctx, to, subject, html)
+}
+
+// stripCRLF removes carriage returns and newlines so a value is safe to place
+// in a single email header line.
+func stripCRLF(s string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(s)
 }
 
 // fromAddress extracts the bare email from the configured From header.
@@ -80,31 +96,43 @@ func (c *Client) fromAddress() string {
 // messages without these headers score as spam and are rejected by content
 // filters (e.g. MailChannels "[CS] Message blocked"); a text part + real
 // headers gets the same content delivered.
-func (c *Client) buildMessage(to, subject, html string) []byte {
+func (c *Client) buildMessage(to, subject, html string) ([]byte, error) {
 	domain := "localhost"
 	if at := strings.LastIndex(c.fromAddress(), "@"); at >= 0 {
 		domain = c.fromAddress()[at+1:]
 	}
-	boundary := randHex(16)
+	boundary, err := randHex(16)
+	if err != nil {
+		return nil, fmt.Errorf("generate MIME boundary: %w", err)
+	}
+	msgID, err := randHex(16)
+	if err != nil {
+		return nil, fmt.Errorf("generate message-id: %w", err)
+	}
 
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "From: %s\r\n", c.cfg.From)
 	fmt.Fprintf(&b, "To: %s\r\n", to)
 	fmt.Fprintf(&b, "Subject: %s\r\n", encodeSubject(subject))
 	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
-	fmt.Fprintf(&b, "Message-ID: <%s@%s>\r\n", randHex(16), domain)
+	fmt.Fprintf(&b, "Message-ID: <%s@%s>\r\n", msgID, domain)
 	b.WriteString("MIME-Version: 1.0\r\n")
 	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary)
 	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n", boundary, htmlToText(html))
 	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n", boundary, html)
 	fmt.Fprintf(&b, "--%s--\r\n", boundary)
-	return b.Bytes()
+	return b.Bytes(), nil
 }
 
-func randHex(n int) string {
+// randHex returns n cryptographically-random bytes hex-encoded. It errors on a
+// rand source failure rather than silently returning a zero (predictable)
+// value, which would yield a fixed MIME boundary/Message-ID.
+func randHex(n int) (string, error) {
 	b := make([]byte, n)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // encodeSubject MIME-encodes a subject only when it contains non-ASCII bytes.
@@ -124,10 +152,6 @@ var (
 	reTag         = regexp.MustCompile(`(?s)<[^>]*>`)
 	reSpaces      = regexp.MustCompile(`[ \t]+`)
 	reBlankLines  = regexp.MustCompile(`\n{3,}`)
-	htmlEntities  = strings.NewReplacer(
-		"&amp;", "&", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&#39;", "'",
-		"&nbsp;", " ", "&mdash;", "—", "&ndash;", "–", "&copy;", "©", "&#10003;", "✓",
-	)
 )
 
 // htmlToText derives a readable plain-text alternative from an HTML body.
@@ -136,7 +160,7 @@ func htmlToText(h string) string {
 	h = reBreak.ReplaceAllString(h, "\n")
 	h = reBlockEnd.ReplaceAllString(h, "\n")
 	h = reTag.ReplaceAllString(h, "")
-	h = htmlEntities.Replace(h)
+	h = stdhtml.UnescapeString(h)
 	h = reSpaces.ReplaceAllString(h, " ")
 	lines := strings.Split(h, "\n")
 	for i := range lines {
@@ -156,7 +180,10 @@ func (c *Client) sendSMTP(to, subject, html string) error {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	from := c.fromAddress()
 
-	msg := c.buildMessage(to, subject, html)
+	msg, err := c.buildMessage(to, subject, html)
+	if err != nil {
+		return fmt.Errorf("build message: %w", err)
+	}
 
 	auth := smtp.PlainAuth("", c.cfg.SMTPUser, c.cfg.SMTPPass, host)
 
