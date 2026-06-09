@@ -17,10 +17,29 @@ type Config struct {
 	JWT      JWTConfig
 	Server   ServerConfig
 	Gemini   GeminiConfig
+	Pakasir  PakasirConfig
+	Internal InternalConfig
 }
 
 type AppConfig struct {
 	Env string
+	// PublicURL is the public base URL of the app (e.g. https://app.suluk.id),
+	// used to build payment redirect-back links. No trailing slash.
+	PublicURL string
+}
+
+// PakasirConfig holds the Pakasir payment-gateway credentials/settings.
+type PakasirConfig struct {
+	APIKey      string
+	ProjectSlug string
+	BaseURL     string
+	Sandbox     bool
+}
+
+// InternalConfig holds the shared secret used to authenticate
+// service-to-service (internal) endpoints.
+type InternalConfig struct {
+	APIKey string
 }
 
 type ServerConfig struct {
@@ -73,7 +92,8 @@ type GeminiConfig struct {
 func Load() *Config {
 	return &Config{
 		App: AppConfig{
-			Env: envOr("APP_ENV", "development"),
+			Env:       envOr("APP_ENV", "development"),
+			PublicURL: strings.TrimRight(envOr("APP_PUBLIC_URL", "http://localhost:5173"), "/"),
 		},
 		Server: ServerConfig{
 			Port: intEnvOr("SERVER_PORT", 8080),
@@ -109,6 +129,15 @@ func Load() *Config {
 		},
 		Gemini: GeminiConfig{
 			APIKey: envOr("GEMINI_API_KEY", ""),
+		},
+		Pakasir: PakasirConfig{
+			APIKey:      envOr("PAKASIR_API_KEY", ""),
+			ProjectSlug: envOr("PAKASIR_PROJECT_SLUG", ""),
+			BaseURL:     strings.TrimRight(envOr("PAKASIR_BASE_URL", "https://app.pakasir.com"), "/"),
+			Sandbox:     envOr("PAKASIR_SANDBOX", "false") == "true",
+		},
+		Internal: InternalConfig{
+			APIKey: envOr("INTERNAL_API_KEY", ""),
 		},
 	}
 }

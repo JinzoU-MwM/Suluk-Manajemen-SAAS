@@ -8,10 +8,11 @@ function unwrapData(json) {
 }
 
 export const paymentApi = {
-    async createPaymentOrder(planType = 'monthly') {
-        const response = await apiFetch(`${API_URL}/payment/create-order?plan_type=${planType}`, {
+    async createPaymentOrder(plan = 'pro', period = 'monthly') {
+        const response = await apiFetch(`${API_URL}/payment/create-order`, {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ plan, plan_type: period }),
         });
         if (!response.ok) throw new Error(await parseError(response));
         return unwrapData(await response.json());

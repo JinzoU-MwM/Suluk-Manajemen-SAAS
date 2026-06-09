@@ -1,6 +1,7 @@
 ﻿<script>
     import { onMount } from 'svelte';
     import { apiFetch, authHeaders } from '../../services/apiCore.js';
+    import { planMeta, isProOrHigher } from '../../config/pricing.js';
 
     export let onUpdate = () => {};
 
@@ -96,10 +97,11 @@
 
     function getPlanBadge(plan) {
         if (!plan) return '<span class="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded">Unknown</span>';
-        if (plan === 'pro') {
-            return '<span class="px-2 py-1 bg-primary-100 text-primary-800 text-xs font-semibold rounded">PRO</span>';
+        const label = planMeta(plan).name.toUpperCase();
+        if (isProOrHigher(plan)) {
+            return `<span class="px-2 py-1 bg-primary-100 text-primary-800 text-xs font-semibold rounded">${label}</span>`;
         }
-        return '<span class="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded">Free</span>';
+        return `<span class="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded">${label}</span>`;
     }
 
     function getStatusBadge(isActive, isAdmin) {

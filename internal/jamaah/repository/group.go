@@ -16,6 +16,20 @@ func (r *JamaahRepo) CreateGroup(ctx context.Context, g *model.Group) error {
 	return r.pool.QueryRow(ctx, query, g.ID, g.OrgID, g.Name, g.Description).Scan(&g.CreatedAt, &g.UpdatedAt)
 }
 
+// CountGroups returns the number of groups owned by an org (for plan-limit checks).
+func (r *JamaahRepo) CountGroups(ctx context.Context, orgID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM groups WHERE org_id = $1`, orgID).Scan(&n)
+	return n, err
+}
+
+// CountProfiles returns the number of jamaah profiles owned by an org (for plan-limit checks).
+func (r *JamaahRepo) CountProfiles(ctx context.Context, orgID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jamaah_profiles WHERE org_id = $1`, orgID).Scan(&n)
+	return n, err
+}
+
 func (r *JamaahRepo) ListGroups(ctx context.Context, orgID uuid.UUID) ([]model.Group, error) {
 	query := `SELECT id, org_id, name, description, member_count, is_active, created_at, updated_at
 		FROM groups WHERE org_id = $1 ORDER BY created_at DESC`

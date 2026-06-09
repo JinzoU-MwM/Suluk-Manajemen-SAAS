@@ -1,10 +1,29 @@
 <script>
+  import { PLANS } from "../config/pricing.js";
+
   let { onGoToLogin = () => {}, onGoToRegister = () => {} } = $props();
 
   let mobileMenuOpen = $state(false);
 
   function closeMenu() {
     mobileMenuOpen = false;
+  }
+
+  // WhatsApp contact for the Enterprise "Hubungi Sales" CTA.
+  const SALES_WA = "https://wa.me/6285159980404?text=" +
+    encodeURIComponent("Halo, saya tertarik dengan paket Enterprise Suluk.");
+
+  function priceText(p) {
+    if (!p.purchasable) return p.priceLabel; // "Gratis" / "Custom"
+    return p.priceLabel;
+  }
+
+  function handlePlanCta(p) {
+    if (p.key === "enterprise") {
+      window.open(SALES_WA, "_blank");
+    } else {
+      onGoToRegister();
+    }
   }
 
   const modules = [
@@ -268,44 +287,26 @@
         <p class="lp-sec-lead">Mulai gratis, tingkatkan saat bisnis berkembang. Tanpa biaya tersembunyi.</p>
       </div>
       <div class="lp-pricing">
-        <div class="lp-price">
-          <h3>Pemula</h3>
-          <p class="desc">Untuk travel baru yang ingin mulai rapi.</p>
-          <div><span class="amt">Gratis</span></div>
-          <ul>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Hingga 50 jamaah</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Data jamaah &amp; grup</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Manajemen paket dasar</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> 1 pengguna</li>
-          </ul>
-          <button class="lp-btn lp-btn-ghost" onclick={() => onGoToRegister()}>Mulai Gratis</button>
-        </div>
-        <div class="lp-price pop">
-          <span class="lp-price-badge">Paling Populer</span>
-          <h3>Pro</h3>
-          <p class="desc">Untuk travel berkembang dengan operasional penuh.</p>
-          <div><span class="amt">Rp 499rb</span> <span class="per">/ bulan</span></div>
-          <ul>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Jamaah tak terbatas</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> AI Scanner dokumen</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Semua modul (CRM, Keuangan, Kontrak)</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Hingga 10 pengguna</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Laporan &amp; ekspor lanjutan</li>
-          </ul>
-          <button class="lp-btn lp-btn-primary" onclick={() => onGoToRegister()}>Coba Pro 14 Hari</button>
-        </div>
-        <div class="lp-price">
-          <h3>Enterprise</h3>
-          <p class="desc">Untuk travel besar &amp; multi-cabang.</p>
-          <div><span class="amt">Custom</span></div>
-          <ul>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Semua fitur Pro</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Multi-cabang &amp; multi-PT</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Akses API &amp; integrasi</li>
-            <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Dukungan prioritas 24/7</li>
-          </ul>
-          <button class="lp-btn lp-btn-ghost" onclick={() => onGoToLogin()}>Hubungi Sales</button>
-        </div>
+        {#each PLANS as p}
+          <div class="lp-price {p.popular ? 'pop' : ''}">
+            {#if p.popular}<span class="lp-price-badge">Paling Populer</span>{/if}
+            <h3>{p.name}</h3>
+            <p class="desc">{p.desc}</p>
+            <div>
+              <span class="amt">{priceText(p)}</span>
+              {#if p.purchasable}<span class="per">/ bulan</span>{/if}
+            </div>
+            <ul>
+              {#each p.features as f}
+                <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> {f}</li>
+              {/each}
+            </ul>
+            <button
+              class="lp-btn {p.popular ? 'lp-btn-primary' : 'lp-btn-ghost'}"
+              onclick={() => handlePlanCta(p)}
+            >{p.cta}</button>
+          </div>
+        {/each}
       </div>
     </div>
   </section>
@@ -471,8 +472,8 @@
   .lp-step h3 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
   .lp-step p { font-size: 14px; line-height: 1.55; color: var(--c-muted); margin: 0; }
 
-  .lp-pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: stretch; }
-  .lp-price { border: 1px solid var(--c-line); border-radius: 22px; padding: 32px; background: var(--c-surface); display: flex; flex-direction: column; }
+  .lp-pricing { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; align-items: stretch; }
+  .lp-price { border: 1px solid var(--c-line); border-radius: 20px; padding: 24px; background: var(--c-surface); display: flex; flex-direction: column; }
   .lp-price.pop { border: 2px solid var(--c-primary); box-shadow: 0 28px 60px -28px var(--c-primary); position: relative; }
   .lp-price-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--c-primary); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; }
   .lp-price h3 { font-size: 19px; font-weight: 800; margin: 0 0 6px; }
@@ -527,6 +528,10 @@
     .lp-modules { grid-template-columns: repeat(2, 1fr); }
     .lp-steps { grid-template-columns: repeat(2, 1fr); row-gap: 36px; }
     .lp-footer-grid { grid-template-columns: 1fr 1fr; row-gap: 36px; }
+  }
+
+  @media (max-width: 1180px) and (min-width: 761px) {
+    .lp-pricing { grid-template-columns: repeat(3, 1fr); }
   }
 
   @media (max-width: 760px) {

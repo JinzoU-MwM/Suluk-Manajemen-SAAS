@@ -125,6 +125,9 @@ services:
       REDIS_ADDR: redis:6379
       JAMAAH_SERVICE_ADDR: jamaah-service:50053
       INVOICE_SERVICE_ADDR: invoice-service:50054
+      # Shared secret to authenticate the internal plan-activation endpoint
+      # called by the payment webhook (must match invoice-service).
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
@@ -182,6 +185,7 @@ services:
       POSTGRES_PASSWORD: Jamaah123!
       POSTGRES_SSLMODE: disable
       INVOICE_SERVICE_ADDR: invoice-service:50054
+      AUTH_SERVICE_ADDR: auth-service:50051
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -216,6 +220,16 @@ services:
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: Jamaah123!
       POSTGRES_SSLMODE: disable
+      AUTH_SERVICE_ADDR: auth-service:50051
+      # Public base URL of the app (used to build the Pakasir redirect-back link).
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      # Shared internal secret (must match auth-service).
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      # Pakasir payment gateway.
+      PAKASIR_API_KEY: ${PAKASIR_API_KEY:-}
+      PAKASIR_PROJECT_SLUG: ${PAKASIR_PROJECT_SLUG:-}
+      PAKASIR_BASE_URL: ${PAKASIR_BASE_URL:-https://app.pakasir.com}
+      PAKASIR_SANDBOX: ${PAKASIR_SANDBOX:-false}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m

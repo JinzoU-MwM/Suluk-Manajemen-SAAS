@@ -24,7 +24,7 @@ func (h *JamaahHandler) CreateGroup(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
-	group, err := h.svc.CreateGroup(c.Context(), claims.OrgID, req)
+	group, err := h.svc.CreateGroup(c.Context(), claims.OrgID, c.Get("Authorization"), req)
 	if err != nil {
 		return response.BadRequest(c, err.Error())
 	}

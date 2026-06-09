@@ -254,27 +254,48 @@ type RefundListResponse struct {
 }
 
 type PaymentOrder struct {
-	ID          uuid.UUID `json:"id" db:"id"`
-	OrgID       uuid.UUID `json:"org_id" db:"org_id"`
-	UserID      uuid.UUID `json:"user_id" db:"user_id"`
-	PlanType    string    `json:"plan_type" db:"plan_type"`
-	Amount      int64     `json:"amount" db:"amount"`
-	Status      string    `json:"status" db:"status"`
-	RedirectURL *string   `json:"redirect_url,omitempty" db:"redirect_url"`
-	GatewayRef  *string   `json:"gateway_ref,omitempty" db:"gateway_ref"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID            uuid.UUID  `json:"id" db:"id"`
+	OrgID         uuid.UUID  `json:"org_id" db:"org_id"`
+	UserID        uuid.UUID  `json:"user_id" db:"user_id"`
+	Plan          string     `json:"plan" db:"plan"`           // tier: starter/pro/bisnis
+	PlanType      string     `json:"plan_type" db:"plan_type"` // period: monthly/yearly
+	Amount        int64      `json:"amount" db:"amount"`
+	Status        string     `json:"status" db:"status"`
+	RedirectURL   *string    `json:"redirect_url,omitempty" db:"redirect_url"`
+	GatewayRef    *string    `json:"gateway_ref,omitempty" db:"gateway_ref"`
+	PaymentMethod *string    `json:"payment_method,omitempty" db:"payment_method"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type CreatePaymentOrderRequest struct {
-	PlanType string `json:"plan_type"`
+	Plan     string `json:"plan"`      // tier: starter/pro/bisnis
+	PlanType string `json:"plan_type"` // period: monthly/yearly
 }
 
 type PaymentOrderResponse struct {
-	OrderID     string `json:"order_id"`
-	RedirectURL string `json:"redirect_url"`
-	Status      string `json:"status"`
-	Amount      int64  `json:"amount"`
+	OrderID    string `json:"order_id"`
+	PaymentURL string `json:"payment_url"`
+	Status     string `json:"status"`
+	Amount     int64  `json:"amount"`
+}
+
+// ActivatePlanBody is the payload sent to the auth-service internal activation endpoint.
+type ActivatePlanBody struct {
+	OrgID  string `json:"org_id"`
+	Plan   string `json:"plan"`
+	Period string `json:"period"`
+}
+
+// PakasirWebhookPayload is the POST body Pakasir sends on a completed payment.
+type PakasirWebhookPayload struct {
+	Amount        int64  `json:"amount"`
+	OrderID       string `json:"order_id"`
+	Project       string `json:"project"`
+	Status        string `json:"status"`
+	PaymentMethod string `json:"payment_method"`
+	CompletedAt   string `json:"completed_at"`
 }
 
 type PaymentStatusResponse struct {

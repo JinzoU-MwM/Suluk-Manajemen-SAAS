@@ -8,6 +8,7 @@
   import UpgradeModal from "./lib/components/UpgradeModal.svelte";
   import Toast from "./lib/components/Toast.svelte";
   import { ApiService } from "./lib/services/api";
+  import { isProOrHigher } from "./lib/config/pricing.js";
 
   const BASE_URL = "https://jamaah.web.id";
   const DEFAULT_SEO = {
@@ -320,7 +321,7 @@
 
   // Derived
   let isPro = $derived(
-    subscription?.plan === "pro" && subscription?.status !== "expired",
+    isProOrHigher(subscription?.plan) && subscription?.status !== "expired",
   );
   let isSuperAdmin = $derived(
     user?.is_super_admin === true,

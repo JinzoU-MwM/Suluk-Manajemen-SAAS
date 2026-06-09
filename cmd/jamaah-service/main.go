@@ -60,7 +60,7 @@ func main() {
 	}
 
 	jamaahRepo := repository.NewJamaahRepo(pool)
-	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"))
+	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"))
 	jamaahHandler := handler.NewJamaahHandler(jamaahService)
 
 	app := fiber.New(fiber.Config{

@@ -8,9 +8,13 @@ import (
 	"github.com/jamaah-in/v2/internal/jamaah/model"
 )
 
-func (s *JamaahService) CreateGroup(ctx context.Context, orgID uuid.UUID, req model.CreateGroupRequest) (*model.Group, error) {
+func (s *JamaahService) CreateGroup(ctx context.Context, orgID uuid.UUID, authToken string, req model.CreateGroupRequest) (*model.Group, error) {
 	if req.Name == "" {
 		return nil, fmt.Errorf("name is required")
+	}
+	lim := s.fetchLimits(ctx, authToken)
+	if count, err := s.repo.CountGroups(ctx, orgID); err == nil && atCap(count, lim.MaxGroups) {
+		return nil, fmt.Errorf("%w: batas grup pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah grup", ErrPlanLimit, lim.MaxGroups)
 	}
 	g := &model.Group{
 		ID:          uuid.New(),

@@ -15,6 +15,7 @@ import (
 	"github.com/jamaah-in/v2/internal/auth/repository"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/httpclient"
+	"github.com/jamaah-in/v2/internal/shared/plan"
 	sharedRedis "github.com/jamaah-in/v2/internal/shared/redis"
 )
 
@@ -308,6 +309,20 @@ func (s *AuthService) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]mo
 }
 
 func (s *AuthService) InviteMember(ctx context.Context, orgID, invitedBy uuid.UUID, email, role string) (*model.TeamInvite, error) {
+	// Enforce the per-tier seat limit before provisioning a new invite.
+	if sub, err := s.repo.GetSubscription(ctx, orgID); err == nil {
+		planName := plan.Gratis
+		if sub != nil {
+			planName = sub.Plan
+		}
+		maxUsers := plan.Get(planName).MaxUsers
+		if maxUsers != plan.Unlimited {
+			if users, err := s.repo.ListUsersByOrg(ctx, orgID); err == nil && len(users) >= maxUsers {
+				return nil, fmt.Errorf("%w: batas pengguna pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah anggota tim", ErrPlanLimit, maxUsers)
+			}
+		}
+	}
+
 	token := generateToken(32)
 	invite := &model.TeamInvite{
 		ID:        uuid.New(),

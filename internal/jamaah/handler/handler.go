@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -31,8 +32,11 @@ func (h *JamaahHandler) CreateProfile(c *fiber.Ctx) error {
 		return response.BadRequest(c, "nama is required")
 	}
 
-	profile, err := h.svc.CreateProfile(c.Context(), claims.OrgID, req)
+	profile, err := h.svc.CreateProfile(c.Context(), claims.OrgID, c.Get("Authorization"), req)
 	if err != nil {
+		if errors.Is(err, service.ErrPlanLimit) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, profile)

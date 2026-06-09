@@ -143,6 +143,10 @@ func main() {
 	subscription.Post("/activate-trial", authHandler.ActivateTrial)
 	subscription.Get("/pricing", authHandler.GetPricing)
 
+	// Service-to-service: payment webhook activates a paid plan. Guarded by
+	// X-Internal-Key inside the handler, so it is intentionally not behind AuthMiddleware.
+	app.Post("/api/v1/internal/subscription/activate", authHandler.ActivatePlanInternal)
+
 	notifications := app.Group("/api/v1/notifications", sharedMW.AuthMiddleware(jwtManager))
 	notifications.Get("/", authHandler.ListNotifications)
 	notifications.Put("/:id/read", authHandler.MarkNotificationRead)

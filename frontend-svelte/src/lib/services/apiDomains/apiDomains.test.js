@@ -60,14 +60,15 @@ describe("API domain modules", () => {
       json: async () => ({ order_id: "ord-1" }),
     });
 
-    const res = await paymentApi.createPaymentOrder("yearly");
+    const res = await paymentApi.createPaymentOrder("bisnis", "yearly");
 
     expect(res.order_id).toBe("ord-1");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/payment/create-order?plan_type=yearly",
+      "/api/payment/create-order",
       expect.objectContaining({
         method: "POST",
         credentials: "include",
+        body: JSON.stringify({ plan: "bisnis", plan_type: "yearly" }),
       }),
     );
   });

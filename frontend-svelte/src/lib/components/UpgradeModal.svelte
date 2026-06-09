@@ -2,11 +2,21 @@
     import { onMount, onDestroy } from "svelte";
     import { Crown, CheckCircle, Loader2 } from "lucide-svelte";
     import { ApiService } from "../services/api";
+    import { PLANS, planMeta, formatIDR } from "../config/pricing.js";
 
-    let { show = false, onClose, onSuccess } = $props();
+    let { show = false, onClose, onSuccess, plan = "pro" } = $props();
 
-    // Upgrade
-    let selectedPlan = $state("monthly"); // monthly | annual
+    // Purchasable tiers shown in the modal selector.
+    const purchasableTiers = PLANS.filter((p) => p.purchasable);
+
+    // Upgrade — initial tier comes from the opener's `plan` prop (one-time default).
+    // svelte-ignore state_referenced_locally
+    let selectedTier = $state(plan && plan !== "gratis" ? plan : "pro"); // starter | pro | bisnis
+    let selectedPlan = $state("monthly"); // monthly | annual (billing period)
+    let tierMeta = $derived(planMeta(selectedTier));
+    let currentAmount = $derived(
+        selectedPlan === "annual" ? tierMeta.annualPrice : tierMeta.monthlyPrice,
+    );
     let paymentLoading = $state(false);
     let paymentOrderId = $state("");
     let paymentStatus = $state("");
@@ -93,11 +103,11 @@
         }
     }
 
-    async function startPayment(planType = "monthly") {
+    async function startPayment(tier = "pro", period = "monthly") {
         paymentLoading = true;
         paymentError = "";
         try {
-            const result = await ApiService.createPaymentOrder(planType);
+            const result = await ApiService.createPaymentOrder(tier, period);
             paymentOrderId = result.order_id;
             paymentStatus = "pending";
             window.open(result.payment_url, "_blank");
@@ -162,7 +172,7 @@
                 <div class="modal-header">
                     <h3 class="modal-title">
                         <Crown class="h-5 w-5 text-emerald-500" />
-                        Upgrade ke Pro
+                        Upgrade ke {tierMeta.name}
                     </h3>
                     <button onclick={closeUpgradeModal} class="modal-close"
                         >x</button
@@ -183,7 +193,7 @@
                                 Pembayaran Berhasil!
                             </h4>
                             <p style="font-size: 14px; color: #64748b;">
-                                Langganan Pro aktif selama 30 hari.
+                                Langganan {tierMeta.name} aktif.
                             </p>
                             <button
                                 onclick={closeUpgradeModal}
@@ -194,6 +204,26 @@
                             </button>
                         </div>
                     {:else}
+                        <!-- Tier selector -->
+                        <div
+                            style="display: flex; gap: 8px; margin-bottom: 12px;"
+                        >
+                            {#each purchasableTiers as t}
+                                <button
+                                    type="button"
+                                    onclick={() => (selectedTier = t.key)}
+                                    style="flex: 1; padding: 10px 6px; font-size: 13px; font-weight: 700; border-radius: 10px; transition: all 0.2s; border: 1.5px solid {selectedTier ===
+                                    t.key
+                                        ? '#1B7F5A'
+                                        : '#e2e8f0'}; {selectedTier === t.key
+                                        ? 'background: #E8F4EF; color: #0F3D2E;'
+                                        : 'background: white; color: #64748b;'}"
+                                >
+                                    {t.name}
+                                </button>
+                            {/each}
+                        </div>
+
                         <!-- Plan Toggle -->
                         <div
                             style="display: flex; background: #f1f5f9; border-radius: 12px; padding: 4px; margin-bottom: 16px;"
@@ -224,37 +254,36 @@
 
                         <div class="price-box">
                             {#if selectedPlan === "annual"}
-                                <p class="price-amount">Rp 2.990.000</p>
+                                <p class="price-amount">
+                                    {formatIDR(tierMeta.annualPrice)}
+                                </p>
                                 <p class="price-period">per tahun</p>
                                 <p class="price-alt">
-                                    Hemat Rp 598.000 (~Rp 249.000/bulan)
+                                    Hemat ~2 bulan (~{formatIDR(
+                                        Math.round(tierMeta.annualPrice / 12),
+                                    )}/bulan)
                                 </p>
                             {:else}
-                                <p class="price-amount">Rp 299.000</p>
+                                <p class="price-amount">
+                                    {formatIDR(tierMeta.monthlyPrice)}
+                                </p>
                                 <p class="price-period">per bulan</p>
                                 <p class="price-alt">
-                                    atau Rp 2.990.000/tahun (hemat ~17%)
+                                    atau {formatIDR(tierMeta.annualPrice)}/tahun
+                                    (hemat ~2 bulan)
                                 </p>
                             {/if}
                         </div>
 
                         <ul class="feature-list">
-                            <li>
-                                <CheckCircle class="h-4 w-4 text-emerald-500" />
-                                Unlimited scan dokumen
-                            </li>
-                            <li>
-                                <CheckCircle class="h-4 w-4 text-emerald-500" />
-                                Unlimited grup jamaah
-                            </li>
-                            <li>
-                                <CheckCircle class="h-4 w-4 text-emerald-500" />
-                                Export Excel
-                            </li>
-                            <li>
-                                <CheckCircle class="h-4 w-4 text-emerald-500" />
-                                Prioritas support
-                            </li>
+                            {#each tierMeta.features as f}
+                                <li>
+                                    <CheckCircle
+                                        class="h-4 w-4 text-emerald-500"
+                                    />
+                                    {f}
+                                </li>
+                            {/each}
                         </ul>
 
                         {#if paymentError}
@@ -330,7 +359,8 @@
                                 </p>
                             {/if}
                             <button
-                                onclick={() => startPayment(selectedPlan)}
+                                onclick={() =>
+                                    startPayment(selectedTier, selectedPlan)}
                                 disabled={paymentLoading}
                                 class="wa-confirm-btn"
                             >
@@ -338,9 +368,10 @@
                                     <Loader2 class="h-4 w-4 animate-spin" />
                                     Memproses...
                                 {:else}
-                                    {selectedPlan === "annual"
-                                        ? "Bayar Rp 2.990.000/tahun"
-                                        : "Bayar Rp 299.000/bulan"}
+                                    Bayar {formatIDR(currentAmount)}{selectedPlan ===
+                                    "annual"
+                                        ? "/tahun"
+                                        : "/bulan"}
                                 {/if}
                             </button>
                         {/if}

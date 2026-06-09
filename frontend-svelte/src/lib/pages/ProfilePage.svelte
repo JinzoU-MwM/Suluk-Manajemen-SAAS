@@ -23,6 +23,7 @@
         Loader2,
     } from "lucide-svelte";
     import { ApiService } from "../services/api";
+    import { planMeta, limitLabel, isProOrHigher } from '../config/pricing.js';
 
     let {
         onLogout,
@@ -289,7 +290,7 @@
     }
 
     let planLabel = $derived(
-        subscription?.plan === "pro" ? "Pro Plan" : "Free Plan",
+        planMeta(subscription?.plan).name + " Plan",
     );
     let usagePercent = $derived(
         subscription?.usage_limit
@@ -436,9 +437,11 @@
                                 <div>
                                     <p class="stat-value">
                                         {groupCount}<span class="stat-limit"
-                                            >/{subscription?.plan === "pro"
-                                                ? "unlimited"
-                                                : "2"}</span
+                                            >/{limitLabel(
+                                                subscription?.max_groups ??
+                                                    planMeta(subscription?.plan)
+                                                        .maxGroups,
+                                            )}</span
                                         >
                                     </p>
                                     <p class="stat-label">Grup</p>
@@ -447,7 +450,7 @@
                             <div class="stat-divider"></div>
                             <div class="stat-item">
                                 <div class="stat-icon stat-icon-plan">
-                                    {#if subscription?.plan === "pro"}
+                                    {#if isProOrHigher(subscription?.plan)}
                                         <Crown class="h-4 w-4" />
                                     {:else}
                                         <Zap class="h-4 w-4" />
@@ -461,7 +464,7 @@
                         </div>
 
                         <!-- Usage Bar (free only) -->
-                        {#if subscription?.plan === "free" && subscription?.usage_limit}
+                        {#if !isProOrHigher(subscription?.plan) && subscription?.usage_limit}
                             <div class="usage-bar-container">
                                 <div class="usage-bar-track">
                                     <div
@@ -481,7 +484,7 @@
 
                         <!-- Subscription Details -->
                         <div class="subscription-details">
-                            {#if subscription?.plan === "pro"}
+                            {#if isProOrHigher(subscription?.plan)}
                                 <div class="sub-detail-row">
                                     <span class="sub-detail-label"
                                         >Berlangganan sejak</span

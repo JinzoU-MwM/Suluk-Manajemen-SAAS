@@ -19,6 +19,7 @@
   import SubscriptionBanner from "../components/SubscriptionBanner.svelte";
   import GroupSelector from "../components/GroupSelector.svelte";
   import { ApiService } from "../services/api";
+  import { isProOrHigher } from "../config/pricing.js";
 
   let {
     onLogout,
@@ -59,7 +60,7 @@
   const bypassQuota = $derived(ocrStatus?.cache_quota?.bypass || null);
   const canUseBypassCacheMode = $derived(
     (() => {
-      const isProActive = localSubscription?.plan === "pro" && localSubscription?.status === "active";
+      const isProActive = isProOrHigher(localSubscription?.plan) && localSubscription?.status === "active";
       if (!isProActive) return false;
       const backendAllowed = ocrStatus?.providers?.gemini?.bypass_allowed_now;
       if (typeof backendAllowed === "boolean") return backendAllowed;
@@ -69,7 +70,7 @@
   );
   const cacheModeNotice = $derived(
     (() => {
-      const isProActive = localSubscription?.plan === "pro" && localSubscription?.status === "active";
+      const isProActive = isProOrHigher(localSubscription?.plan) && localSubscription?.status === "active";
       if (canUseBypassCacheMode) {
         return bypassQuota?.unlimited
           ? "Bypass aktif tanpa limit per jam. Tetap gunakan seperlunya untuk kontrol biaya."
@@ -109,7 +110,7 @@
     paymentLoading = true;
     paymentError = "";
     try {
-      const result = await ApiService.createPaymentOrder(selectedPlan);
+      const result = await ApiService.createPaymentOrder("pro", selectedPlan);
       paymentOrderId = result.order_id;
       paymentStatus = "pending";
       window.open(result.payment_url, "_blank");
@@ -333,7 +334,7 @@
     subtitle="Upload KTP, KK, paspor, dan visa untuk diekstrak menjadi data jamaah."
   >
     {#snippet actions()}
-      {#if localSubscription?.plan === "pro"}
+      {#if isProOrHigher(localSubscription?.plan)}
         <div class="inline-flex w-fit items-center gap-2 rounded-full border border-[#C99A2E]/30 bg-[#F7EFD6] px-4 py-2 text-sm font-semibold text-[#8a6a1d] shadow-sm">
           <Crown class="h-4 w-4 text-[#C99A2E]" />
           Pro Active
@@ -407,7 +408,7 @@
             Upload dan ekstrak data jamaah dengan AI
           </p>
         </div>
-        {#if localSubscription?.plan === "pro"}
+        {#if isProOrHigher(localSubscription?.plan)}
           <div
             class="hidden sm:flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full"
           >
@@ -459,7 +460,7 @@
         bind:selectedGroup
         onGroupSelect={(g) => (selectedGroup = g)}
         onViewGroup={viewGroupData}
-        isPro={localSubscription?.plan === "pro" &&
+        isPro={isProOrHigher(localSubscription?.plan) &&
           localSubscription?.status === "active"}
       />
     </div>
@@ -547,7 +548,7 @@
     showModal = false;
     showUpgradeModal = true;
   }}
-  readOnly={localSubscription?.plan !== "pro"}
+  readOnly={!isProOrHigher(localSubscription?.plan)}
   {validationWarnings}
   {fileResults}
   {errorMessage}

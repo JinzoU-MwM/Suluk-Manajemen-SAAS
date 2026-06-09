@@ -15,20 +15,27 @@ import (
 type JamaahService struct {
 	repo        *repository.JamaahRepo
 	invoiceAddr string
+	authAddr    string
 	httpc       *httpclient.Client
 }
 
-func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr string) *JamaahService {
+func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr, authAddr string) *JamaahService {
 	return &JamaahService{
 		repo:        repo,
 		invoiceAddr: invoiceAddr,
+		authAddr:    authAddr,
 		httpc:       httpclient.New(),
 	}
 }
 
-func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, req model.CreateJamaahRequest) (*model.JamaahProfile, error) {
+func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, authToken string, req model.CreateJamaahRequest) (*model.JamaahProfile, error) {
 	if req.Nama == "" {
 		return nil, fmt.Errorf("nama is required")
+	}
+
+	lim := s.fetchLimits(ctx, authToken)
+	if count, err := s.repo.CountProfiles(ctx, orgID); err == nil && atCap(count, lim.MaxJamaah) {
+		return nil, fmt.Errorf("%w: batas jamaah pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah jamaah lagi", ErrPlanLimit, lim.MaxJamaah)
 	}
 
 	p := &model.JamaahProfile{

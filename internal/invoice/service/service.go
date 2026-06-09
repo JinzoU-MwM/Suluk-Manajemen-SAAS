@@ -9,14 +9,38 @@ import (
 
 	"github.com/jamaah-in/v2/internal/invoice/model"
 	"github.com/jamaah-in/v2/internal/invoice/repository"
+	"github.com/jamaah-in/v2/internal/shared/config"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 )
 
 type InvoiceService struct {
-	repo *repository.InvoiceRepo
+	repo        *repository.InvoiceRepo
+	pakasir     config.PakasirConfig
+	internalKey string
+	authAddr    string
+	publicURL   string
+	httpc       *httpclient.Client
+}
+
+// PaymentDeps carries the settings the payment/subscription flow needs.
+type PaymentDeps struct {
+	Pakasir     config.PakasirConfig
+	InternalKey string
+	AuthAddr    string
+	PublicURL   string
 }
 
 func NewInvoiceService(repo *repository.InvoiceRepo) *InvoiceService {
-	return &InvoiceService{repo: repo}
+	return &InvoiceService{repo: repo, httpc: httpclient.New()}
+}
+
+// WithPayments configures the Pakasir + cross-service activation dependencies.
+func (s *InvoiceService) WithPayments(d PaymentDeps) *InvoiceService {
+	s.pakasir = d.Pakasir
+	s.internalKey = d.InternalKey
+	s.authAddr = d.AuthAddr
+	s.publicURL = d.PublicURL
+	return s
 }
 
 func (s *InvoiceService) CreateInvoice(ctx context.Context, orgID, userID uuid.UUID, req model.CreateInvoiceRequest) (*model.Invoice, error) {

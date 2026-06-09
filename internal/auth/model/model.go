@@ -185,6 +185,18 @@ type SubscriptionStatusResponse struct {
 	Plan      string     `json:"plan"`
 	Status    string     `json:"status"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Rank      int        `json:"rank"`
+	MaxJamaah int        `json:"max_jamaah"`
+	MaxGroups int        `json:"max_groups"`
+	MaxUsers  int        `json:"max_users"`
+}
+
+// ActivatePlanRequest is the body of the internal service-to-service
+// activation endpoint called by the payment webhook after a paid order.
+type ActivatePlanRequest struct {
+	OrgID  string `json:"org_id"`
+	Plan   string `json:"plan"`
+	Period string `json:"period"`
 }
 
 type TrialStatusResponse struct {

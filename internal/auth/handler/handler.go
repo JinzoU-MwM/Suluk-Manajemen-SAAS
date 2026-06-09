@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
@@ -227,6 +229,9 @@ func (h *AuthHandler) InviteMember(c *fiber.Ctx) error {
 
 	invite, err := h.svc.InviteMember(c.Context(), claims.OrgID, claims.UserID, req.Email, req.Role)
 	if err != nil {
+		if errors.Is(err, service.ErrPlanLimit) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, invite)

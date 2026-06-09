@@ -60,7 +60,12 @@ func main() {
 	}
 
 	invoiceRepo := repository.NewInvoiceRepo(pool)
-	invoiceService := service.NewInvoiceService(invoiceRepo)
+	invoiceService := service.NewInvoiceService(invoiceRepo).WithPayments(service.PaymentDeps{
+		Pakasir:     cfg.Pakasir,
+		InternalKey: cfg.Internal.APIKey,
+		AuthAddr:    os.Getenv("AUTH_SERVICE_ADDR"),
+		PublicURL:   cfg.App.PublicURL,
+	})
 	invoiceHandler := handler.NewInvoiceHandler(invoiceService)
 
 	refundSvc := service.NewRefundService(invoiceRepo)
@@ -98,6 +103,10 @@ func main() {
 	invoices.Post("/:id/payments", invoiceHandler.RecordPayment)
 	invoices.Get("/:id/payments", invoiceHandler.GetPayments)
 	invoices.Get("/:id/pdf", invoiceHandler.ExportInvoicePDF)
+
+	// Public Pakasir webhook (server-to-server, no JWT). Registered before the
+	// authenticated payment group so it is not gated by AuthMiddleware.
+	app.Post("/api/v1/payment/webhook", invoiceHandler.PakasirWebhook)
 
 	payment := app.Group("/api/v1/payment", authMW)
 	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)

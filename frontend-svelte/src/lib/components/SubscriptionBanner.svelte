@@ -6,11 +6,12 @@
         Zap,
         ChevronRight,
     } from "lucide-svelte";
+    import { isProOrHigher } from "../config/pricing.js";
 
     let { subscription = null, onUpgrade } = $props();
 
     // Derive states
-    let isFree = $derived(subscription?.plan === "free");
+    let isFree = $derived(!isProOrHigher(subscription?.plan));
     let isExpired = $derived(subscription?.status === "expired");
     let isTrial = $derived(subscription?.status === "trial");
     let usagePercent = $derived(
@@ -144,7 +145,7 @@
     </div>
 {/if}
 
-{#if subscription && subscription.plan === "pro"}
+{#if subscription && isProOrHigher(subscription.plan)}
     <div class="w-full">
         <div
             class="rounded-3xl border border-primary-100 bg-white p-4 shadow-sm"

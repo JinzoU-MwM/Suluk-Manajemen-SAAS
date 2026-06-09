@@ -21,6 +21,7 @@
   } from "lucide-svelte";
   import { ApiService } from "../services/api";
   import { formatRupiah, formatDate, formatPct } from "../utils/formatting.js";
+  import { isProOrHigher } from "../config/pricing.js";
 
   let { user = null, subscription = null, onNavigate = null } = $props();
 
@@ -31,7 +32,7 @@
   let error = $state("");
 
   let isOwner = $derived(user?.role === "owner" || user?.role === "admin");
-  let isPro = $derived(subscription?.plan === "pro" && subscription?.status !== "expired");
+  let isPro = $derived(isProOrHigher(subscription?.plan) && subscription?.status !== "expired");
   let displayName = $derived(user?.name || "Admin Travel");
 
   const today = new Date().toLocaleDateString("id-ID", {
