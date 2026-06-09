@@ -1,7 +1,7 @@
 <script>
   import { PLANS } from "../config/pricing.js";
 
-  let { onGoToLogin = () => {}, onGoToRegister = () => {} } = $props();
+  let { onGoToLogin = () => {}, onGoToRegister = () => {}, onNavigate = () => {} } = $props();
 
   let mobileMenuOpen = $state(false);
 
@@ -360,8 +360,8 @@
           </a>
           <p>Sistem manajemen all-in-one untuk bisnis travel umrah &amp; haji di Indonesia. Otomatis, terintegrasi, dan dibuat untuk pertumbuhan.</p>
         </div>
-        <div><h4>Fitur</h4><ul><li><a href="#modul">Modul</a></li><li><a href="#fitur">AI Scanner</a></li><li><a href="#harga">Harga</a></li><li><a href="#cara">Cara Kerja</a></li></ul></div>
-        <div><h4>Perusahaan</h4><ul><li><a href="#testimoni">Testimoni</a></li><li><a href="#usecase">Use Case</a></li><li><a href="#top">Beranda</a></li></ul></div>
+        <div><h4>Fitur</h4><ul><li><button class="lp-foot-link" onclick={() => onNavigate("software")}>Software Travel</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-invoice")}>Invoice</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-crm")}>CRM Jamaah</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-keuangan")}>Laporan Keuangan</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-kontrak")}>E-Kontrak</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-payroll")}>Payroll</button></li></ul></div>
+        <div><h4>Perusahaan</h4><ul><li><button class="lp-foot-link" onclick={() => onNavigate("about")}>Tentang</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("contact")}>Kontak</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("privacy")}>Kebijakan Privasi</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("terms")}>Syarat &amp; Ketentuan</button></li></ul></div>
         <div><h4>Akun</h4><ul><li><button class="lp-foot-link" onclick={() => onGoToLogin()}>Masuk</button></li><li><button class="lp-foot-link" onclick={() => onGoToRegister()}>Daftar Gratis</button></li></ul></div>
       </div>
       <div class="lp-footer-bottom">

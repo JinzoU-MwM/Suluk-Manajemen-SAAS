@@ -4,6 +4,51 @@
   import Login from "./lib/pages/Login.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
+  import MarketingRouter from "./lib/pages/marketing/MarketingRouter.svelte";
+
+  // Public marketing/content routes (hash <-> slug).
+  const MARKETING_HASHES = {
+    "#/tentang": "about",
+    "#/kontak": "contact",
+    "#/privasi": "privacy",
+    "#/ketentuan": "terms",
+    "#/software-travel-umrah": "software",
+    "#/fitur/invoice-umrah": "fitur-invoice",
+    "#/fitur/crm-jamaah": "fitur-crm",
+    "#/fitur/laporan-keuangan": "fitur-keuangan",
+    "#/fitur/e-kontrak": "fitur-kontrak",
+    "#/fitur/penggajian": "fitur-payroll",
+  };
+  const SLUG_TO_HASH = {
+    about: "#/tentang",
+    contact: "#/kontak",
+    privacy: "#/privasi",
+    terms: "#/ketentuan",
+    software: "#/software-travel-umrah",
+    "fitur-invoice": "#/fitur/invoice-umrah",
+    "fitur-crm": "#/fitur/crm-jamaah",
+    "fitur-keuangan": "#/fitur/laporan-keuangan",
+    "fitur-kontrak": "#/fitur/e-kontrak",
+    "fitur-payroll": "#/fitur/penggajian",
+  };
+  function marketingSlugForHash(h) {
+    if (MARKETING_HASHES[h]) return MARKETING_HASHES[h];
+    if (h === "#/404") return "404";
+    return null;
+  }
+  function goMarketing(slug) {
+    marketingSlug = slug;
+    currentPage = "marketing";
+    window.location.hash = SLUG_TO_HASH[slug] || "#/404";
+  }
+  function marketingGoApp() {
+    window.location.hash = "";
+    currentPage = user ? "dashboard" : "register";
+  }
+  function marketingGoHome() {
+    window.location.hash = "";
+    currentPage = "landing";
+  }
   import ProGateScreen from "./lib/components/ProGateScreen.svelte";
   import SupportChatBubble from "./lib/components/SupportChatBubble.svelte";
   import UpgradeModal from "./lib/components/UpgradeModal.svelte";
@@ -288,6 +333,10 @@
     const packageMatch = hash.match(/^#\/paket\/([a-zA-Z0-9_-]+)$/i);
     const contractMatch = hash.match(/^#\/kontrak\/([a-zA-Z0-9_-]+)$/i);
     const superAdminMatch = hash === "#/super-admin";
+    const mslug = marketingSlugForHash(hash);
+    if (mslug) {
+      return { page: "marketing", marketingSlug: mslug, sharedToken: "", registrationToken: "", packageSlug: "", contractToken: "" };
+    }
     if (superAdminMatch) {
       return { page: "super-admin", sharedToken: "", registrationToken: "", packageSlug: "", contractToken: "" };
     }
@@ -314,6 +363,7 @@
   let subscription = $state(null);
   let sidebarCollapsed = $state(false);
   let sidebarOpen = $state(false); // mobile drawer
+  let marketingSlug = $state(initial.marketingSlug || "");
   let showGlobalUpgradeModal = $state(false);
   let checkingSuperAdminAuth = $state(false); // Loading state for super admin auth check
   let sharedToken = $state(initial.sharedToken); // For /#/m/{token} public manifest
@@ -452,8 +502,17 @@
     document.documentElement.classList.remove("dark");
     localStorage.removeItem("darkMode");
 
+    // Public marketing/content pages: route on hash change (back/forward + direct nav).
+    window.addEventListener("hashchange", () => {
+      const ms = marketingSlugForHash(window.location.hash);
+      if (ms) {
+        marketingSlug = ms;
+        currentPage = "marketing";
+      }
+    });
+
     // If already on public page (set by getInitialPageAndTokens), skip auth flow
-    if (currentPage === "mutawwif" || currentPage === "registration" || currentPage === "package" || currentPage === "contract-sign") {
+    if (currentPage === "mutawwif" || currentPage === "registration" || currentPage === "package" || currentPage === "contract-sign" || currentPage === "marketing") {
       return;
     }
 
@@ -668,6 +727,14 @@
     <LandingPage
       onGoToLogin={() => (currentPage = "login")}
       onGoToRegister={() => (currentPage = "register")}
+      onNavigate={goMarketing}
+    />
+  {:else if currentPage === "marketing"}
+    <MarketingRouter
+      slug={marketingSlug}
+      onNav={goMarketing}
+      onGoToApp={marketingGoApp}
+      onHome={marketingGoHome}
     />
   {:else if currentPage === "login" || currentPage === "register"}
     <Login
