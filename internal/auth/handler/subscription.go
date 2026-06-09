@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"os"
 
 	"github.com/gofiber/fiber/v2"
@@ -71,8 +72,14 @@ func (h *AuthHandler) ActivatePlanInternal(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid org_id")
 	}
-	if err := h.svc.ActivatePlan(c.Context(), orgID, req.Plan, req.Period); err != nil {
+	expiresAt, err := h.svc.ActivatePlan(c.Context(), orgID, req.Plan, req.Period)
+	if err != nil {
 		return response.BadRequest(c, err.Error())
+	}
+	// Best-effort: email the buyer the confirmation + invoice. Never fail
+	// activation if the email send errors.
+	if err := h.svc.SendSubscriptionInvoice(c.Context(), req, expiresAt); err != nil {
+		log.Printf("subscription invoice email failed (order %s): %v", req.OrderID, err)
 	}
 	return response.OK(c, fiber.Map{"activated": true, "plan": req.Plan})
 }

@@ -283,9 +283,13 @@ type PaymentOrderResponse struct {
 
 // ActivatePlanBody is the payload sent to the auth-service internal activation endpoint.
 type ActivatePlanBody struct {
-	OrgID  string `json:"org_id"`
-	Plan   string `json:"plan"`
-	Period string `json:"period"`
+	OrgID         string `json:"org_id"`
+	UserID        string `json:"user_id"`
+	Plan          string `json:"plan"`
+	Period        string `json:"period"`
+	Amount        int64  `json:"amount"`
+	OrderID       string `json:"order_id"`
+	PaymentMethod string `json:"payment_method"`
 }
 
 // PakasirWebhookPayload is the POST body Pakasir sends on a completed payment.

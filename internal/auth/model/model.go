@@ -194,9 +194,13 @@ type SubscriptionStatusResponse struct {
 // ActivatePlanRequest is the body of the internal service-to-service
 // activation endpoint called by the payment webhook after a paid order.
 type ActivatePlanRequest struct {
-	OrgID  string `json:"org_id"`
-	Plan   string `json:"plan"`
-	Period string `json:"period"`
+	OrgID         string `json:"org_id"`
+	UserID        string `json:"user_id"`
+	Plan          string `json:"plan"`
+	Period        string `json:"period"`
+	Amount        int64  `json:"amount"`
+	OrderID       string `json:"order_id"`
+	PaymentMethod string `json:"payment_method"`
 }
 
 type TrialStatusResponse struct {

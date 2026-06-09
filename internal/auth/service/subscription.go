@@ -44,15 +44,16 @@ func (s *AuthService) GetSubscriptionStatus(ctx context.Context, orgID uuid.UUID
 }
 
 // ActivatePlan sets the org's subscription to the given paid tier with an expiry
-// based on the billing period (monthly → +1 month, yearly → +1 year).
-func (s *AuthService) ActivatePlan(ctx context.Context, orgID uuid.UUID, planName, period string) error {
+// based on the billing period (monthly → +1 month, yearly → +1 year). It returns
+// the new expiry so callers can include it in receipts.
+func (s *AuthService) ActivatePlan(ctx context.Context, orgID uuid.UUID, planName, period string) (time.Time, error) {
 	planName = plan.Normalize(planName)
 	if !plan.Valid(planName) {
-		return fmt.Errorf("invalid plan: %s", planName)
+		return time.Time{}, fmt.Errorf("invalid plan: %s", planName)
 	}
 	sub, err := s.repo.GetSubscription(ctx, orgID)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	now := time.Now()
 	var expiresAt time.Time
@@ -62,25 +63,68 @@ func (s *AuthService) ActivatePlan(ctx context.Context, orgID uuid.UUID, planNam
 		expiresAt = now.AddDate(0, 1, 0)
 	}
 	if sub == nil {
-		return s.repo.CreateSubscription(ctx, &model.Subscription{
+		if err := s.repo.CreateSubscription(ctx, &model.Subscription{
 			ID:        uuid.New(),
 			OrgID:     orgID,
 			Plan:      planName,
 			Status:    "active",
 			StartsAt:  now,
 			ExpiresAt: &expiresAt,
-		})
+		}); err != nil {
+			return time.Time{}, err
+		}
+		return expiresAt, nil
 	}
 	sub.Plan = planName
 	sub.Status = "active"
 	sub.ExpiresAt = &expiresAt
-	return s.repo.UpdateSubscription(ctx, sub)
+	if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
+		return time.Time{}, err
+	}
+	return expiresAt, nil
 }
 
 // UpgradeToPro is retained for the existing authenticated upgrade route; it now
 // delegates to ActivatePlan with the Pro monthly tier.
 func (s *AuthService) UpgradeToPro(ctx context.Context, orgID uuid.UUID, req model.UpgradeRequest) error {
-	return s.ActivatePlan(ctx, orgID, plan.Pro, plan.PeriodMonthly)
+	_, err := s.ActivatePlan(ctx, orgID, plan.Pro, plan.PeriodMonthly)
+	return err
+}
+
+// SendSubscriptionInvoice emails the buyer a combined payment-confirmation +
+// invoice/receipt. Best-effort: any error is returned for logging but must not
+// fail the activation flow.
+func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.ActivatePlanRequest, expiresAt time.Time) error {
+	if s.email == nil || !s.email.Enabled() {
+		return nil
+	}
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		return fmt.Errorf("invalid user_id: %w", err)
+	}
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	orgID, _ := uuid.Parse(req.OrgID)
+	orgName := ""
+	if org, err := s.repo.GetOrganizationByID(ctx, orgID); err == nil && org != nil {
+		orgName = org.Name
+	}
+	tier := plan.Get(req.Plan)
+	subject, html := buildInvoiceEmail(invoiceData{
+		OrgName:       orgName,
+		CustomerName:  user.Name,
+		CustomerEmail: user.Email,
+		PlanName:      tier.Name,
+		Period:        req.Period,
+		Amount:        req.Amount,
+		PaymentMethod: req.PaymentMethod,
+		OrderID:       req.OrderID,
+		StartsAt:      time.Now(),
+		ExpiresAt:     expiresAt,
+	})
+	return s.email.Send(ctx, user.Email, subject, html)
 }
 
 func (s *AuthService) GetTrialStatus(ctx context.Context, orgID uuid.UUID) (*model.TrialStatusResponse, error) {

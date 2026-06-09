@@ -117,19 +117,28 @@ func (s *InvoiceService) HandlePakasirWebhook(ctx context.Context, p model.Pakas
 	if err := s.repo.MarkPaymentOrderPaid(ctx, order.ID, p.PaymentMethod); err != nil {
 		return fmt.Errorf("mark paid: %w", err)
 	}
-	if err := s.activateSubscription(ctx, order.OrgID.String(), order.Plan, order.PlanType); err != nil {
+	if err := s.activateSubscription(ctx, order, p.PaymentMethod); err != nil {
 		return fmt.Errorf("activate subscription: %w", err)
 	}
 	return nil
 }
 
 // activateSubscription calls the auth-service internal endpoint to flip the org
-// onto the paid tier, authenticated with the shared internal key.
-func (s *InvoiceService) activateSubscription(ctx context.Context, orgID, planName, period string) error {
+// onto the paid tier (which also sends the invoice/confirmation email),
+// authenticated with the shared internal key.
+func (s *InvoiceService) activateSubscription(ctx context.Context, order *model.PaymentOrder, paymentMethod string) error {
 	if s.authAddr == "" {
 		return fmt.Errorf("auth service address not configured")
 	}
-	body := model.ActivatePlanBody{OrgID: orgID, Plan: planName, Period: period}
+	body := model.ActivatePlanBody{
+		OrgID:         order.OrgID.String(),
+		UserID:        order.UserID.String(),
+		Plan:          order.Plan,
+		Period:        order.PlanType,
+		Amount:        order.Amount,
+		OrderID:       order.ID.String(),
+		PaymentMethod: paymentMethod,
+	}
 	headers := map[string]string{"X-Internal-Key": s.internalKey}
 	return s.httpc.PostJSON(ctx, s.authAddr, "/api/v1/internal/subscription/activate", headers, body, nil)
 }

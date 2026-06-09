@@ -19,6 +19,13 @@ type Config struct {
 	Gemini   GeminiConfig
 	Pakasir  PakasirConfig
 	Internal InternalConfig
+	Email    EmailConfig
+}
+
+// EmailConfig holds the Resend transactional-email settings.
+type EmailConfig struct {
+	ResendAPIKey string
+	From         string
 }
 
 type AppConfig struct {
@@ -138,6 +145,10 @@ func Load() *Config {
 		},
 		Internal: InternalConfig{
 			APIKey: envOr("INTERNAL_API_KEY", ""),
+		},
+		Email: EmailConfig{
+			ResendAPIKey: envOr("RESEND_API_KEY", ""),
+			From:         envOr("EMAIL_FROM", "Suluk <onboarding@resend.dev>"),
 		},
 	}
 }

@@ -18,6 +18,7 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	sharedEmail "github.com/jamaah-in/v2/internal/shared/email"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
@@ -75,7 +76,8 @@ func main() {
 	authRepo.StartCleanupScheduler(ctx)
 	jamaahAddr := os.Getenv("JAMAAH_SERVICE_ADDR")
 	invoiceAddr := os.Getenv("INVOICE_SERVICE_ADDR")
-	authService := service.NewAuthService(authRepo, jwtManager, rdb, jamaahAddr, invoiceAddr)
+	authService := service.NewAuthService(authRepo, jwtManager, rdb, jamaahAddr, invoiceAddr).
+		WithEmail(sharedEmail.New(cfg.Email.ResendAPIKey, cfg.Email.From))
 	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{

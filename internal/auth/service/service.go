@@ -14,6 +14,7 @@ import (
 	"github.com/jamaah-in/v2/internal/auth/model"
 	"github.com/jamaah-in/v2/internal/auth/repository"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
+	"github.com/jamaah-in/v2/internal/shared/email"
 	"github.com/jamaah-in/v2/internal/shared/httpclient"
 	"github.com/jamaah-in/v2/internal/shared/plan"
 	sharedRedis "github.com/jamaah-in/v2/internal/shared/redis"
@@ -26,6 +27,7 @@ type AuthService struct {
 	jamaahAddr  string
 	invoiceAddr string
 	httpc       *httpclient.Client
+	email       *email.Client
 }
 
 func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis *sharedRedis.Client, jamaahAddr, invoiceAddr string) *AuthService {
@@ -37,6 +39,12 @@ func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis
 		invoiceAddr: invoiceAddr,
 		httpc:       httpclient.New(),
 	}
+}
+
+// WithEmail attaches a transactional-email client (for subscription invoices, etc.).
+func (s *AuthService) WithEmail(c *email.Client) *AuthService {
+	s.email = c
+	return s
 }
 
 func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (*model.User, *model.Organization, *sharedAuth.TokenPair, error) {
