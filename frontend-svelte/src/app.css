@@ -474,3 +474,8 @@ input[type="checkbox"] {
   font-size: 0.8125rem;
   margin-top: var(--space-1);
 }
+
+/* App shell layout (matches Claude design: sidebar + topbar + scrollable content) */
+.suluk-shell { display: flex; min-height: 100vh; }
+.suluk-main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.suluk-content { flex: 1; overflow-y: auto; background: var(--c-bg); }

@@ -3,6 +3,7 @@
   import LandingPage from "./lib/pages/LandingPage.svelte";
   import Login from "./lib/pages/Login.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
+  import Topbar from "./lib/components/Topbar.svelte";
   import ProGateScreen from "./lib/components/ProGateScreen.svelte";
   import SupportChatBubble from "./lib/components/SupportChatBubble.svelte";
   import UpgradeModal from "./lib/components/UpgradeModal.svelte";
@@ -312,6 +313,7 @@
   let user = $state(null);
   let subscription = $state(null);
   let sidebarCollapsed = $state(false);
+  let sidebarOpen = $state(false); // mobile drawer
   let showGlobalUpgradeModal = $state(false);
   let checkingSuperAdminAuth = $state(false); // Loading state for super admin auth check
   let sharedToken = $state(initial.sharedToken); // For /#/m/{token} public manifest
@@ -674,22 +676,27 @@
       onBack={() => (currentPage = "landing")}
     />
   {:else if showSidebar}
-    <!-- Layout with Sidebar -->
-    <div class="flex min-h-screen">
+    <!-- Layout with Sidebar (matches Claude design app shell) -->
+    <div class="suluk-shell">
       <Sidebar
         {currentPage}
         onPageChange={handlePageChange}
         {user}
         {isPro}
-        {trialAvailable}
-        jamaahCount={totalJamaahCount}
-        onLogout={handleLogout}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={toggleSidebar}
+        open={sidebarOpen}
+        onClose={() => (sidebarOpen = false)}
+        onUpgrade={() => (showGlobalUpgradeModal = true)}
       />
 
-      <!-- Main Content Area -->
-      <div class="flex-1 lg:ml-0 pt-16 lg:pt-0">
+      <!-- Main column: topbar + scrollable content -->
+      <div class="suluk-main">
+        <Topbar
+          {currentPage}
+          {user}
+          onMenu={() => (sidebarOpen = !sidebarOpen)}
+          onProfile={() => handlePageChange("profile")}
+        />
+        <div class="suluk-content">
         {#if currentPage === "dashboard"}
           {#if DashboardPage}
             <DashboardPage
@@ -934,6 +941,7 @@
             <div class="p-6 text-slate-500">Loading inventory...</div>
           {/if}
         {/if}
+        </div>
       </div>
     </div>
   {:else if currentPage === "profile"}
