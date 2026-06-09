@@ -163,17 +163,18 @@ func Load() *Config {
 
 // Validate fails fast (in production) when critical secrets are not explicitly
 // set, so a service never silently falls back to a built-in default credential.
-// INTERNAL_API_KEY is required everywhere because it gates the service-to-service
-// endpoints (plan activation, billing info, notifications); an empty value would
-// otherwise silently weaken those guards. Services with extra mandatory secrets
-// (e.g. invoice-service needs the Pakasir keys) pass them via extraRequired.
+// POSTGRES_PASSWORD is required for every service (they all connect to the DB).
+// Service-specific secrets are passed via extraRequired by the services that use
+// them — e.g. auth/invoice require INTERNAL_API_KEY, invoice also the Pakasir
+// keys. (INTERNAL_API_KEY must NOT be globally required: most services neither
+// set nor use it, and requiring it would fatal them on boot.)
 // Dev keeps the convenient defaults. Call once after Load() in each service main.
 func (c *Config) Validate(extraRequired ...string) {
 	if c.App.Env != "production" {
 		return
 	}
 	var missing []string
-	required := append([]string{"POSTGRES_PASSWORD", "INTERNAL_API_KEY"}, extraRequired...)
+	required := append([]string{"POSTGRES_PASSWORD"}, extraRequired...)
 	for _, key := range required {
 		if os.Getenv(key) == "" {
 			missing = append(missing, key)

@@ -31,7 +31,7 @@ func main() {
 		cfg.Server.Port, _ = strconv.Atoi(p)
 	}
 
-	cfg.Validate("PAKASIR_API_KEY", "PAKASIR_PROJECT_SLUG")
+	cfg.Validate("INTERNAL_API_KEY", "PAKASIR_API_KEY", "PAKASIR_PROJECT_SLUG")
 	logger := sharedLogger.New(cfg.App.Env)
 	sharedResponse.SetLogger(logger)
 	logger.Infof("starting invoice service on :%d", cfg.Server.Port)

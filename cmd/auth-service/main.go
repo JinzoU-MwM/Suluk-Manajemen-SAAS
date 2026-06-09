@@ -34,7 +34,7 @@ func main() {
 		fmt.Sscan(p, &cfg.Server.Port)
 	}
 
-	cfg.Validate()
+	cfg.Validate("INTERNAL_API_KEY")
 	logger := sharedLogger.New(cfg.App.Env)
 	sharedResponse.SetLogger(logger)
 	logger.Infof("starting auth service on :%d", cfg.Server.Port)
