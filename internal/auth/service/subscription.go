@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jamaah-in/v2/internal/auth/model"
 	"github.com/jamaah-in/v2/internal/shared/plan"
+	"github.com/jamaah-in/v2/internal/shared/sign"
 )
 
 // ErrPlanLimit is returned when an action would exceed the org's plan quota.
@@ -118,6 +119,12 @@ func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.Act
 	if appURL == "" {
 		appURL = "https://suluk.site"
 	}
+	// Signed public link to the subscription-invoice PDF (served by invoice-service);
+	// the HMAC uses the shared INTERNAL_API_KEY so invoice-service can verify it.
+	pdfURL := ""
+	if key := strings.TrimSpace(os.Getenv("INTERNAL_API_KEY")); key != "" && req.OrderID != "" {
+		pdfURL = appURL + "/api/payment/invoice/" + req.OrderID + "?sig=" + sign.Token(req.OrderID, key)
+	}
 	subject, html := buildInvoiceEmail(invoiceData{
 		OrgName:       orgName,
 		CustomerName:  user.Name,
@@ -130,9 +137,22 @@ func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.Act
 		StartsAt:      time.Now(),
 		ExpiresAt:     expiresAt,
 		AppURL:        appURL,
+		PDFURL:        pdfURL,
 		Features:      tier.Features,
 	})
 	return s.email.Send(ctx, user.Email, subject, html)
+}
+
+// GetBillingInfo returns the org + buyer display fields used on the subscription
+// invoice (PDF), looked up by the invoice-service when rendering the receipt.
+func (s *AuthService) GetBillingInfo(ctx context.Context, orgID, userID uuid.UUID) (orgName, userName, userEmail string, err error) {
+	if user, e := s.repo.GetUserByID(ctx, userID); e == nil && user != nil {
+		userName, userEmail = user.Name, user.Email
+	}
+	if org, e := s.repo.GetOrganizationByID(ctx, orgID); e == nil && org != nil {
+		orgName = org.Name
+	}
+	return orgName, userName, userEmail, nil
 }
 
 // CreateNotification persists an in-app notification (id auto-filled).

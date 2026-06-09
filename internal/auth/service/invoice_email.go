@@ -18,6 +18,7 @@ type invoiceData struct {
 	StartsAt      time.Time
 	ExpiresAt     time.Time
 	AppURL        string   // dashboard / public app base, e.g. https://suluk.site
+	PDFURL        string   // signed subscription-invoice PDF download link
 	Features      []string // tier feature list ("Yang termasuk dalam Paket …")
 }
 
@@ -145,6 +146,10 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
 	markURL := appURL + "/brand/suluk-mark-white.png?v=1"
 	checkURL := appURL + "/brand/check-green.png?v=1"
 	waURL := "https://wa.me/" + supportWANumber
+	pdfURL := strings.TrimSpace(d.PDFURL)
+	if pdfURL == "" {
+		pdfURL = appURL
+	}
 	included := includedSection(d.PlanName, d.Features, checkURL)
 
 	html = `<!DOCTYPE html>
@@ -248,7 +253,7 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
             </td>
           </tr></table>
           <div style="margin-top:14px;">
-            <a href="` + appURL + `" style="font-size:13.5px;font-weight:600;color:#1B7F5A;">Unduh Invoice (PDF)</a>
+            <a href="` + pdfURL + `" style="font-size:13.5px;font-weight:600;color:#1B7F5A;">Unduh Invoice (PDF)</a>
           </div>
         </td></tr>
 ` + included + `

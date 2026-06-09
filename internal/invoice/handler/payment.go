@@ -42,6 +42,19 @@ func (h *InvoiceHandler) PakasirWebhook(c *fiber.Ctx) error {
 	return response.OK(c, fiber.Map{"received": true})
 }
 
+// SubscriptionInvoicePDF streams the signed subscription-invoice PDF. Public
+// (linked from the confirmation email) — protected by the HMAC sig query param,
+// not a JWT.
+func (h *InvoiceHandler) SubscriptionInvoicePDF(c *fiber.Ctx) error {
+	pdf, filename, err := h.svc.SubscriptionInvoicePDF(c.Context(), c.Params("orderID"), c.Query("sig"))
+	if err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	return c.Send(pdf)
+}
+
 func (h *InvoiceHandler) CheckPaymentStatus(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	orderID := c.Params("id")

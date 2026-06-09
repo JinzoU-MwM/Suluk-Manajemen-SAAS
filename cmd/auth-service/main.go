@@ -161,6 +161,8 @@ func main() {
 	app.Post("/api/v1/internal/subscription/activate", authHandler.ActivatePlanInternal)
 	// Service-to-service: other services push in-app notifications on key events.
 	app.Post("/api/v1/internal/notifications", authHandler.CreateNotificationInternal)
+	// Service-to-service: invoice-service fetches billing names for the invoice PDF.
+	app.Post("/api/v1/internal/billing-info", authHandler.BillingInfoInternal)
 
 	notifications := app.Group("/api/v1/notifications", sharedMW.AuthMiddleware(jwtManager))
 	notifications.Get("/", authHandler.ListNotifications)

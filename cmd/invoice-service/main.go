@@ -110,6 +110,9 @@ func main() {
 	// Public Pakasir webhook (server-to-server, no JWT). Registered before the
 	// authenticated payment group so it is not gated by AuthMiddleware.
 	app.Post("/api/v1/payment/webhook", invoiceHandler.PakasirWebhook)
+	// Public signed subscription-invoice PDF (linked from the confirmation email).
+	// Protected by an HMAC sig query param rather than a JWT.
+	app.Get("/api/v1/payment/invoice/:orderID", invoiceHandler.SubscriptionInvoicePDF)
 
 	payment := app.Group("/api/v1/payment", authMW)
 	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)

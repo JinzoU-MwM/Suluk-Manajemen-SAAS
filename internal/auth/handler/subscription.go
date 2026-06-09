@@ -126,3 +126,29 @@ func (h *AuthHandler) CreateNotificationInternal(c *fiber.Ctx) error {
 	}
 	return response.OK(c, fiber.Map{"created": true})
 }
+
+// BillingInfoInternal returns the org + buyer display fields for an invoice,
+// called by the invoice-service when rendering the subscription-invoice PDF.
+// Guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header.
+func (h *AuthHandler) BillingInfoInternal(c *fiber.Ctx) error {
+	want := os.Getenv("INTERNAL_API_KEY")
+	if want == "" || c.Get("X-Internal-Key") != want {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req struct {
+		OrgID  string `json:"org_id"`
+		UserID string `json:"user_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	orgID, _ := uuid.Parse(req.OrgID)
+	userID, _ := uuid.Parse(req.UserID)
+	orgName, userName, userEmail, err := h.svc.GetBillingInfo(c.Context(), orgID, userID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{
+		"org_name": orgName, "user_name": userName, "user_email": userEmail,
+	})
+}
