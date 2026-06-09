@@ -53,6 +53,9 @@ type Organization struct {
 	Address     *string   `json:"address,omitempty" db:"address"`
 	Phone       *string   `json:"phone,omitempty" db:"phone"`
 	Email       *string   `json:"email,omitempty" db:"email"`
+	NPWP        *string   `json:"npwp,omitempty" db:"npwp"`
+	PPIUNumber  *string   `json:"ppiu_number,omitempty" db:"ppiu_number"`
+	SKNumber    *string   `json:"sk_number,omitempty" db:"sk_number"`
 	BankName    *string   `json:"bank_name,omitempty" db:"bank_name"`
 	BankAccount *string   `json:"bank_account,omitempty" db:"bank_account"`
 	BankHolder  *string   `json:"bank_holder,omitempty" db:"bank_holder"`
@@ -217,6 +220,21 @@ type CreateOrgRequest struct {
 	Address     *string `json:"address,omitempty"`
 	Phone       *string `json:"phone,omitempty"`
 	Email       *string `json:"email,omitempty"`
+	BankName    *string `json:"bank_name,omitempty"`
+	BankAccount *string `json:"bank_account,omitempty"`
+	BankHolder  *string `json:"bank_holder,omitempty"`
+}
+
+// UpdateOrgRequest patches editable organization profile fields. Nil fields are
+// left unchanged (COALESCE).
+type UpdateOrgRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Address     *string `json:"address,omitempty"`
+	Phone       *string `json:"phone,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	NPWP        *string `json:"npwp,omitempty"`
+	PPIUNumber  *string `json:"ppiu_number,omitempty"`
+	SKNumber    *string `json:"sk_number,omitempty"`
 	BankName    *string `json:"bank_name,omitempty"`
 	BankAccount *string `json:"bank_account,omitempty"`
 	BankHolder  *string `json:"bank_holder,omitempty"`

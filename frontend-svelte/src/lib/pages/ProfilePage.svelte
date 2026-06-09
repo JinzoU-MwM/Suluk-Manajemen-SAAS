@@ -57,6 +57,44 @@
     let loading = $state(true);
     let groupCount = $state(0);
 
+    // Organization / company profile (Perusahaan tab)
+    let org = $state(null);
+    let editingOrg = $state(false);
+    let savingOrg = $state(false);
+    let orgMsg = $state({ type: "", text: "" });
+    let orgForm = $state({
+        name: "", ppiu_number: "", npwp: "", sk_number: "",
+        phone: "", email: "", address: "",
+    });
+
+    function startEditOrg() {
+        orgForm = {
+            name: org?.name || "",
+            ppiu_number: org?.ppiu_number || "",
+            npwp: org?.npwp || "",
+            sk_number: org?.sk_number || "",
+            phone: org?.phone || "",
+            email: org?.email || "",
+            address: org?.address || "",
+        };
+        orgMsg = { type: "", text: "" };
+        editingOrg = true;
+    }
+
+    async function saveOrg() {
+        savingOrg = true;
+        orgMsg = { type: "", text: "" };
+        try {
+            org = await ApiService.updateOrganization(orgForm);
+            editingOrg = false;
+            orgMsg = { type: "success", text: "Profil perusahaan diperbarui!" };
+        } catch (e) {
+            orgMsg = { type: "error", text: e.message };
+        } finally {
+            savingOrg = false;
+        }
+    }
+
     // Sync initial props to state (silences state_referenced_locally warning)
     $effect.pre(() => {
         subscription ??= initialSubscription;
@@ -133,6 +171,7 @@
             ]);
             profile = me;
             editName = me.name;
+            ApiService.getOrganization().then((o) => { org = o; }).catch(() => {});
             selectedColor = me.avatar_color || "blue";
             notifyUsageLimit =
                 me.notify_usage_limit !== undefined
@@ -887,13 +926,26 @@
                                     Informasi legal travel yang tampil pada invoice & kontrak.
                                 </div>
                             </div>
-                            <div class="section-icon"><Building size={19} /></div>
+                            {#if editingOrg}
+                                <div style="display:flex;gap:8px">
+                                    <Button variant="ghost" size="sm" onclick={() => (editingOrg = false)}>Batal</Button>
+                                    <Button variant="primary" size="sm" icon={Check} onclick={saveOrg} disabled={savingOrg}>
+                                        {savingOrg ? "Menyimpan…" : "Simpan"}
+                                    </Button>
+                                </div>
+                            {:else}
+                                <Button variant="soft" size="sm" icon={UserCheck} onclick={startEditOrg}>Edit</Button>
+                            {/if}
                         </div>
+
+                        {#if orgMsg.text}
+                            <div class="msg {orgMsg.type === 'success' ? 'msg-success' : 'msg-error'}">{orgMsg.text}</div>
+                        {/if}
 
                         <div class="company-head">
                             <div class="company-tile"><Building size={28} /></div>
                             <div>
-                                <div class="company-name">{user?.organization?.name || "—"}</div>
+                                <div class="company-name">{org?.name || "—"}</div>
                                 <div class="company-sub">
                                     <Badge status="Lunas">PPIU Berizin</Badge>
                                     Travel Umrah & Haji
@@ -904,40 +956,59 @@
                         <div class="fields-grid">
                             <div class="field">
                                 <span class="field-label">Nama Legal</span>
-                                <div class="field-view">{user?.organization?.name || "—"}</div>
+                                {#if editingOrg}
+                                    <input class="field-input" bind:value={orgForm.name} placeholder="Nama legal perusahaan" />
+                                {:else}
+                                    <div class="field-view">{org?.name || "—"}</div>
+                                {/if}
                             </div>
                             <div class="field">
                                 <span class="field-label">No. Izin PPIU</span>
-                                <div class="field-view">{user?.organization?.ppiu_no || "—"}</div>
+                                {#if editingOrg}
+                                    <input class="field-input" bind:value={orgForm.ppiu_number} placeholder="cth. U.123 Tahun 2024" />
+                                {:else}
+                                    <div class="field-view">{org?.ppiu_number || "—"}</div>
+                                {/if}
                             </div>
                             <div class="field">
                                 <span class="field-label">NPWP</span>
-                                <div class="field-view">{user?.organization?.npwp || "—"}</div>
+                                {#if editingOrg}
+                                    <input class="field-input" bind:value={orgForm.npwp} placeholder="cth. 01.234.567.8-901.000" />
+                                {:else}
+                                    <div class="field-view">{org?.npwp || "—"}</div>
+                                {/if}
                             </div>
                             <div class="field">
                                 <span class="field-label">No. SK Kemenag</span>
-                                <div class="field-view">{user?.organization?.sk_no || "—"}</div>
+                                {#if editingOrg}
+                                    <input class="field-input" bind:value={orgForm.sk_number} placeholder="cth. KMA 1234/2024" />
+                                {:else}
+                                    <div class="field-view">{org?.sk_number || "—"}</div>
+                                {/if}
                             </div>
                             <div class="field">
                                 <span class="field-label">Telepon Kantor</span>
-                                <div class="field-view">
-                                    <Phone size={16} class="field-ic" />
-                                    {user?.organization?.phone || "—"}
-                                </div>
+                                {#if editingOrg}
+                                    <input class="field-input" bind:value={orgForm.phone} placeholder="cth. 022-2358-9000" />
+                                {:else}
+                                    <div class="field-view"><Phone size={16} class="field-ic" />{org?.phone || "—"}</div>
+                                {/if}
                             </div>
                             <div class="field">
                                 <span class="field-label">Email Resmi</span>
-                                <div class="field-view">
-                                    <Mail size={16} class="field-ic" />
-                                    {user?.organization?.email || "—"}
-                                </div>
+                                {#if editingOrg}
+                                    <input class="field-input" type="email" bind:value={orgForm.email} placeholder="cth. cs@travel.id" />
+                                {:else}
+                                    <div class="field-view"><Mail size={16} class="field-ic" />{org?.email || "—"}</div>
+                                {/if}
                             </div>
                             <div class="field field-full">
                                 <span class="field-label">Alamat Kantor</span>
-                                <div class="field-view">
-                                    <MapPin size={16} class="field-ic" />
-                                    {user?.organization?.address || "—"}
-                                </div>
+                                {#if editingOrg}
+                                    <input class="field-input" bind:value={orgForm.address} placeholder="Alamat lengkap kantor" />
+                                {:else}
+                                    <div class="field-view"><MapPin size={16} class="field-ic" />{org?.address || "—"}</div>
+                                {/if}
                             </div>
                         </div>
                     </Card>

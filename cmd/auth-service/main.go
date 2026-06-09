@@ -131,6 +131,7 @@ func main() {
 	orgs := app.Group("/api/v1/orgs", sharedMW.AuthMiddleware(jwtManager))
 	orgs.Post("/", authHandler.CreateOrganization)
 	orgs.Get("/", authHandler.GetOrganization)
+	orgs.Put("/", adminRole, authHandler.UpdateOrganization)
 	orgs.Get("/members", authHandler.ListTeamMembers)
 	orgs.Get("/users", authHandler.ListUsersByOrg)
 	orgs.Post("/members", adminRole, authHandler.AddTeamMember)

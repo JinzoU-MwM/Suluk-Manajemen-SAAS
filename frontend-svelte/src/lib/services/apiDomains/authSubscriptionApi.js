@@ -82,6 +82,24 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
             return unwrapData(await response.json());
         },
 
+        async getOrganization() {
+            const response = await apiFetch(`${API_URL}/orgs/`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async updateOrganization(updates) {
+            const response = await apiFetch(`${API_URL}/orgs/`, {
+                method: 'PUT',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(updates),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
         async changePassword(currentPassword, newPassword) {
             const response = await apiFetch(`${API_URL}/auth/change-password`, {
                 method: 'POST',

@@ -111,9 +111,10 @@ func (r *AuthRepo) CreateOrganization(ctx context.Context, org *model.Organizati
 
 func (r *AuthRepo) GetOrganizationByID(ctx context.Context, id uuid.UUID) (*model.Organization, error) {
 	o := &model.Organization{}
-	query := `SELECT id, name, slug, logo_url, address, phone, email, bank_name, bank_account, bank_holder, created_by, created_at, updated_at FROM organizations WHERE id = $1`
+	query := `SELECT id, name, slug, logo_url, address, phone, email, npwp, ppiu_number, sk_number, bank_name, bank_account, bank_holder, created_by, created_at, updated_at FROM organizations WHERE id = $1`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&o.ID, &o.Name, &o.Slug, &o.LogoURL, &o.Address, &o.Phone, &o.Email,
+		&o.NPWP, &o.PPIUNumber, &o.SKNumber,
 		&o.BankName, &o.BankAccount, &o.BankHolder, &o.CreatedBy,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
@@ -124,6 +125,26 @@ func (r *AuthRepo) GetOrganizationByID(ctx context.Context, id uuid.UUID) (*mode
 		return nil, fmt.Errorf("get org: %w", err)
 	}
 	return o, nil
+}
+
+// UpdateOrganization patches editable org fields; nil request fields are kept.
+func (r *AuthRepo) UpdateOrganization(ctx context.Context, orgID uuid.UUID, req model.UpdateOrgRequest) error {
+	query := `UPDATE organizations SET
+		name = COALESCE($2, name),
+		address = COALESCE($3, address),
+		phone = COALESCE($4, phone),
+		email = COALESCE($5, email),
+		npwp = COALESCE($6, npwp),
+		ppiu_number = COALESCE($7, ppiu_number),
+		sk_number = COALESCE($8, sk_number),
+		bank_name = COALESCE($9, bank_name),
+		bank_account = COALESCE($10, bank_account),
+		bank_holder = COALESCE($11, bank_holder),
+		updated_at = NOW()
+		WHERE id = $1`
+	_, err := r.pool.Exec(ctx, query, orgID, req.Name, req.Address, req.Phone, req.Email,
+		req.NPWP, req.PPIUNumber, req.SKNumber, req.BankName, req.BankAccount, req.BankHolder)
+	return err
 }
 
 func (r *AuthRepo) AddTeamMember(ctx context.Context, member *model.TeamMember) error {

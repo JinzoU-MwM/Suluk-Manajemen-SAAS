@@ -228,6 +228,14 @@ func (s *AuthService) GetOrganization(ctx context.Context, orgID uuid.UUID) (*mo
 	return s.repo.GetOrganizationByID(ctx, orgID)
 }
 
+// UpdateOrganization patches the org profile and returns the fresh record.
+func (s *AuthService) UpdateOrganization(ctx context.Context, orgID uuid.UUID, req model.UpdateOrgRequest) (*model.Organization, error) {
+	if err := s.repo.UpdateOrganization(ctx, orgID, req); err != nil {
+		return nil, err
+	}
+	return s.repo.GetOrganizationByID(ctx, orgID)
+}
+
 func (s *AuthService) CreateOrganization(ctx context.Context, userID uuid.UUID, req model.CreateOrgRequest) (*model.Organization, error) {
 	slug := repository.GenerateSlug(req.Name)
 	slug, err := s.repo.GenerateUniqueSlug(ctx, slug)

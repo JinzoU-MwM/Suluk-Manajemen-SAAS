@@ -149,6 +149,19 @@ func (h *AuthHandler) GetOrganization(c *fiber.Ctx) error {
 	return response.OK(c, org)
 }
 
+func (h *AuthHandler) UpdateOrganization(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	var req model.UpdateOrgRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	org, err := h.svc.UpdateOrganization(c.Context(), claims.OrgID, req)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, org)
+}
+
 func (h *AuthHandler) AddTeamMember(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 
