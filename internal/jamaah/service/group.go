@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jamaah-in/v2/internal/jamaah/model"
+	"github.com/jamaah-in/v2/internal/jamaah/repository"
 )
 
 func (s *JamaahService) CreateGroup(ctx context.Context, orgID uuid.UUID, authToken string, req model.CreateGroupRequest) (*model.Group, error) {
@@ -13,16 +15,18 @@ func (s *JamaahService) CreateGroup(ctx context.Context, orgID uuid.UUID, authTo
 		return nil, fmt.Errorf("name is required")
 	}
 	lim := s.fetchLimits(ctx, authToken)
-	if count, err := s.repo.CountGroups(ctx, orgID); err == nil && atCap(count, lim.MaxGroups) {
-		return nil, fmt.Errorf("%w: batas grup pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah grup", ErrPlanLimit, lim.MaxGroups)
-	}
 	g := &model.Group{
 		ID:          uuid.New(),
 		OrgID:       orgID,
 		Name:        req.Name,
 		Description: req.Description,
 	}
-	if err := s.repo.CreateGroup(ctx, g); err != nil {
+	// Atomic, race-safe cap enforcement (per-org advisory lock + count + insert
+	// in one transaction).
+	if err := s.repo.CreateGroupTx(ctx, g, lim.MaxGroups); err != nil {
+		if errors.Is(err, repository.ErrLimitReached) {
+			return nil, fmt.Errorf("%w: batas grup pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah grup", ErrPlanLimit, lim.MaxGroups)
+		}
 		return nil, err
 	}
 	return g, nil

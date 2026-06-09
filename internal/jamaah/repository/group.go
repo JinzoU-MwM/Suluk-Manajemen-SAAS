@@ -10,10 +10,16 @@ import (
 )
 
 func (r *JamaahRepo) CreateGroup(ctx context.Context, g *model.Group) error {
+	return insertGroup(ctx, r.pool, g)
+}
+
+// insertGroup runs the group INSERT on any querier (the pool or a tx), shared by
+// the plain create and the transactional, limit-enforced CreateGroupTx.
+func insertGroup(ctx context.Context, q querier, g *model.Group) error {
 	query := `INSERT INTO groups (id, org_id, name, description, member_count, is_active)
 		VALUES ($1, $2, $3, $4, 0, TRUE)
 		RETURNING created_at, updated_at`
-	return r.pool.QueryRow(ctx, query, g.ID, g.OrgID, g.Name, g.Description).Scan(&g.CreatedAt, &g.UpdatedAt)
+	return q.QueryRow(ctx, query, g.ID, g.OrgID, g.Name, g.Description).Scan(&g.CreatedAt, &g.UpdatedAt)
 }
 
 // ListGroupMembersWithGender returns a group's members joined with their jamaah

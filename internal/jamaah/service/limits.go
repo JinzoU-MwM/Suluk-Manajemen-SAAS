@@ -37,11 +37,6 @@ func (s *JamaahService) fetchLimits(ctx context.Context, authToken string) planL
 	return out
 }
 
-// atCap reports whether a count has reached a plan limit (-1 means unlimited).
-func atCap(count, max int) bool {
-	return max != plan.Unlimited && count >= max
-}
-
 // reserveSeat asks package-service to reserve one seat (capacity-checked). It
 // returns a user-facing error when the package is full/unavailable so the
 // registration is aborted. If package-service isn't configured it no-ops (dev).

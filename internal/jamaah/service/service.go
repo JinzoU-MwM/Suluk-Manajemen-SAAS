@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -44,9 +45,6 @@ func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, auth
 	}
 
 	lim := s.fetchLimits(ctx, authToken)
-	if count, err := s.repo.CountProfiles(ctx, orgID); err == nil && atCap(count, lim.MaxJamaah) {
-		return nil, fmt.Errorf("%w: batas jamaah pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah jamaah lagi", ErrPlanLimit, lim.MaxJamaah)
-	}
 
 	p := &model.JamaahProfile{
 		ID:    uuid.New(),
@@ -160,7 +158,13 @@ func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, auth
 		p.BajuSize = req.BajuSize
 	}
 
-	if err := s.repo.CreateProfile(ctx, p); err != nil {
+	// Atomic, race-safe cap enforcement: the repo counts + inserts under a
+	// per-org advisory lock in one transaction (replaces the old count-then-
+	// insert which could overshoot under concurrent creates).
+	if err := s.repo.CreateProfileTx(ctx, p, lim.MaxJamaah); err != nil {
+		if errors.Is(err, repository.ErrLimitReached) {
+			return nil, fmt.Errorf("%w: batas jamaah pada paket Anda (%d) telah tercapai. Upgrade paket untuk menambah jamaah lagi", ErrPlanLimit, lim.MaxJamaah)
+		}
 		return nil, err
 	}
 	return p, nil

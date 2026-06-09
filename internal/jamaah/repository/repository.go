@@ -54,9 +54,16 @@ func (r *JamaahRepo) scanProfile(row rowScanner) (*model.JamaahProfile, error) {
 }
 
 func (r *JamaahRepo) CreateProfile(ctx context.Context, p *model.JamaahProfile) error {
+	return insertProfile(ctx, r.pool, p)
+}
+
+// insertProfile runs the profile INSERT on any querier (the pool or a tx), so
+// the same statement backs both the plain create and the transactional,
+// limit-enforced CreateProfileTx.
+func insertProfile(ctx context.Context, q querier, p *model.JamaahProfile) error {
 	query := fmt.Sprintf(`INSERT INTO jamaah_profiles (%s) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44)
 		RETURNING created_at, updated_at`, insertCols)
-	err := r.pool.QueryRow(ctx, query,
+	err := q.QueryRow(ctx, query,
 		p.ID, p.OrgID, p.Title, p.Nama, p.NamaAyah, p.JenisIdentitas, p.NoIdentitas, p.NamaPaspor,
 		p.NoPaspor, p.TanggalPaspor, p.KotaPaspor, p.TempatLahir, p.TanggalLahir, p.Gender, p.Alamat,
 		p.Provinsi, p.Kabupaten, p.Kecamatan, p.Kelurahan, p.NoTelepon, p.NoHP, p.Kewarganegaraan,
