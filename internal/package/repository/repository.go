@@ -209,6 +209,35 @@ func (r *PackageRepo) UpdatePackageStatus(ctx context.Context, id, orgID uuid.UU
 	return nil
 }
 
+// ReserveSeat atomically increments reserved_seats by one only if a seat is
+// available (reserved_seats < total_seats), so concurrent registrations cannot
+// overbook a package. Returns ErrPackageFull when no seat is free.
+func (r *PackageRepo) ReserveSeat(ctx context.Context, id, orgID uuid.UUID) error {
+	result, err := r.pool.Exec(ctx,
+		`UPDATE packages SET reserved_seats = reserved_seats + 1, updated_at = NOW()
+		 WHERE id = $1 AND org_id = $2 AND reserved_seats < total_seats`, id, orgID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		var exists bool
+		_ = r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM packages WHERE id = $1 AND org_id = $2)`, id, orgID).Scan(&exists)
+		if !exists {
+			return ErrPackageNotFound
+		}
+		return ErrPackageFull
+	}
+	return nil
+}
+
+// ReleaseSeat decrements reserved_seats by one (never below zero).
+func (r *PackageRepo) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE packages SET reserved_seats = GREATEST(reserved_seats - 1, 0), updated_at = NOW()
+		 WHERE id = $1 AND org_id = $2`, id, orgID)
+	return err
+}
+
 func (r *PackageRepo) UpdateReservedSeats(ctx context.Context, id, orgID uuid.UUID, delta int) error {
 	query := `UPDATE packages SET reserved_seats = reserved_seats + $2, updated_at = NOW() WHERE id = $1 AND org_id = $3`
 	result, err := r.pool.Exec(ctx, query, id, delta, orgID)
@@ -419,6 +448,7 @@ func GenerateSlug(name string) string {
 
 var (
 	ErrPackageNotFound = fmt.Errorf("package not found")
+	ErrPackageFull     = fmt.Errorf("package is full")
 	ErrSlugExists      = fmt.Errorf("package slug already exists")
 	ErrTierNotFound    = fmt.Errorf("pricing tier not found")
 	ErrCostNotFound    = fmt.Errorf("cost component not found")

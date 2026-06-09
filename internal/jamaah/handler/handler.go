@@ -146,8 +146,11 @@ func (h *JamaahHandler) RegisterToPackage(c *fiber.Ctx) error {
 		return response.BadRequest(c, "room_type is required")
 	}
 
-	reg, err := h.svc.RegisterToPackage(c.Context(), claims.OrgID, claims.UserID, jamaahID, req)
+	reg, err := h.svc.RegisterToPackage(c.Context(), claims.OrgID, claims.UserID, jamaahID, c.Get("Authorization"), req)
 	if err != nil {
+		if errors.Is(err, service.ErrPlanLimit) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, reg)
@@ -205,7 +208,7 @@ func (h *JamaahHandler) RemoveFromPackage(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid package id")
 	}
 
-	if err := h.svc.RemoveFromPackage(c.Context(), claims.OrgID, jamaahID, packageID); err != nil {
+	if err := h.svc.RemoveFromPackage(c.Context(), claims.OrgID, jamaahID, packageID, c.Get("Authorization")); err != nil {
 		return response.NotFound(c, "registration not found")
 	}
 	return response.OK(c, fiber.Map{"message": "removed from package"})

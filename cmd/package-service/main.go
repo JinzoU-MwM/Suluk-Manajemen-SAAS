@@ -84,6 +84,8 @@ func main() {
 	pkgs.Patch("/:id/status", pkgHandler.UpdatePackageStatus)
 	pkgs.Get("/:id/quota", pkgHandler.GetPackageQuota)
 	pkgs.Get("/:id/profit", pkgHandler.GetProfitProjection)
+	pkgs.Post("/:id/reserve", pkgHandler.ReserveSeat)
+	pkgs.Post("/:id/release", pkgHandler.ReleaseSeat)
 
 	pkgs.Post("/:id/tiers", pkgHandler.CreatePricingTier)
 	pkgs.Put("/:id/tiers/:tid", pkgHandler.UpdatePricingTier)

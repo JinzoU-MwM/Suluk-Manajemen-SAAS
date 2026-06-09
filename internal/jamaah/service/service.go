@@ -16,14 +16,16 @@ type JamaahService struct {
 	repo        *repository.JamaahRepo
 	invoiceAddr string
 	authAddr    string
+	packageAddr string
 	httpc       *httpclient.Client
 }
 
-func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr, authAddr string) *JamaahService {
+func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr, authAddr, packageAddr string) *JamaahService {
 	return &JamaahService{
 		repo:        repo,
 		invoiceAddr: invoiceAddr,
 		authAddr:    authAddr,
+		packageAddr: packageAddr,
 		httpc:       httpclient.New(),
 	}
 }
@@ -314,10 +316,16 @@ func (s *JamaahService) FindByPaspor(ctx context.Context, orgID uuid.UUID, paspo
 	return s.repo.FindByPaspor(ctx, orgID, paspor)
 }
 
-func (s *JamaahService) RegisterToPackage(ctx context.Context, orgID, userID uuid.UUID, jamaahID uuid.UUID, req model.RegisterToPackageRequest) (*model.JamaahPackageRegistration, error) {
+func (s *JamaahService) RegisterToPackage(ctx context.Context, orgID, userID uuid.UUID, jamaahID uuid.UUID, authToken string, req model.RegisterToPackageRequest) (*model.JamaahPackageRegistration, error) {
 	existing, _ := s.repo.GetRegistration(ctx, orgID, jamaahID, req.PackageID)
 	if existing != nil {
 		return nil, fmt.Errorf("jamaah is already registered to this package")
+	}
+
+	// Reserve a seat first (capacity-checked in package-service) so a full
+	// package cannot be overbooked. Aborts the registration when full.
+	if err := s.reserveSeat(ctx, req.PackageID, authToken); err != nil {
+		return nil, err
 	}
 
 	reg := &model.JamaahPackageRegistration{
@@ -336,6 +344,8 @@ func (s *JamaahService) RegisterToPackage(ctx context.Context, orgID, userID uui
 	}
 
 	if err := s.repo.CreateRegistration(ctx, reg); err != nil {
+		// Compensate: give the reserved seat back if the registration failed.
+		s.releaseSeat(ctx, req.PackageID, authToken)
 		return nil, err
 	}
 	return reg, nil
@@ -382,8 +392,13 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, jamaahI
 	return s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 }
 
-func (s *JamaahService) RemoveFromPackage(ctx context.Context, orgID, jamaahID, packageID uuid.UUID) error {
-	return s.repo.RemoveFromPackage(ctx, orgID, jamaahID, packageID)
+func (s *JamaahService) RemoveFromPackage(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, authToken string) error {
+	if err := s.repo.RemoveFromPackage(ctx, orgID, jamaahID, packageID); err != nil {
+		return err
+	}
+	// Free the seat (best-effort; never block the unregister on this).
+	s.releaseSeat(ctx, packageID, authToken)
+	return nil
 }
 
 func (s *JamaahService) ListByPackage(ctx context.Context, orgID, packageID uuid.UUID, status string, page, limit int) ([]model.JamaahProfile, int, error) {

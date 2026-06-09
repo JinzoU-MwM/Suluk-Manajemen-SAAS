@@ -33,6 +33,14 @@ export function createContentApi({ cacheGet, cacheSet }) {
             return result;
         },
 
+        async getPnL(packageId) {
+            const response = await apiFetch(`${API_URL}/finance/pnl/${packageId}`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
         async getItinerary(groupId) {
             const response = await apiFetch(`${API_URL}/itineraries/${groupId}`, {
                 headers: authHeaders(),

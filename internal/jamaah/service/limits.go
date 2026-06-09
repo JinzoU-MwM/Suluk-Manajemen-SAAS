@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jamaah-in/v2/internal/shared/plan"
 )
 
@@ -38,4 +40,29 @@ func (s *JamaahService) fetchLimits(ctx context.Context, authToken string) planL
 // atCap reports whether a count has reached a plan limit (-1 means unlimited).
 func atCap(count, max int) bool {
 	return max != plan.Unlimited && count >= max
+}
+
+// reserveSeat asks package-service to reserve one seat (capacity-checked). It
+// returns a user-facing error when the package is full/unavailable so the
+// registration is aborted. If package-service isn't configured it no-ops (dev).
+func (s *JamaahService) reserveSeat(ctx context.Context, packageID uuid.UUID, authToken string) error {
+	if s.packageAddr == "" || authToken == "" {
+		return nil
+	}
+	path := "/api/v1/packages/" + packageID.String() + "/reserve"
+	headers := map[string]string{"Authorization": authToken}
+	if err := s.httpc.PostJSON(ctx, s.packageAddr, path, headers, struct{}{}, nil); err != nil {
+		return fmt.Errorf("%w: kuota paket sudah penuh atau paket tidak tersedia", ErrPlanLimit)
+	}
+	return nil
+}
+
+// releaseSeat frees one reserved seat (best-effort; errors are ignored).
+func (s *JamaahService) releaseSeat(ctx context.Context, packageID uuid.UUID, authToken string) {
+	if s.packageAddr == "" || authToken == "" {
+		return
+	}
+	path := "/api/v1/packages/" + packageID.String() + "/release"
+	headers := map[string]string{"Authorization": authToken}
+	_ = s.httpc.PostJSON(ctx, s.packageAddr, path, headers, struct{}{}, nil)
 }

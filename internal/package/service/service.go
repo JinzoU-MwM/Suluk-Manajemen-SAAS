@@ -17,6 +17,16 @@ func NewPackageService(repo *repository.PackageRepo) *PackageService {
 	return &PackageService{repo: repo}
 }
 
+// ReserveSeat reserves one seat on a package (capacity-checked, atomic).
+func (s *PackageService) ReserveSeat(ctx context.Context, id, orgID uuid.UUID) error {
+	return s.repo.ReserveSeat(ctx, id, orgID)
+}
+
+// ReleaseSeat frees one previously-reserved seat.
+func (s *PackageService) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID) error {
+	return s.repo.ReleaseSeat(ctx, id, orgID)
+}
+
 func (s *PackageService) CreatePackage(ctx context.Context, orgID uuid.UUID, req model.CreatePackageRequest) (*model.Package, error) {
 	slug := repository.GenerateSlug(req.Name)
 	taken, err := s.repo.IsSlugTaken(ctx, slug, nil)

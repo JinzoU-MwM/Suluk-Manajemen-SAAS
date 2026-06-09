@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/package/model"
+	"github.com/jamaah-in/v2/internal/package/repository"
 	"github.com/jamaah-in/v2/internal/package/service"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
@@ -18,6 +20,38 @@ type PackageHandler struct {
 
 func NewPackageHandler(svc *service.PackageService) *PackageHandler {
 	return &PackageHandler{svc: svc}
+}
+
+// ReserveSeat reserves one seat (called by jamaah-service on registration).
+func (h *PackageHandler) ReserveSeat(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.BadRequest(c, "invalid package id")
+	}
+	if err := h.svc.ReserveSeat(c.Context(), id, claims.OrgID); err != nil {
+		if errors.Is(err, repository.ErrPackageFull) {
+			return response.Conflict(c, "kuota paket sudah penuh")
+		}
+		if errors.Is(err, repository.ErrPackageNotFound) {
+			return response.NotFound(c, "paket tidak ditemukan")
+		}
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"reserved": true})
+}
+
+// ReleaseSeat frees one previously-reserved seat (called on unregister/rollback).
+func (h *PackageHandler) ReleaseSeat(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.BadRequest(c, "invalid package id")
+	}
+	if err := h.svc.ReleaseSeat(c.Context(), id, claims.OrgID); err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"released": true})
 }
 
 func (h *PackageHandler) CreatePackage(c *fiber.Ctx) error {
