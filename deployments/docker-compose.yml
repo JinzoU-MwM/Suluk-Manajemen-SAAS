@@ -121,7 +121,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       REDIS_ADDR: redis:6379
       JAMAAH_SERVICE_ADDR: jamaah-service:50053
       INVOICE_SERVICE_ADDR: invoice-service:50054
@@ -163,7 +163,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
@@ -191,7 +191,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       INVOICE_SERVICE_ADDR: invoice-service:50054
       AUTH_SERVICE_ADDR: auth-service:50051
       PACKAGE_SERVICE_ADDR: package-service:50052
@@ -229,7 +229,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       AUTH_SERVICE_ADDR: auth-service:50051
       # Public base URL of the app (used to build the Pakasir redirect-back link).
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
@@ -267,7 +267,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       INVOICE_SERVICE_ADDR: invoice-service:50054
@@ -297,7 +297,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set in deployments/.env}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set in deployments/.env}
@@ -332,7 +332,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
@@ -360,7 +360,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
@@ -388,7 +388,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
     volumes:
@@ -414,7 +414,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
     volumes:
@@ -440,7 +440,7 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
-      POSTGRES_SSLMODE: disable
+      POSTGRES_SSLMODE: require
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
     volumes:
