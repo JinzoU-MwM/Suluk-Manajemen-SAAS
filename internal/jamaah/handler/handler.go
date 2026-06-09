@@ -192,6 +192,41 @@ func (h *JamaahHandler) UpdatePipelineStatus(c *fiber.Ctx) error {
 
 	reg, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, jamaahID, packageID, req.PipelineStatus)
 	if err != nil {
+		if errors.Is(err, service.ErrGate) {
+			return response.BadRequest(c, err.Error())
+		}
+		return response.Internal(c, err)
+	}
+	return response.OK(c, reg)
+}
+
+// SetMahram links/unlinks the mahram of a jamaah's package registration.
+func (h *JamaahHandler) SetMahram(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	jamaahID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.BadRequest(c, "invalid jamaah id")
+	}
+	packageID, err := uuid.Parse(c.Params("pkgId"))
+	if err != nil {
+		return response.BadRequest(c, "invalid package id")
+	}
+	var req struct {
+		MahramID string `json:"mahram_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	var mahramID *uuid.UUID
+	if req.MahramID != "" {
+		mid, err := uuid.Parse(req.MahramID)
+		if err != nil {
+			return response.BadRequest(c, "invalid mahram_id")
+		}
+		mahramID = &mid
+	}
+	reg, err := h.svc.SetMahram(c.Context(), claims.OrgID, jamaahID, packageID, mahramID)
+	if err != nil {
 		return response.Internal(c, err)
 	}
 	return response.OK(c, reg)

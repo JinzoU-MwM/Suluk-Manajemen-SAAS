@@ -82,9 +82,12 @@ func main() {
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
+	// Money writes are restricted to owner/admin/finance; reads stay open to any
+	// authenticated role (cs needs to view invoices/balances).
+	finRole := sharedMW.RequireRole("owner", "admin", "finance")
 
 	invoices := app.Group("/api/v1/invoices", authMW)
-	invoices.Post("/", invoiceHandler.CreateInvoice)
+	invoices.Post("/", finRole, invoiceHandler.CreateInvoice)
 	invoices.Get("/", invoiceHandler.ListInvoices)
 	invoices.Get("/summary", invoiceHandler.GetSummary)
 	invoices.Get("/revenue/monthly", invoiceHandler.GetMonthlyRevenue)
@@ -94,13 +97,13 @@ func main() {
 	invoices.Get("/number/:number", invoiceHandler.GetInvoiceByNumber)
 	invoices.Get("/jamaah/:jamaahId", invoiceHandler.GetInvoicesByJamaah)
 	invoices.Get("/:id", invoiceHandler.GetInvoice)
-	invoices.Put("/:id", invoiceHandler.UpdateInvoice)
-	invoices.Patch("/:id/cancel", invoiceHandler.CancelInvoice)
+	invoices.Put("/:id", finRole, invoiceHandler.UpdateInvoice)
+	invoices.Patch("/:id/cancel", finRole, invoiceHandler.CancelInvoice)
 
-	invoices.Post("/:id/schedules", invoiceHandler.CreatePaymentSchedules)
+	invoices.Post("/:id/schedules", finRole, invoiceHandler.CreatePaymentSchedules)
 	invoices.Get("/:id/schedules", invoiceHandler.GetPaymentSchedules)
 
-	invoices.Post("/:id/payments", invoiceHandler.RecordPayment)
+	invoices.Post("/:id/payments", finRole, invoiceHandler.RecordPayment)
 	invoices.Get("/:id/payments", invoiceHandler.GetPayments)
 	invoices.Get("/:id/pdf", invoiceHandler.ExportInvoicePDF)
 
@@ -114,17 +117,17 @@ func main() {
 
 	refunds := app.Group("/api/v1/refunds", authMW)
 	refunds.Get("/policies", refundHandler.ListPolicies)
-	refunds.Post("/policies", refundHandler.CreatePolicy)
-	refunds.Put("/policies/:id", refundHandler.UpdatePolicy)
-	refunds.Delete("/policies/:id", refundHandler.DeletePolicy)
+	refunds.Post("/policies", finRole, refundHandler.CreatePolicy)
+	refunds.Put("/policies/:id", finRole, refundHandler.UpdatePolicy)
+	refunds.Delete("/policies/:id", finRole, refundHandler.DeletePolicy)
 	refunds.Get("/", refundHandler.ListRefunds)
 	refunds.Get("/by-invoice/:id", refundHandler.GetRefundsByInvoice)
 	refunds.Get("/:id", refundHandler.GetRefund)
-	refunds.Put("/:id/approve", refundHandler.ApproveRefund)
-	refunds.Put("/:id/process", refundHandler.ProcessRefund)
-	refunds.Put("/:id/complete", refundHandler.CompleteRefund)
-	refunds.Put("/:id/reject", refundHandler.RejectRefund)
-	invoices.Post("/:id/refund", refundHandler.InitiateRefund)
+	refunds.Put("/:id/approve", finRole, refundHandler.ApproveRefund)
+	refunds.Put("/:id/process", finRole, refundHandler.ProcessRefund)
+	refunds.Put("/:id/complete", finRole, refundHandler.CompleteRefund)
+	refunds.Put("/:id/reject", finRole, refundHandler.RejectRefund)
+	invoices.Post("/:id/refund", finRole, refundHandler.InitiateRefund)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

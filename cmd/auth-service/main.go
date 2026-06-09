@@ -125,16 +125,19 @@ func main() {
 	authPublic.Post("/forgot-password", authHandler.ForgotPassword)
 	authPublic.Post("/reset-password", authHandler.ResetPassword)
 
+	// Team/branch management is restricted to owner/admin.
+	adminRole := sharedMW.RequireRole("owner", "admin")
+
 	orgs := app.Group("/api/v1/orgs", sharedMW.AuthMiddleware(jwtManager))
 	orgs.Post("/", authHandler.CreateOrganization)
 	orgs.Get("/", authHandler.GetOrganization)
 	orgs.Get("/members", authHandler.ListTeamMembers)
 	orgs.Get("/users", authHandler.ListUsersByOrg)
-	orgs.Post("/members", authHandler.AddTeamMember)
-	orgs.Delete("/members/:userId", authHandler.RemoveTeamMember)
-	orgs.Put("/members/:userId/role", authHandler.UpdateMemberRole)
-	orgs.Post("/invite", authHandler.InviteMember)
-	orgs.Post("/branches", authHandler.CreateBranch)
+	orgs.Post("/members", adminRole, authHandler.AddTeamMember)
+	orgs.Delete("/members/:userId", adminRole, authHandler.RemoveTeamMember)
+	orgs.Put("/members/:userId/role", adminRole, authHandler.UpdateMemberRole)
+	orgs.Post("/invite", adminRole, authHandler.InviteMember)
+	orgs.Post("/branches", adminRole, authHandler.CreateBranch)
 	orgs.Get("/branches", authHandler.ListBranches)
 	orgs.Get("/dashboard/consolidated", authHandler.GetConsolidatedDashboard)
 
@@ -148,6 +151,8 @@ func main() {
 	// Service-to-service: payment webhook activates a paid plan. Guarded by
 	// X-Internal-Key inside the handler, so it is intentionally not behind AuthMiddleware.
 	app.Post("/api/v1/internal/subscription/activate", authHandler.ActivatePlanInternal)
+	// Service-to-service: other services push in-app notifications on key events.
+	app.Post("/api/v1/internal/notifications", authHandler.CreateNotificationInternal)
 
 	notifications := app.Group("/api/v1/notifications", sharedMW.AuthMiddleware(jwtManager))
 	notifications.Get("/", authHandler.ListNotifications)
@@ -163,9 +168,9 @@ func main() {
 	team := app.Group("/api/v1/team", sharedMW.AuthMiddleware(jwtManager))
 	team.Get("/", authHandler.GetOrganization)
 	team.Post("/create", authHandler.CreateOrganization)
-	team.Post("/invite", authHandler.InviteMember)
-	team.Patch("/members/:userId", authHandler.UpdateMemberRole)
-	team.Delete("/members/:userId", authHandler.RemoveTeamMember)
+	team.Post("/invite", adminRole, authHandler.InviteMember)
+	team.Patch("/members/:userId", adminRole, authHandler.UpdateMemberRole)
+	team.Delete("/members/:userId", adminRole, authHandler.RemoveTeamMember)
 	team.Post("/join/:token", authHandler.AcceptInvite)
 	team.Delete("/invites/:inviteId", authHandler.CancelInvite)
 

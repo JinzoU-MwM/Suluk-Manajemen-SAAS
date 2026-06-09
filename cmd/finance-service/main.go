@@ -79,7 +79,7 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	finance := app.Group("/api/v1/finance", authMW)
+	finance := app.Group("/api/v1/finance", authMW, sharedMW.RequireRole("owner", "admin", "finance"))
 	expenses := finance.Group("/expenses")
 	expenses.Post("/", financeHandler.CreateExpense)
 	expenses.Get("/", financeHandler.ListExpenses)

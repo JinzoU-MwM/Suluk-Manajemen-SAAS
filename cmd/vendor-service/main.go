@@ -75,7 +75,7 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	api := app.Group("/api/v1/vendors", authMW)
+	api := app.Group("/api/v1/vendors", authMW, sharedMW.RequireRole("owner", "admin", "finance"))
 
 	// Vendor master CRUD (static routes before param routes)
 	api.Post("/", vendorHandler.CreateVendor)

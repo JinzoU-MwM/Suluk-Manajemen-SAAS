@@ -20,6 +20,7 @@ import (
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
+	sharedNotify "github.com/jamaah-in/v2/internal/shared/notify"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 )
 
@@ -60,7 +61,8 @@ func main() {
 	}
 
 	jamaahRepo := repository.NewJamaahRepo(pool)
-	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("PACKAGE_SERVICE_ADDR"))
+	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("PACKAGE_SERVICE_ADDR")).
+		WithNotify(sharedNotify.New(os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("INTERNAL_API_KEY")))
 	jamaahHandler := handler.NewJamaahHandler(jamaahService)
 
 	app := fiber.New(fiber.Config{
@@ -89,6 +91,7 @@ func main() {
 	jamaah.Post("/:id/register", jamaahHandler.RegisterToPackage)
 	jamaah.Get("/:id/registrations/:pkgId", jamaahHandler.GetRegistration)
 	jamaah.Patch("/:id/registrations/:pkgId/status", jamaahHandler.UpdatePipelineStatus)
+	jamaah.Patch("/:id/registrations/:pkgId/mahram", jamaahHandler.SetMahram)
 	jamaah.Delete("/:id/registrations/:pkgId", jamaahHandler.RemoveFromPackage)
 
 	jamaah.Post("/:id/notes", jamaahHandler.AddNote)

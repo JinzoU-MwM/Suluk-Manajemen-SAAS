@@ -1,6 +1,18 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// RoomCandidate is a group member enriched with the gender from their jamaah
+// profile, used by auto-rooming to split rooms by gender.
+type RoomCandidate struct {
+	MemberID uuid.UUID `json:"member_id"`
+	Name     string    `json:"name"`
+	Gender   string    `json:"gender"`
+}
 
 type Room struct {
 	ID         string    `json:"id"`

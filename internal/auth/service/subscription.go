@@ -127,6 +127,17 @@ func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.Act
 	return s.email.Send(ctx, user.Email, subject, html)
 }
 
+// CreateNotification persists an in-app notification (id auto-filled).
+func (s *AuthService) CreateNotification(ctx context.Context, n *model.Notification) error {
+	if n.ID == uuid.Nil {
+		n.ID = uuid.New()
+	}
+	if n.Severity == "" {
+		n.Severity = "info"
+	}
+	return s.repo.CreateNotification(ctx, n)
+}
+
 func (s *AuthService) GetTrialStatus(ctx context.Context, orgID uuid.UUID) (*model.TrialStatusResponse, error) {
 	sub, err := s.repo.GetSubscription(ctx, orgID)
 	if err != nil {

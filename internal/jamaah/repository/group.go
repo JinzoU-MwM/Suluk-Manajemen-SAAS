@@ -16,6 +16,31 @@ func (r *JamaahRepo) CreateGroup(ctx context.Context, g *model.Group) error {
 	return r.pool.QueryRow(ctx, query, g.ID, g.OrgID, g.Name, g.Description).Scan(&g.CreatedAt, &g.UpdatedAt)
 }
 
+// ListGroupMembersWithGender returns a group's members joined with their jamaah
+// profile gender (empty when no matching profile), ordered so same-gender members
+// — and families added together — stay adjacent for auto-rooming.
+func (r *JamaahRepo) ListGroupMembersWithGender(ctx context.Context, groupID uuid.UUID) ([]model.RoomCandidate, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT gm.member_id, gm.name, COALESCE(p.gender, '')
+		FROM group_members gm
+		LEFT JOIN jamaah_profiles p ON p.id = gm.member_id
+		WHERE gm.group_id = $1
+		ORDER BY COALESCE(p.gender, ''), gm.created_at`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.RoomCandidate
+	for rows.Next() {
+		var c model.RoomCandidate
+		if err := rows.Scan(&c.MemberID, &c.Name, &c.Gender); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // CountGroups returns the number of groups owned by an org (for plan-limit checks).
 func (r *JamaahRepo) CountGroups(ctx context.Context, orgID uuid.UUID) (int, error) {
 	var n int

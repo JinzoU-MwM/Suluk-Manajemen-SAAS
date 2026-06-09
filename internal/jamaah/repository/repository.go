@@ -211,6 +211,19 @@ func (r *JamaahRepo) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, 
 	return nil
 }
 
+func (r *JamaahRepo) UpdateRegistrationMahram(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, mahramID *uuid.UUID) error {
+	result, err := r.pool.Exec(ctx,
+		`UPDATE jamaah_package_registrations SET mahram_id = $4, updated_at = NOW() WHERE org_id = $1 AND jamaah_id = $2 AND package_id = $3`,
+		orgID, jamaahID, packageID, mahramID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrRegistrationNotFound
+	}
+	return nil
+}
+
 func (r *JamaahRepo) RemoveFromPackage(ctx context.Context, orgID, jamaahID, packageID uuid.UUID) error {
 	result, err := r.pool.Exec(ctx, `DELETE FROM jamaah_package_registrations WHERE org_id = $1 AND jamaah_id = $2 AND package_id = $3`, orgID, jamaahID, packageID)
 	if err != nil {

@@ -76,7 +76,7 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	api := app.Group("/api/v1/payroll", authMW)
+	api := app.Group("/api/v1/payroll", authMW, sharedMW.RequireRole("owner", "admin", "finance"))
 	api.Get("/summary", payrollHandler.GetSummary)
 	api.Post("/employees", payrollHandler.CreateEmployee)
 	api.Get("/employees", payrollHandler.ListEmployees)

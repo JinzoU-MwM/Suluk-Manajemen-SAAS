@@ -61,7 +61,8 @@ func (h *JamaahHandler) AutoRooming(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid group id")
 	}
-	rooms, err := h.svc.AutoRooming(c.Context(), claims.OrgID, groupID)
+	capacity := c.QueryInt("capacity", 4)
+	rooms, err := h.svc.AutoRooming(c.Context(), claims.OrgID, groupID, capacity)
 	if err != nil {
 		return response.Internal(c, err)
 	}

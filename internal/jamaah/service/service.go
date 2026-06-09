@@ -10,6 +10,7 @@ import (
 	"github.com/jamaah-in/v2/internal/jamaah/model"
 	"github.com/jamaah-in/v2/internal/jamaah/repository"
 	"github.com/jamaah-in/v2/internal/shared/httpclient"
+	"github.com/jamaah-in/v2/internal/shared/notify"
 )
 
 type JamaahService struct {
@@ -18,6 +19,13 @@ type JamaahService struct {
 	authAddr    string
 	packageAddr string
 	httpc       *httpclient.Client
+	notifier    *notify.Client
+}
+
+// WithNotify attaches a best-effort in-app notification client.
+func (s *JamaahService) WithNotify(n *notify.Client) *JamaahService {
+	s.notifier = n
+	return s
 }
 
 func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr, authAddr, packageAddr string) *JamaahService {
@@ -358,6 +366,11 @@ func (s *JamaahService) GetRegistration(ctx context.Context, orgID, jamaahID, pa
 func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, status string) (*model.JamaahPackageRegistration, error) {
 	reg, err := s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 	if err != nil {
+		return nil, err
+	}
+
+	// Gate advancing to lunas/berangkat on document completeness (+ mahram).
+	if err := s.checkTransitionGate(ctx, orgID, jamaahID, status, reg); err != nil {
 		return nil, err
 	}
 

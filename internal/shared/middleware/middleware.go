@@ -51,6 +51,26 @@ func GetClaims(c *fiber.Ctx) (*sharedAuth.Claims, bool) {
 	return claims, ok
 }
 
+// RequireRole returns middleware that allows the request only if the
+// authenticated user's role is one of the given roles (403 otherwise). Must run
+// after AuthMiddleware. Use to gate write/management routes by role.
+func RequireRole(roles ...string) fiber.Handler {
+	allowed := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		allowed[r] = true
+	}
+	return func(c *fiber.Ctx) error {
+		claims, ok := GetClaims(c)
+		if !ok {
+			return response.Unauthorized(c, "unauthorized")
+		}
+		if !allowed[claims.Role] {
+			return response.Forbidden(c, "akses ditolak untuk peran Anda")
+		}
+		return c.Next()
+	}
+}
+
 // RequireClaims returns the claims or writes a 401 and returns ok=false.
 func RequireClaims(c *fiber.Ctx) (*sharedAuth.Claims, error) {
 	claims, ok := GetClaims(c)

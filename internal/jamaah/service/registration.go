@@ -88,6 +88,14 @@ func (s *JamaahService) SubmitPublicRegistration(ctx context.Context, token stri
 	if err := s.repo.CreatePendingRegistration(ctx, p); err != nil {
 		return nil, err
 	}
+	if s.notifier != nil {
+		name := req.Name
+		if name == "" {
+			name = req.PhoneNumber
+		}
+		s.notifier.Send(ctx, link.OrgID, "", "info", "Pendaftaran baru",
+			fmt.Sprintf("Calon jamaah baru mendaftar: %s", name))
+	}
 	return p, nil
 }
 

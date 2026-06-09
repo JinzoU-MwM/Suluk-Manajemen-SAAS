@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -269,11 +270,37 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 		return payment, nil, fmt.Errorf("update invoice: %w", err)
 	}
 
+	// Allocate the cumulative paid amount across the installment schedule in
+	// order (DP first, then cicilan): mark each schedule paid once the running
+	// total of its amounts is covered. This enforces "DP before cicilan" — a
+	// later installment is only settled after the earlier ones are fully paid.
+	s.allocatePaymentsToSchedules(ctx, invoiceID, inv.AmountPaid)
+
 	updated, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
 	if err != nil {
 		return payment, nil, nil
 	}
 	return payment, updated, nil
+}
+
+// allocatePaymentsToSchedules marks installment schedules paid in installment
+// order as the cumulative amountPaid covers them. Best-effort: schedule sync
+// must never fail the payment itself.
+func (s *InvoiceService) allocatePaymentsToSchedules(ctx context.Context, invoiceID uuid.UUID, amountPaid int64) {
+	schedules, err := s.repo.GetPaymentSchedules(ctx, invoiceID)
+	if err != nil || len(schedules) == 0 {
+		return
+	}
+	sort.Slice(schedules, func(i, j int) bool {
+		return schedules[i].InstallmentNum < schedules[j].InstallmentNum
+	})
+	var cumulative int64
+	for _, sch := range schedules {
+		cumulative += sch.Amount
+		if !sch.IsPaid && amountPaid >= cumulative {
+			_ = s.repo.MarkSchedulePaid(ctx, sch.ID)
+		}
+	}
 }
 
 func (s *InvoiceService) GetPayments(ctx context.Context, orgID, invoiceID uuid.UUID) ([]model.Payment, error) {

@@ -83,3 +83,46 @@ func (h *AuthHandler) ActivatePlanInternal(c *fiber.Ctx) error {
 	}
 	return response.OK(c, fiber.Map{"activated": true, "plan": req.Plan})
 }
+
+// CreateNotificationInternal is a service-to-service endpoint (NOT behind
+// AuthMiddleware) used by other services to push in-app notifications on key
+// events. Guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header.
+func (h *AuthHandler) CreateNotificationInternal(c *fiber.Ctx) error {
+	want := os.Getenv("INTERNAL_API_KEY")
+	if want == "" || c.Get("X-Internal-Key") != want {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req struct {
+		OrgID    string `json:"org_id"`
+		UserID   string `json:"user_id"`
+		Severity string `json:"severity"`
+		Title    string `json:"title"`
+		Message  string `json:"message"`
+		GroupID  string `json:"group_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	n := &model.Notification{
+		OrgID:    orgID,
+		Severity: req.Severity,
+		Title:    req.Title,
+		Message:  req.Message,
+	}
+	if req.UserID != "" {
+		if uid, err := uuid.Parse(req.UserID); err == nil {
+			n.UserID = &uid
+		}
+	}
+	if req.GroupID != "" {
+		n.GroupID = &req.GroupID
+	}
+	if err := h.svc.CreateNotification(c.Context(), n); err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"created": true})
+}

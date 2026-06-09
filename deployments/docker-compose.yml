@@ -190,6 +190,7 @@ services:
       INVOICE_SERVICE_ADDR: invoice-service:50054
       AUTH_SERVICE_ADDR: auth-service:50051
       PACKAGE_SERVICE_ADDR: package-service:50052
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin

@@ -5,11 +5,39 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jamaah-in/v2/internal/jamaah/model"
 )
+
+// normalizeGender maps assorted gender spellings to a rooming bucket label.
+func normalizeGender(g string) string {
+	switch strings.ToUpper(strings.TrimSpace(g)) {
+	case "L", "LAKI-LAKI", "PRIA", "M", "MALE":
+		return "Ikhwan"
+	case "P", "PEREMPUAN", "WANITA", "F", "FEMALE":
+		return "Akhwat"
+	default:
+		return "Lainnya"
+	}
+}
+
+func roomTypeForCapacity(capacity int) string {
+	switch capacity {
+	case 1:
+		return "single"
+	case 2:
+		return "double"
+	case 3:
+		return "triple"
+	case 4:
+		return "quad"
+	default:
+		return "custom"
+	}
+}
 
 func (s *JamaahService) ListRooms(ctx context.Context, orgID uuid.UUID, groupID *uuid.UUID) ([]model.Room, error) {
 	rooms, err := s.repo.ListRooms(ctx, orgID, groupID)
@@ -58,40 +86,57 @@ func (s *JamaahService) DeleteRoom(ctx context.Context, roomID, orgID uuid.UUID)
 	return s.repo.DeleteRoom(ctx, roomID, orgID)
 }
 
-func (s *JamaahService) AutoRooming(ctx context.Context, orgID, groupID uuid.UUID) ([]model.Room, error) {
+// AutoRooming regenerates rooms for a group: members are split by gender
+// (never mixed — required for Umrah/Haji) and packed into rooms of `capacity`.
+// Members keep their group order within a gender, so a family added together
+// tends to land in the same room. capacity falls back to 4 (quad) when invalid.
+func (s *JamaahService) AutoRooming(ctx context.Context, orgID, groupID uuid.UUID, capacity int) ([]model.Room, error) {
+	if capacity < 1 || capacity > 6 {
+		capacity = 4
+	}
 	_ = s.repo.DeleteRoomsByGroup(ctx, groupID, orgID)
 
-	members, err := s.repo.ListGroupMembers(ctx, groupID)
+	members, err := s.repo.ListGroupMembersWithGender(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
 
-	var rooms []model.Room
-	roomNum := 1
-	for i := 0; i < len(members); i += 2 {
-		gs := groupID.String()
-		room := &model.Room{
-			ID:         uuid.New().String(),
-			OrgID:      orgID.String(),
-			GroupID:    &gs,
-			RoomNumber: fmt.Sprintf("%d", roomNum),
-			GenderType: "mixed",
-			RoomType:   "double",
-			Capacity:   2,
-			IsActive:   true,
+	// Bucket members by normalized gender, preserving first-seen order.
+	buckets := map[string][]model.RoomCandidate{}
+	var order []string
+	for _, m := range members {
+		g := normalizeGender(m.Gender)
+		if _, ok := buckets[g]; !ok {
+			order = append(order, g)
 		}
-		if err := s.repo.CreateRoom(ctx, room); err == nil {
-			rooms = append(rooms, *room)
-			roomID, _ := uuid.Parse(room.ID)
-			s.repo.AssignMemberToRoom(ctx, orgID, roomID, members[i].MemberID.String())
-			if i+1 < len(members) {
-				s.repo.AssignMemberToRoom(ctx, orgID, roomID, members[i+1].MemberID.String())
-			}
-		}
-		roomNum++
+		buckets[g] = append(buckets[g], m)
 	}
-	if rooms == nil {
-		rooms = []model.Room{}
+
+	rooms := []model.Room{}
+	roomNum := 1
+	for _, g := range order {
+		list := buckets[g]
+		for i := 0; i < len(list); i += capacity {
+			gs := groupID.String()
+			room := &model.Room{
+				ID:         uuid.New().String(),
+				OrgID:      orgID.String(),
+				GroupID:    &gs,
+				RoomNumber: fmt.Sprintf("%d", roomNum),
+				GenderType: g,
+				RoomType:   roomTypeForCapacity(capacity),
+				Capacity:   capacity,
+				IsActive:   true,
+			}
+			if err := s.repo.CreateRoom(ctx, room); err == nil {
+				rooms = append(rooms, *room)
+				roomID, _ := uuid.Parse(room.ID)
+				for j := i; j < i+capacity && j < len(list); j++ {
+					s.repo.AssignMemberToRoom(ctx, orgID, roomID, list[j].MemberID.String())
+				}
+			}
+			roomNum++
+		}
 	}
 	return rooms, nil
 }
