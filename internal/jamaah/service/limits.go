@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jamaah-in/v2/internal/shared/plan"
@@ -21,19 +22,34 @@ type planLimits struct {
 	MaxGroups int    `json:"max_groups"`
 }
 
+type limitCacheEntry struct {
+	limits planLimits
+	expiry time.Time
+}
+
 // fetchLimits asks auth-service for the caller org's plan limits. It FAILS OPEN
 // (returns unlimited) when the token/address is missing or the call fails, so a
 // transient auth-service outage never blocks core CRUD — the cap is best-effort
 // enforcement layered on top of the (authoritative) frontend gating.
-func (s *JamaahService) fetchLimits(ctx context.Context, authToken string) planLimits {
+//
+// Results are cached per org for a short TTL: plan limits change rarely
+// (upgrade/expiry), so this removes the auth round-trip from every create — and
+// avoids N round-trips during a bulk import.
+func (s *JamaahService) fetchLimits(ctx context.Context, orgID uuid.UUID, authToken string) planLimits {
 	unlimited := planLimits{MaxJamaah: plan.Unlimited, MaxGroups: plan.Unlimited}
 	if s.authAddr == "" || authToken == "" {
 		return unlimited
+	}
+	if v, ok := s.limitCache.Load(orgID); ok {
+		if e := v.(limitCacheEntry); e.expiry.After(time.Now()) {
+			return e.limits
+		}
 	}
 	var out planLimits
 	if err := s.httpc.GetJSON(ctx, s.authAddr, "/api/v1/subscription/status", authToken, &out); err != nil {
 		return unlimited
 	}
+	s.limitCache.Store(orgID, limitCacheEntry{limits: out, expiry: time.Now().Add(45 * time.Second)})
 	return out
 }
 

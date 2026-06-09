@@ -40,6 +40,18 @@ const insertCols = `id, org_id, title, nama, nama_ayah, jenis_identitas, no_iden
 	contact_emergency_name, contact_emergency_phone, lead_source, referring_agent_id,
 	ihram_size, mukena_size, baju_size`
 
+// profileColsP is profileCols qualified with the "p." alias, for JOINs where
+// bare column names (id, org_id, …) would be ambiguous against the other table.
+var profileColsP = prefixCols(profileCols, "p")
+
+func prefixCols(cols, alias string) string {
+	parts := strings.Split(cols, ",")
+	for i, c := range parts {
+		parts[i] = alias + "." + strings.TrimSpace(c)
+	}
+	return strings.Join(parts, ", ")
+}
+
 func (r *JamaahRepo) scanProfile(row rowScanner) (*model.JamaahProfile, error) {
 	p := &model.JamaahProfile{}
 	err := row.Scan(&p.ID, &p.OrgID, &p.Title, &p.Nama, &p.NamaAyah, &p.JenisIdentitas, &p.NoIdentitas,
@@ -254,7 +266,11 @@ func (r *JamaahRepo) ListByPackage(ctx context.Context, orgID, packageID uuid.UU
 		return nil, 0, err
 	}
 
-	listQuery := `SELECT jp.jamaah_id FROM jamaah_package_registrations jp WHERE jp.org_id = $1 AND jp.package_id = $2`
+	// Single JOIN instead of fetching IDs then a GetProfileByID per row (was an
+	// N+1 on the package-roster hot path).
+	listQuery := `SELECT ` + profileColsP + ` FROM jamaah_package_registrations jp
+		JOIN jamaah_profiles p ON p.id = jp.jamaah_id
+		WHERE jp.org_id = $1 AND jp.package_id = $2`
 	listArgs := []any{orgID, packageID}
 	argIdx := 3
 	if status != "" {
@@ -273,13 +289,9 @@ func (r *JamaahRepo) ListByPackage(ctx context.Context, orgID, packageID uuid.UU
 
 	profiles := []model.JamaahProfile{}
 	for rows.Next() {
-		var jamaahID uuid.UUID
-		if err := rows.Scan(&jamaahID); err != nil {
-			return nil, 0, err
-		}
-		p, err := r.GetProfileByID(ctx, jamaahID, orgID)
+		p, err := r.scanProfile(rows)
 		if err != nil {
-			continue
+			return nil, 0, err
 		}
 		profiles = append(profiles, *p)
 	}

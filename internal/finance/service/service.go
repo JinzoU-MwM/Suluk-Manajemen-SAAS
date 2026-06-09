@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -325,64 +324,49 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 	if pkgRes.err == nil {
 		dash.Summary.TotalPackages = pkgRes.total
 
-		// Fan-out per-package revenue calls (bounded: max 10 concurrent)
-		type pkgRevResult struct {
-			idx      int
-			overview model.PackageOverview
-		}
-		sem := make(chan struct{}, 10)
-		resultsCh := make(chan pkgRevResult, len(pkgRes.list))
-		var wg sync.WaitGroup
-
-		for i, p := range pkgRes.list {
-			wg.Add(1)
-			go func(idx int, pkg packageOverviewResponse) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
-
-				ov := model.PackageOverview{
-					ID:            pkg.ID,
-					Name:          pkg.Name,
-					Status:        pkg.Status,
-					TotalSeats:    pkg.TotalSeats,
-					ReservedSeats: pkg.ReservedSeats,
+		// Prefetch revenue for ALL packages in ONE call (was an HTTP call +
+		// SQL aggregate per package — an O(packages) cross-service N+1).
+		type pkgRev struct{ TotalAmount, TotalPaid, TotalRemaining int64 }
+		revByPkg := map[string]pkgRev{}
+		if revAllData, err := s.fetchFromService(ctx, s.invoiceAddr,
+			"/api/v1/invoices/revenue/by-package", authToken); err == nil {
+			var all []struct {
+				PackageID      string `json:"package_id"`
+				TotalAmount    int64  `json:"total_amount"`
+				TotalPaid      int64  `json:"total_paid"`
+				TotalRemaining int64  `json:"total_remaining"`
+			}
+			if json.Unmarshal(revAllData, &all) == nil {
+				for _, rv := range all {
+					revByPkg[rv.PackageID] = pkgRev{rv.TotalAmount, rv.TotalPaid, rv.TotalRemaining}
 				}
-				if pkg.DepartureDate != nil {
-					t := *pkg.DepartureDate
-					if len(t) >= 10 {
-						ov.DepartureDate = &t
-					}
-				}
-
-				revData, revErr := s.fetchFromService(ctx, s.invoiceAddr,
-					fmt.Sprintf("/api/v1/invoices/package/%s/revenue", pkg.ID), authToken)
-				if revErr == nil {
-					var rev struct {
-						TotalAmount    int64 `json:"total_amount"`
-						TotalPaid      int64 `json:"total_paid"`
-						TotalRemaining int64 `json:"total_remaining"`
-					}
-					if json.Unmarshal(revData, &rev) == nil {
-						ov.Revenue = rev.TotalAmount
-						ov.Paid = rev.TotalPaid
-						ov.Remaining = rev.TotalRemaining
-						if rev.TotalAmount > 0 {
-							ov.PaymentPct = float64(rev.TotalPaid) * 100 / float64(rev.TotalAmount)
-						}
-					}
-				}
-				resultsCh <- pkgRevResult{idx: idx, overview: ov}
-			}(i, p)
+			}
 		}
 
-		wg.Wait()
-		close(resultsCh)
-
-		// Reassemble in original order
 		ordered := make([]model.PackageOverview, len(pkgRes.list))
-		for r := range resultsCh {
-			ordered[r.idx] = r.overview
+		for i, pkg := range pkgRes.list {
+			ov := model.PackageOverview{
+				ID:            pkg.ID,
+				Name:          pkg.Name,
+				Status:        pkg.Status,
+				TotalSeats:    pkg.TotalSeats,
+				ReservedSeats: pkg.ReservedSeats,
+			}
+			if pkg.DepartureDate != nil {
+				t := *pkg.DepartureDate
+				if len(t) >= 10 {
+					ov.DepartureDate = &t
+				}
+			}
+			if rev, ok := revByPkg[pkg.ID.String()]; ok {
+				ov.Revenue = rev.TotalAmount
+				ov.Paid = rev.TotalPaid
+				ov.Remaining = rev.TotalRemaining
+				if rev.TotalAmount > 0 {
+					ov.PaymentPct = float64(rev.TotalPaid) * 100 / float64(rev.TotalAmount)
+				}
+			}
+			ordered[i] = ov
 		}
 		dash.ActivePackages = ordered
 	}

@@ -49,7 +49,7 @@ func (r *AgentRepo) ListAgents(ctx context.Context, orgID, search string, page, 
 			       SUM(commission_amount) as total_comm,
 			       SUM(CASE WHEN status = 'paid' THEN commission_amount ELSE 0 END) as total_paid,
 			       COUNT(DISTINCT jamaah_id) as jamaah_count
-			FROM agent_commissions GROUP BY agent_id
+			FROM agent_commissions WHERE org_id = $1 GROUP BY agent_id
 		) c ON a.id = c.agent_id
 		%s ORDER BY a.name LIMIT $%d OFFSET $%d
 	`, baseWhere, baseArgCount+1, baseArgCount+2)
@@ -88,7 +88,7 @@ func (r *AgentRepo) GetAgent(ctx context.Context, id, orgID string) (*model.Agen
 			       SUM(commission_amount) as total_comm,
 			       SUM(CASE WHEN status = 'paid' THEN commission_amount ELSE 0 END) as total_paid,
 			       COUNT(DISTINCT jamaah_id) as jamaah_count
-			FROM agent_commissions GROUP BY agent_id
+			FROM agent_commissions WHERE org_id = $2 GROUP BY agent_id
 		) c ON a.id = c.agent_id
 		WHERE a.id = $1 AND a.org_id = $2
 	`, id, orgID).Scan(

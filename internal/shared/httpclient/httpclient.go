@@ -19,7 +19,18 @@ type Client struct {
 
 func New() *Client {
 	return &Client{
-		http:    &http.Client{Timeout: 10 * time.Second},
+		http: &http.Client{
+			Timeout: 10 * time.Second,
+			// Tuned pool so service-to-service fan-out (e.g. the finance
+			// dashboard firing ~10 concurrent calls to invoice-service) reuses
+			// keep-alive connections instead of churning them — Go's default
+			// transport only keeps 2 idle conns per host.
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 20,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		},
 		retries: 2,
 	}
 }

@@ -225,7 +225,6 @@ func createProxyHandler(targetAddr string) fiber.Handler {
 		req.Header.Set("X-Forwarded-For", c.IP())
 		req.Header.Set("X-Forwarded-Proto", "http")
 		req.Header.Set("X-Real-Ip", c.IP())
-		req.Close = true
 
 		resp, err := httpClient.Do(req)
 		if err != nil {

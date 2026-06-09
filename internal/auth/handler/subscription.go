@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"crypto/subtle"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -88,11 +90,18 @@ func (h *AuthHandler) ActivatePlanInternal(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, err.Error())
 	}
-	// Best-effort: email the buyer the confirmation + invoice. Never fail
-	// activation if the email send errors.
-	if err := h.svc.SendSubscriptionInvoice(c.Context(), req, expiresAt); err != nil {
-		log.Printf("subscription invoice email failed (order %s): %v", req.OrderID, err)
-	}
+	// Best-effort: email the buyer the confirmation + invoice OFF the hot path.
+	// A slow mail provider must not delay the activation response (which would
+	// hold the cross-service call and risk a Pakasir webhook retry). Detached
+	// goroutine with its own background context (c.Context() is reused after the
+	// request returns, so it cannot be used here).
+	go func(req model.ActivatePlanRequest, expiresAt time.Time) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := h.svc.SendSubscriptionInvoice(ctx, req, expiresAt); err != nil {
+			log.Printf("subscription invoice email failed (order %s): %v", req.OrderID, err)
+		}
+	}(req, expiresAt)
 	return response.OK(c, fiber.Map{"activated": true, "plan": req.Plan})
 }
 

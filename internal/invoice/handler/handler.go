@@ -253,6 +253,17 @@ func (h *InvoiceHandler) GetPackageRevenue(c *fiber.Ctx) error {
 	return response.OK(c, summary)
 }
 
+// GetPackageRevenueAll returns per-package revenue for the whole org in one
+// response (used by the finance dashboard instead of one call per package).
+func (h *InvoiceHandler) GetPackageRevenueAll(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	data, err := h.svc.GetPackageRevenueAll(c.Context(), claims.OrgID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, data)
+}
+
 func (h *InvoiceHandler) GetBalances(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	balances, err := h.svc.GetBalances(c.Context(), claims.OrgID)

@@ -50,7 +50,7 @@ func (r *JamaahRepo) GetDocumentRate(ctx context.Context, orgID string) float64 
 
 func (r *JamaahRepo) GetPassportExpiringSoon(ctx context.Context, orgID string) int {
 	var count int
-	r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jamaah_profiles WHERE org_id = $1 AND passport_expiry IS NOT NULL AND passport_expiry <= NOW() + INTERVAL '90 days' AND passport_expiry > NOW()`, orgID).Scan(&count)
+	r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jamaah_profiles WHERE org_id = $1 AND tanggal_paspor IS NOT NULL AND tanggal_paspor <= NOW() + INTERVAL '90 days' AND tanggal_paspor > NOW()`, orgID).Scan(&count)
 	return count
 }
 

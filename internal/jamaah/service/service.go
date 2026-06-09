@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,7 @@ type JamaahService struct {
 	packageAddr string
 	httpc       *httpclient.Client
 	notifier    *notify.Client
+	limitCache  sync.Map // uuid.UUID -> limitCacheEntry (short-TTL plan limits)
 }
 
 // WithNotify attaches a best-effort in-app notification client.
@@ -44,7 +46,7 @@ func (s *JamaahService) CreateProfile(ctx context.Context, orgID uuid.UUID, auth
 		return nil, fmt.Errorf("nama is required")
 	}
 
-	lim := s.fetchLimits(ctx, authToken)
+	lim := s.fetchLimits(ctx, orgID, authToken)
 
 	p := &model.JamaahProfile{
 		ID:    uuid.New(),

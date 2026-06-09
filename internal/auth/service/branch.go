@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 )
@@ -67,34 +68,56 @@ func (s *AuthService) GetConsolidatedStats(ctx context.Context, parentOrgID stri
 	var totalRevenue int64
 	partial := false
 
+	// Fan out per-org stats concurrently (bounded) instead of summing serially —
+	// latency was O(branches): (branches+1)*2 sequential round-trips.
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, 10)
+	)
 	for _, orgID := range orgIDs {
-		tp, err := s.jwt.GenerateTokenPair(uuid.Nil, orgID, "owner", "consolidated@internal")
-		if err != nil {
-			partial = true
-			continue
-		}
-		token := "Bearer " + tp.AccessToken
+		wg.Add(1)
+		go func(orgID uuid.UUID) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 
-		var analytics struct {
-			TotalJamaah int `json:"total_jamaah"`
-		}
-		if err := s.fetchJSON(ctx, s.jamaahAddr, "/api/v1/analytics/dashboard", token, &analytics); err != nil {
-			partial = true
-		} else {
-			totalJamaah += analytics.TotalJamaah
-		}
+			tp, err := s.jwt.GenerateTokenPair(uuid.Nil, orgID, "owner", "consolidated@internal")
+			if err != nil {
+				mu.Lock()
+				partial = true
+				mu.Unlock()
+				return
+			}
+			token := "Bearer " + tp.AccessToken
 
-		var summary struct {
-			TotalInvoices int64 `json:"total_invoices"`
-			TotalPaid     int64 `json:"total_paid"`
-		}
-		if err := s.fetchJSON(ctx, s.invoiceAddr, "/api/v1/invoices/summary", token, &summary); err != nil {
-			partial = true
-		} else {
-			totalRevenue += summary.TotalPaid
-			totalInvoices += int(summary.TotalInvoices)
-		}
+			var analytics struct {
+				TotalJamaah int `json:"total_jamaah"`
+			}
+			aErr := s.fetchJSON(ctx, s.jamaahAddr, "/api/v1/analytics/dashboard", token, &analytics)
+
+			var summary struct {
+				TotalInvoices int64 `json:"total_invoices"`
+				TotalPaid     int64 `json:"total_paid"`
+			}
+			sErr := s.fetchJSON(ctx, s.invoiceAddr, "/api/v1/invoices/summary", token, &summary)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if aErr != nil {
+				partial = true
+			} else {
+				totalJamaah += analytics.TotalJamaah
+			}
+			if sErr != nil {
+				partial = true
+			} else {
+				totalRevenue += summary.TotalPaid
+				totalInvoices += int(summary.TotalInvoices)
+			}
+		}(orgID)
 	}
+	wg.Wait()
 
 	result["total_jamaah"] = totalJamaah
 	result["total_revenue"] = totalRevenue

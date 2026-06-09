@@ -146,6 +146,7 @@ func (r *PackageRepo) ListPackages(ctx context.Context, orgID uuid.UUID, status 
 	defer rows.Close()
 
 	packages := []model.Package{}
+	ids := []string{}
 	for rows.Next() {
 		var pkg model.Package
 		if err := rows.Scan(
@@ -158,10 +159,45 @@ func (r *PackageRepo) ListPackages(ctx context.Context, orgID uuid.UUID, status 
 		); err != nil {
 			return nil, 0, err
 		}
-		pkg.PricingTiers, _ = r.GetPricingTiers(ctx, pkg.ID)
 		packages = append(packages, pkg)
+		ids = append(ids, pkg.ID.String())
+	}
+	rows.Close()
+
+	// Batch-load pricing tiers for the whole page in one query (was a
+	// GetPricingTiers call per package — an N+1).
+	tiersByPkg, err := r.pricingTiersFor(ctx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range packages {
+		packages[i].PricingTiers = tiersByPkg[packages[i].ID.String()]
 	}
 	return packages, total, nil
+}
+
+// pricingTiersFor batch-loads pricing tiers for many packages in a single query,
+// grouped by package_id, to avoid the per-package N+1 in list endpoints.
+func (r *PackageRepo) pricingTiersFor(ctx context.Context, packageIDs []string) (map[string][]model.PricingTier, error) {
+	out := map[string][]model.PricingTier{}
+	if len(packageIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, created_at, updated_at
+		FROM pricing_tiers WHERE package_id = ANY($1::uuid[]) ORDER BY package_id, sort_order`, packageIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t model.PricingTier
+		if err := rows.Scan(&t.ID, &t.PackageID, &t.RoomType, &t.Price, &t.Label, &t.IsEarlyBird, &t.EarlyBirdExpiresAt, &t.SortOrder, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		k := t.PackageID.String()
+		out[k] = append(out[k], t)
+	}
+	return out, nil
 }
 
 func (r *PackageRepo) UpdatePackage(ctx context.Context, pkg *model.Package) error {

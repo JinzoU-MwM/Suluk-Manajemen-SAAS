@@ -319,6 +319,10 @@ func (s *InvoiceService) GetPackageRevenue(ctx context.Context, orgID, packageID
 	return s.repo.GetPackageRevenue(ctx, orgID, packageID)
 }
 
+func (s *InvoiceService) GetPackageRevenueAll(ctx context.Context, orgID uuid.UUID) ([]model.PackageRevenueSummary, error) {
+	return s.repo.GetPackageRevenueAll(ctx, orgID)
+}
+
 func (s *InvoiceService) GetMonthlyRevenue(ctx context.Context, orgID uuid.UUID, months int) ([]model.MonthlyRevenuePoint, error) {
 	return s.repo.GetMonthlyRevenue(ctx, orgID, months)
 }

@@ -344,6 +344,37 @@ func (r *InvoiceRepo) GetPackageRevenue(ctx context.Context, orgID, packageID uu
 	return s, nil
 }
 
+// GetPackageRevenueAll returns revenue aggregates for every package of an org in
+// ONE grouped query — replaces the finance dashboard's per-package HTTP+aggregate
+// fan-out (O(packages) round-trips) with a single call.
+func (r *InvoiceRepo) GetPackageRevenueAll(ctx context.Context, orgID uuid.UUID) ([]model.PackageRevenueSummary, error) {
+	rows, err := r.pool.Query(ctx, `SELECT package_id,
+		COUNT(*) FILTER (WHERE status != 'batal'),
+		COALESCE(SUM(total_amount) FILTER (WHERE status != 'batal'),0),
+		COALESCE(SUM(amount_paid) FILTER (WHERE status != 'batal'),0),
+		COALESCE(SUM(amount_remaining) FILTER (WHERE status != 'batal'),0),
+		COUNT(*) FILTER (WHERE status = 'lunas'),
+		COUNT(*) FILTER (WHERE status = 'sebagian'),
+		COUNT(*) FILTER (WHERE status = 'belum_bayar'),
+		COUNT(*) FILTER (WHERE status = 'batal')
+		FROM invoices WHERE org_id = $1 AND package_id IS NOT NULL
+		GROUP BY package_id`, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.PackageRevenueSummary{}
+	for rows.Next() {
+		var s model.PackageRevenueSummary
+		if err := rows.Scan(&s.PackageID, &s.TotalInvoices, &s.TotalAmount, &s.TotalPaid,
+			&s.TotalRemaining, &s.LunasCount, &s.SebagianCount, &s.BelumBayarCount, &s.BatalCount); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 func (r *InvoiceRepo) ListInvoicesByPackage(ctx context.Context, orgID, packageID uuid.UUID) ([]model.Invoice, error) {
 	rows, err := r.pool.Query(ctx, fmt.Sprintf(`SELECT %s FROM invoices WHERE org_id = $1 AND package_id = $2 ORDER BY created_at DESC`, invoiceCols), orgID, packageID)
 	if err != nil {

@@ -14,7 +14,7 @@ func (s *JamaahService) CreateGroup(ctx context.Context, orgID uuid.UUID, authTo
 	if req.Name == "" {
 		return nil, fmt.Errorf("name is required")
 	}
-	lim := s.fetchLimits(ctx, authToken)
+	lim := s.fetchLimits(ctx, orgID, authToken)
 	g := &model.Group{
 		ID:          uuid.New(),
 		OrgID:       orgID,

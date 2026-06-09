@@ -14,7 +14,7 @@ function mapPagination(json) {
   return data;
 }
 
-export function createVendorApi({ cacheInvalidate }) {
+export function createVendorApi({ cacheInvalidate, cacheGet, cacheSet }) {
   return {
     // ── Vendors ────────────────────────────────────────────
     async listVendors({ type = '', search = '', page = 1, pageSize = 50 } = {}) {
@@ -24,11 +24,20 @@ export function createVendorApi({ cacheInvalidate }) {
       });
       if (type) params.set('type', type);
       if (search) params.set('search', search);
+      // Short-TTL cache (mutations invalidate 'vendors:'). Skip caching active
+      // searches so typing stays live.
+      const cacheKey = search ? null : `vendors:list:${params.toString()}`;
+      if (cacheKey) {
+        const cached = cacheGet?.(cacheKey);
+        if (cached) return cached;
+      }
       const response = await apiFetch(`${API_URL}/vendors/?${params.toString()}`, {
         headers: authHeaders(),
       });
       if (!response.ok) throw new Error(await parseError(response));
-      return mapPagination(await response.json());
+      const data = mapPagination(await response.json());
+      if (cacheKey) cacheSet?.(cacheKey, data, 60_000);
+      return data;
     },
 
     async getVendor(vendorId) {

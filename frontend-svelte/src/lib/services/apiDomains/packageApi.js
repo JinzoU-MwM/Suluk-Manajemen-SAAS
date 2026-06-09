@@ -7,7 +7,7 @@ function unwrapData(json) {
     return json;
 }
 
-export function createPackageApi({ cacheInvalidate }) {
+export function createPackageApi({ cacheInvalidate, cacheGet, cacheSet }) {
     return {
         async listPackages({ status = '', page = 1, pageSize = 100 } = {}) {
             const params = new URLSearchParams({
@@ -17,11 +17,18 @@ export function createPackageApi({ cacheInvalidate }) {
             if (status) {
                 params.set('status', status);
             }
+            // Short-TTL cache: packages change rarely but the list is fetched as a
+            // dropdown source across many pages. Mutations call cacheInvalidate('packages:').
+            const cacheKey = `packages:list:${params.toString()}`;
+            const cached = cacheGet?.(cacheKey);
+            if (cached) return cached;
             const response = await apiFetch(`${API_URL}/packages/?${params.toString()}`, {
                 headers: authHeaders(),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return unwrapData(await response.json());
+            const data = unwrapData(await response.json());
+            cacheSet?.(cacheKey, data, 60_000);
+            return data;
         },
 
         async getPackage(packageId) {

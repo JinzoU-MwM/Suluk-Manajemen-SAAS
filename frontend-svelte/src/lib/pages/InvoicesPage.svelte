@@ -84,6 +84,19 @@
     cRoomType = 'quad'; cPrice = 0; cScheme = 'dp_lunas';
     cDiscount = 0; cDueDate = ''; cNotes = '';
     showCreate = true;
+    // Lazy-load the picker lists only when the create drawer is opened, instead
+    // of pulling them on every page mount.
+    loadPickerLists();
+  }
+
+  async function loadPickerLists() {
+    if (allJamaah.length && allPackages.length) return; // already loaded this session
+    const [jamaahData, packageData] = await Promise.all([
+      ApiService.listJamaah({ pageSize: 1000 }).catch(() => ({ jamaah: [] })),
+      ApiService.listPackages({ pageSize: 1000 }).catch(() => ({ packages: [] })),
+    ]);
+    allJamaah = jamaahData.jamaah || jamaahData.data || jamaahData || [];
+    allPackages = packageData.packages || packageData.data || packageData || [];
   }
 
   async function submitCreate() {
@@ -170,20 +183,11 @@
   async function loadInvoices() {
     isLoading = true;
     try {
-      const [invoiceData, jamaahData, packageData] = await Promise.all([
-        invoiceApi.listInvoices({ status: filterStatus === 'all' ? '' : filterStatus }),
-        ApiService.listJamaah({ pageSize: 1000 }).catch(() => ({ jamaah: [] })),
-        ApiService.listPackages({ pageSize: 1000 }).catch(() => ({ packages: [] })),
-      ]);
-
+      // Only fetch invoices on mount — the list already carries jamaah_name /
+      // package_name from the backend, so we no longer pull up to 1000 jamaah +
+      // 1000 packages here just to build fallback name maps.
+      const invoiceData = await invoiceApi.listInvoices({ status: filterStatus === 'all' ? '' : filterStatus });
       const rawInvoices = invoiceData.invoices || invoiceData || [];
-      const jamaahList = jamaahData.jamaah || jamaahData.data || jamaahData || [];
-      const packageList = packageData.packages || packageData.data || packageData || [];
-
-      allJamaah = jamaahList;
-      allPackages = packageList;
-      const jamaahMap = new Map(jamaahList.map(j => [j.id, j.nama || j.nama_paspor || j.name || 'Tanpa Nama']));
-      const packageMap = new Map(packageList.map(p => [p.id, p.name || 'Tanpa Nama']));
 
       invoices = rawInvoices.map(inv => ({
         ...inv,
@@ -191,8 +195,8 @@
         total: inv.total_amount ?? inv.total,
         paid: inv.amount_paid ?? inv.paid,
         remaining: inv.amount_remaining ?? inv.remaining,
-        jamaah_name: inv.jamaah_name || jamaahMap.get(inv.jamaah_id) || 'Jamaah',
-        package_name: inv.package_name || packageMap.get(inv.package_id) || 'Paket Umroh',
+        jamaah_name: inv.jamaah_name || 'Jamaah',
+        package_name: inv.package_name || 'Paket Umroh',
       }));
     } catch (e) {
       showToast('Gagal memuat invoice: ' + e.message, 'error');
