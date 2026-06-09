@@ -39,7 +39,10 @@
             year: "numeric",
         });
     });
-    let isBlocked = $derived(!subscription?.allowed);
+    // Only blocked when the backend explicitly disallows (allowed === false) and
+    // the plan isn't pro-or-higher. The status payload omits `allowed`, so the
+    // old `!allowed` incorrectly blocked everyone (including Pro).
+    let isBlocked = $derived(!isProOrHigher(subscription?.plan) && subscription?.allowed === false);
 </script>
 
 {#if subscription && isFree}

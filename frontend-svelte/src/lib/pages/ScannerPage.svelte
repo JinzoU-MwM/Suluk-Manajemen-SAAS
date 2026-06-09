@@ -278,8 +278,13 @@
     errorMessage = "";
   }
 
-  let isBlocked = $derived(localSubscription && !localSubscription.allowed);
+  // Block only when the backend EXPLICITLY disallows access, and never for a
+  // pro-or-higher active plan. (The subscription status payload has no `allowed`
+  // field, so the old `!allowed` blocked everyone — including Pro.)
   let isPro = $derived(isProOrHigher(localSubscription?.plan));
+  let isBlocked = $derived(
+    !isPro && localSubscription?.allowed === false,
+  );
 </script>
 
 <div class="scanner-page page-enter">
