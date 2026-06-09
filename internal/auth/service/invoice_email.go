@@ -140,8 +140,10 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
 	if appURL == "" {
 		appURL = "https://suluk.site"
 	}
-	markURL := appURL + "/brand/suluk-mark-white.png"
-	checkURL := appURL + "/brand/check-green.png"
+	// ?v= cache-buster: Cloudflare caches per full URL, so bumping this forces a
+	// fresh origin fetch when the asset changes (and sidesteps a poisoned entry).
+	markURL := appURL + "/brand/suluk-mark-white.png?v=1"
+	checkURL := appURL + "/brand/check-green.png?v=1"
 	waURL := "https://wa.me/" + supportWANumber
 	included := includedSection(d.PlanName, d.Features, checkURL)
 
