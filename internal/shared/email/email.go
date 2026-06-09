@@ -6,14 +6,18 @@ package email
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/mail"
 	"net/smtp"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -71,6 +75,78 @@ func (c *Client) fromAddress() string {
 	return c.cfg.From
 }
 
+// buildMessage assembles an RFC-5322 multipart/alternative message (plain text +
+// HTML) with Date and Message-ID headers and a MIME-encoded subject. HTML-only
+// messages without these headers score as spam and are rejected by content
+// filters (e.g. MailChannels "[CS] Message blocked"); a text part + real
+// headers gets the same content delivered.
+func (c *Client) buildMessage(to, subject, html string) []byte {
+	domain := "localhost"
+	if at := strings.LastIndex(c.fromAddress(), "@"); at >= 0 {
+		domain = c.fromAddress()[at+1:]
+	}
+	boundary := randHex(16)
+
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "From: %s\r\n", c.cfg.From)
+	fmt.Fprintf(&b, "To: %s\r\n", to)
+	fmt.Fprintf(&b, "Subject: %s\r\n", encodeSubject(subject))
+	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
+	fmt.Fprintf(&b, "Message-ID: <%s@%s>\r\n", randHex(16), domain)
+	b.WriteString("MIME-Version: 1.0\r\n")
+	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary)
+	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n", boundary, htmlToText(html))
+	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s\r\n", boundary, html)
+	fmt.Fprintf(&b, "--%s--\r\n", boundary)
+	return b.Bytes()
+}
+
+func randHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// encodeSubject MIME-encodes a subject only when it contains non-ASCII bytes.
+func encodeSubject(s string) string {
+	for _, r := range s {
+		if r > 127 {
+			return mime.QEncoding.Encode("UTF-8", s)
+		}
+	}
+	return s
+}
+
+var (
+	reStyleScript = regexp.MustCompile(`(?is)<(script|style)[^>]*>.*?</(script|style)>`)
+	reBreak       = regexp.MustCompile(`(?i)<br\s*/?>`)
+	reBlockEnd    = regexp.MustCompile(`(?i)</(p|div|tr|h1|h2|h3|table|li)>`)
+	reTag         = regexp.MustCompile(`(?s)<[^>]*>`)
+	reSpaces      = regexp.MustCompile(`[ \t]+`)
+	reBlankLines  = regexp.MustCompile(`\n{3,}`)
+	htmlEntities  = strings.NewReplacer(
+		"&amp;", "&", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&#39;", "'",
+		"&nbsp;", " ", "&mdash;", "—", "&ndash;", "–", "&copy;", "©", "&#10003;", "✓",
+	)
+)
+
+// htmlToText derives a readable plain-text alternative from an HTML body.
+func htmlToText(h string) string {
+	h = reStyleScript.ReplaceAllString(h, "")
+	h = reBreak.ReplaceAllString(h, "\n")
+	h = reBlockEnd.ReplaceAllString(h, "\n")
+	h = reTag.ReplaceAllString(h, "")
+	h = htmlEntities.Replace(h)
+	h = reSpaces.ReplaceAllString(h, " ")
+	lines := strings.Split(h, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimSpace(lines[i])
+	}
+	h = strings.Join(lines, "\n")
+	h = reBlankLines.ReplaceAllString(h, "\n\n")
+	return strings.TrimSpace(h)
+}
+
 func (c *Client) sendSMTP(to, subject, html string) error {
 	host := c.cfg.SMTPHost
 	port := c.cfg.SMTPPort
@@ -80,15 +156,7 @@ func (c *Client) sendSMTP(to, subject, html string) error {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	from := c.fromAddress()
 
-	var b bytes.Buffer
-	fmt.Fprintf(&b, "From: %s\r\n", c.cfg.From)
-	fmt.Fprintf(&b, "To: %s\r\n", to)
-	fmt.Fprintf(&b, "Subject: %s\r\n", subject)
-	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
-	b.WriteString("\r\n")
-	b.WriteString(html)
-	msg := b.Bytes()
+	msg := c.buildMessage(to, subject, html)
 
 	auth := smtp.PlainAuth("", c.cfg.SMTPUser, c.cfg.SMTPPass, host)
 
@@ -132,7 +200,8 @@ func (c *Client) sendSMTP(to, subject, html string) error {
 
 func (c *Client) sendResend(ctx context.Context, to, subject, html string) error {
 	payload, err := json.Marshal(map[string]any{
-		"from": c.cfg.From, "to": []string{to}, "subject": subject, "html": html,
+		"from": c.cfg.From, "to": []string{to}, "subject": subject,
+		"html": html, "text": htmlToText(html),
 	})
 	if err != nil {
 		return err
