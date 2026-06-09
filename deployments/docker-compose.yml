@@ -128,9 +128,14 @@ services:
       # Shared secret to authenticate the internal plan-activation endpoint
       # called by the payment webhook (must match invoice-service).
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
-      # Resend transactional email (subscription invoice/confirmation, OTP, etc.).
+      # Transactional email (subscription invoice/confirmation, OTP, etc.).
+      # SMTP preferred (mailspace.id); Resend is an optional fallback.
+      EMAIL_FROM: ${EMAIL_FROM:-Suluk <admin@suluk.site>}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      EMAIL_FROM: ${EMAIL_FROM:-Suluk <onboarding@resend.dev>}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 60m

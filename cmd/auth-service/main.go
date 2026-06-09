@@ -77,7 +77,14 @@ func main() {
 	jamaahAddr := os.Getenv("JAMAAH_SERVICE_ADDR")
 	invoiceAddr := os.Getenv("INVOICE_SERVICE_ADDR")
 	authService := service.NewAuthService(authRepo, jwtManager, rdb, jamaahAddr, invoiceAddr).
-		WithEmail(sharedEmail.New(cfg.Email.ResendAPIKey, cfg.Email.From))
+		WithEmail(sharedEmail.New(sharedEmail.Config{
+			From:         cfg.Email.From,
+			SMTPHost:     cfg.Email.SMTPHost,
+			SMTPPort:     cfg.Email.SMTPPort,
+			SMTPUser:     cfg.Email.SMTPUser,
+			SMTPPass:     cfg.Email.SMTPPass,
+			ResendAPIKey: cfg.Email.ResendAPIKey,
+		}))
 	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{

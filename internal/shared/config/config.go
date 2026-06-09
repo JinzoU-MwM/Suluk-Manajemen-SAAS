@@ -22,10 +22,14 @@ type Config struct {
 	Email    EmailConfig
 }
 
-// EmailConfig holds the Resend transactional-email settings.
+// EmailConfig holds transactional-email settings (SMTP preferred, Resend fallback).
 type EmailConfig struct {
 	ResendAPIKey string
 	From         string
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPass     string
 }
 
 type AppConfig struct {
@@ -149,6 +153,10 @@ func Load() *Config {
 		Email: EmailConfig{
 			ResendAPIKey: envOr("RESEND_API_KEY", ""),
 			From:         envOr("EMAIL_FROM", "Suluk <onboarding@resend.dev>"),
+			SMTPHost:     envOr("SMTP_HOST", ""),
+			SMTPPort:     intEnvOr("SMTP_PORT", 465),
+			SMTPUser:     envOr("SMTP_USER", ""),
+			SMTPPass:     envOr("SMTP_PASS", ""),
 		},
 	}
 }
