@@ -82,18 +82,23 @@ func invoiceNumber(orderID string, t time.Time) string {
 	return fmt.Sprintf("SULUK-INV-%s-%s", t.Format("20060102"), short)
 }
 
-// featuresGrid renders the "Yang termasuk" list as a Gmail-safe 2-column table
-// (unicode check marks, not SVG — Gmail strips inline SVG).
-func featuresGrid(features []string) string {
+// featuresGrid renders the "Yang termasuk" list as a 2-column table matching
+// the design (hosted green check PNG + feature text). checkURL is the absolute
+// URL of the green check image.
+func featuresGrid(features []string, checkURL string) string {
 	if len(features) == 0 {
 		return ""
 	}
-	const check = `<td valign="top" style="padding-right:9px;color:#1B7F5A;font-size:15px;font-weight:800;line-height:1.4;">&#10003;</td>`
-	cell := func(text string) string {
+	check := `<td valign="top" style="padding-right:9px;"><img src="` + checkURL + `" width="18" height="18" alt="" style="display:block;" /></td>`
+	cell := func(text string, padLeft bool) string {
+		pad := "0 10px 14px 0"
+		if padLeft {
+			pad = "0 0 14px 10px"
+		}
 		if text == "" {
 			return `<td class="em-feat" width="50%">&nbsp;</td>`
 		}
-		return `<td class="em-feat" width="50%" valign="top" style="padding:0 10px 14px 0;">` +
+		return `<td class="em-feat" width="50%" valign="top" style="padding:` + pad + `;">` +
 			`<table role="presentation" cellpadding="0" cellspacing="0"><tr>` + check +
 			`<td valign="top" style="font-size:13.5px;color:#3f5650;line-height:1.5;">` + htmlEscape(text) + `</td>` +
 			`</tr></table></td>`
@@ -101,9 +106,9 @@ func featuresGrid(features []string) string {
 	var b strings.Builder
 	for i := 0; i < len(features); i += 2 {
 		b.WriteString(`<tr>`)
-		b.WriteString(cell(features[i]))
+		b.WriteString(cell(features[i], false))
 		if i+1 < len(features) {
-			b.WriteString(cell(features[i+1]))
+			b.WriteString(cell(features[i+1], true))
 		} else {
 			b.WriteString(`<td class="em-feat" width="50%">&nbsp;</td>`)
 		}
@@ -113,11 +118,10 @@ func featuresGrid(features []string) string {
 }
 
 // buildInvoiceEmail returns the subject and HTML body of the subscription
-// payment-confirmation email (Indonesian, Suluk-branded). It mirrors the
-// "Email Konfirmasi Langganan" design: deep-green header, mint success badge,
-// amount block, billing-detail rows, dashboard CTA, included-features grid,
-// help note, and footer. Built table-based with inline styles for email
-// clients; check marks use the unicode glyph so they render in Gmail.
+// payment-confirmation email — a faithful port of the "Email Konfirmasi
+// Langganan" design (table-based, inline styles, email-client safe). The brand
+// mark and check icons are served as PNGs from {AppURL}/brand/ because email
+// clients (Gmail) strip inline SVG.
 func buildInvoiceEmail(d invoiceData) (subject, html string) {
 	invNo := invoiceNumber(d.OrderID, d.StartsAt)
 	subject = "Pembayaran Berhasil — Invoice " + invNo
@@ -136,7 +140,10 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
 	if appURL == "" {
 		appURL = "https://suluk.site"
 	}
+	markURL := appURL + "/brand/suluk-mark-white.png"
+	checkURL := appURL + "/brand/check-green.png"
 	waURL := "https://wa.me/" + supportWANumber
+	included := includedSection(d.PlanName, d.Features, checkURL)
 
 	html = `<!DOCTYPE html>
 <html lang="id"><head>
@@ -144,6 +151,8 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="x-apple-disable-message-reformatting" />
 <title>Suluk — Konfirmasi Langganan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
 <style>
   body { margin:0; padding:0; background:#eef2f0; -webkit-font-smoothing:antialiased; }
   a { text-decoration:none; }
@@ -161,17 +170,24 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
 </style></head>
 <body class="em-body">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#eef2f0;font-size:1px;line-height:1px;">Pembayaran berhasil — langganan Paket ` + htmlEscape(d.PlanName) + ` Anda kini aktif. Terima kasih telah bergabung bersama Suluk.</div>
+
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f0;"><tr>
     <td align="center" style="padding:40px 16px;">
 
+      <!-- ====== CARD ====== -->
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 48px rgba(15,61,46,0.12);">
 
         <!-- HEADER -->
         <tr><td style="background:#0F3D2E;padding:26px 40px;" class="em-pad">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
             <td align="left" valign="middle">
-              <div class="em-display" style="color:#ffffff;font-size:21px;font-weight:800;line-height:1;">Suluk</div>
-              <div style="color:#C99A2E;font-size:9px;font-weight:700;letter-spacing:2.6px;margin-top:5px;">ERP FOR TRAVEL</div>
+              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                <td valign="middle" style="padding-right:11px;"><img src="` + markURL + `" width="34" height="49" alt="Suluk" style="display:block;height:42px;width:auto;" /></td>
+                <td valign="middle">
+                  <div class="em-display" style="color:#ffffff;font-size:21px;font-weight:800;line-height:1;">Suluk</div>
+                  <div style="color:#C99A2E;font-size:9px;font-weight:700;letter-spacing:2.6px;margin-top:4px;">ERP FOR TRAVEL</div>
+                </td>
+              </tr></table>
             </td>
             <td align="right" valign="middle">
               <span style="color:#7FB5A1;font-size:12px;font-weight:600;">Konfirmasi&nbsp;Langganan</span>
@@ -179,9 +195,13 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
           </tr></table>
         </td></tr>
 
-        <!-- SUCCESS BADGE -->
-        <tr><td align="center" style="padding:44px 40px 0;" class="em-pad">
-          <div style="width:74px;height:74px;background:#E8F4EF;border-radius:50%;line-height:74px;text-align:center;color:#1B7F5A;font-size:40px;font-weight:700;">&#10003;</div>
+        <!-- HERO / SUCCESS -->
+        <tr><td align="center" style="padding:44px 40px 8px;" class="em-pad">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr><td align="center">
+            <div style="width:74px;height:74px;background:#E8F4EF;border-radius:50%;line-height:74px;text-align:center;">
+              <img src="` + checkURL + `" width="38" height="38" alt="" style="vertical-align:middle;" />
+            </div>
+          </td></tr></table>
         </td></tr>
         <tr><td align="center" style="padding:22px 40px 0;" class="em-pad">
           <div class="em-display em-h1" style="font-size:30px;font-weight:800;color:#10211c;letter-spacing:-0.5px;">Pembayaran Berhasil!</div>
@@ -225,8 +245,11 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
               <a href="` + appURL + `" style="display:inline-block;padding:15px 34px;font-size:15px;font-weight:700;color:#ffffff;">Buka Dashboard &rarr;</a>
             </td>
           </tr></table>
+          <div style="margin-top:14px;">
+            <a href="` + appURL + `" style="font-size:13.5px;font-weight:600;color:#1B7F5A;">Unduh Invoice (PDF)</a>
+          </div>
         </td></tr>
-` + includedSection(d.PlanName, d.Features) + `
+` + included + `
         <!-- HELP NOTE -->
         <tr><td style="padding:22px 40px 38px;" class="em-pad">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBF7EC;border-radius:14px;"><tr>
@@ -235,6 +258,7 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
         </td></tr>
 
       </table>
+      <!-- ====== /CARD ====== -->
 
       <!-- FOOTER -->
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;"><tr>
@@ -259,8 +283,8 @@ func buildInvoiceEmail(d invoiceData) (subject, html string) {
 
 // includedSection renders the "Yang termasuk dalam Paket …" block, or nothing
 // when the tier has no feature list.
-func includedSection(planName string, features []string) string {
-	grid := featuresGrid(features)
+func includedSection(planName string, features []string, checkURL string) string {
+	grid := featuresGrid(features, checkURL)
 	if grid == "" {
 		return ""
 	}
