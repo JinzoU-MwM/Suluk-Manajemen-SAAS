@@ -1,11 +1,8 @@
-﻿<script>
-  import { onMount, onDestroy } from "svelte";
+<script>
+  import { onMount } from "svelte";
   import {
     Crown,
-    X,
-    Loader2,
     CheckCircle,
-    ExternalLink,
     ScanLine,
     Sparkles,
     ShieldCheck,
@@ -18,6 +15,10 @@
   import FileUpload from "../components/FileUpload.svelte";
   import SubscriptionBanner from "../components/SubscriptionBanner.svelte";
   import GroupSelector from "../components/GroupSelector.svelte";
+  import UpgradeModal from "../components/UpgradeModal.svelte";
+  import Card from "../components/ui/Card.svelte";
+  import Badge from "../components/ui/Badge.svelte";
+  import Button from "../components/ui/Button.svelte";
   import { ApiService } from "../services/api";
   import { isProOrHigher } from "../config/pricing.js";
 
@@ -97,55 +98,8 @@
   let isSavingToGroup = $state(false);
   let groupSaveSuccess = $state("");
 
-  // Upgrade modal
+  // Upgrade modal (5-tier shared component handles tiers + payment)
   let showUpgradeModal = $state(false);
-  let paymentLoading = $state(false);
-  let paymentOrderId = $state("");
-  let paymentStatus = $state(""); // pending | paid | error
-  let paymentError = $state("");
-  let paymentPollInterval = null;
-  let selectedPlan = $state("monthly"); // monthly | annual
-
-  async function startPayment() {
-    paymentLoading = true;
-    paymentError = "";
-    try {
-      const result = await ApiService.createPaymentOrder("pro", selectedPlan);
-      paymentOrderId = result.order_id;
-      paymentStatus = "pending";
-      window.open(result.payment_url, "_blank");
-      // Start polling for payment status
-      paymentPollInterval = setInterval(async () => {
-        try {
-          const status = await ApiService.checkPaymentStatus(paymentOrderId);
-          if (status.status === "paid") {
-            paymentStatus = "paid";
-            clearInterval(paymentPollInterval);
-            localSubscription = await ApiService.getSubscriptionStatus();
-          }
-        } catch (e) {
-          /* keep polling */
-        }
-      }, 5000);
-    } catch (err) {
-      paymentError = err.message;
-      paymentStatus = "error";
-    } finally {
-      paymentLoading = false;
-    }
-  }
-
-  function closeUpgradeModal() {
-    showUpgradeModal = false;
-    if (paymentPollInterval) clearInterval(paymentPollInterval);
-    paymentStatus = "";
-    paymentOrderId = "";
-    paymentError = "";
-  }
-
-  onDestroy(() => {
-    if (paymentPollInterval) clearInterval(paymentPollInterval);
-  });
 
   // Fetch subscription status if not passed
   onMount(async () => {
@@ -325,103 +279,67 @@
   }
 
   let isBlocked = $derived(localSubscription && !localSubscription.allowed);
+  let isPro = $derived(isProOrHigher(localSubscription?.plan));
 </script>
 
-<div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+<div class="scanner-page page-enter">
   <PageHeader
     kicker="Fitur Unggulan"
-    title="AI Scanner"
-    subtitle="Upload KTP, KK, paspor, dan visa untuk diekstrak menjadi data jamaah."
+    title="AI Scanner Dokumen"
+    subtitle="Pindai KTP, Kartu Keluarga, atau Paspor — sistem akan mengekstrak data jamaah secara otomatis dengan OCR."
   >
     {#snippet actions()}
-      {#if isProOrHigher(localSubscription?.plan)}
-        <div class="inline-flex w-fit items-center gap-2 rounded-full border border-[#C99A2E]/30 bg-[#F7EFD6] px-4 py-2 text-sm font-semibold text-[#8a6a1d] shadow-sm">
-          <Crown class="h-4 w-4 text-[#C99A2E]" />
-          Pro Active
-        </div>
+      <Badge tone="success">
+        <span style="display:inline-flex;align-items:center;gap:5px;">
+          <Sparkles class="h-3.5 w-3.5" /> AI OCR
+        </span>
+      </Badge>
+      {#if isPro}
+        <span
+          style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--c-accent-soft);color:#8a6a1d;font-size:13px;font-weight:700;border:1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);"
+        >
+          <Crown class="h-4 w-4" style="color:var(--c-accent)" /> Pro Active
+        </span>
       {/if}
     {/snippet}
   </PageHeader>
 
   <!-- AI flow / info panel -->
-  <div class="mb-6 grid gap-4 lg:grid-cols-3">
-    <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm lg:col-span-2">
-      <div class="flex items-start gap-4">
-        <div class="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-800 text-white">
+  <div class="info-grid">
+    <Card style="grid-column: span 1;">
+      <div style="display:flex;align-items:flex-start;gap:16px;">
+        <div class="scan-tile">
           <ScanLine class="h-6 w-6" />
-          <div class="scan-beam pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-[#C99A2E] shadow-[0_0_10px_2px_#C99A2E]"></div>
+          <div class="scan-beam"></div>
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-sm font-bold text-[#10211c]">Alur Scan Dokumen</h2>
-            <span class="inline-flex items-center gap-1 rounded-full bg-[#F7EFD6] px-2 py-0.5 text-[11px] font-bold text-[#8a6a1d]">
-              <Sparkles class="h-3 w-3 text-[#C99A2E]" /> AI OCR
-            </span>
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h2 style="margin:0;font-size:15.5px;font-weight:800;color:var(--c-ink);">Alur Scan Dokumen</h2>
           </div>
-          <p class="mt-1 text-sm leading-relaxed text-slate-500">
+          <p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:var(--c-muted);">
             Pilih grup, upload dokumen, review hasil AI, lalu simpan ke grup atau export Excel.
           </p>
-          <div class="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500">
-            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1">
-              <FileCheck class="h-3.5 w-3.5 text-primary-600" /> Upload
-            </span>
-            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1">
-              <Sparkles class="h-3.5 w-3.5 text-primary-600" /> Ekstrak AI
-            </span>
-            <span class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/70 bg-slate-50 px-2.5 py-1">
-              <ShieldCheck class="h-3.5 w-3.5 text-primary-600" /> Review &amp; Simpan
-            </span>
+          <div class="flow-chips">
+            <span class="flow-chip"><FileCheck class="h-3.5 w-3.5" style="color:var(--c-primary)" /> Upload</span>
+            <span class="flow-chip"><Sparkles class="h-3.5 w-3.5" style="color:var(--c-primary)" /> Ekstrak AI</span>
+            <span class="flow-chip"><ShieldCheck class="h-3.5 w-3.5" style="color:var(--c-primary)" /> Review &amp; Simpan</span>
           </div>
         </div>
       </div>
-    </div>
-    <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
-      <div class="flex items-center gap-2">
-        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F7EFD6] text-[#C99A2E]">
-          <Sparkles class="h-4 w-4" />
-        </div>
-        <p class="text-xs font-bold uppercase tracking-wide text-slate-400">Mode AI</p>
-      </div>
-      <p class="mt-2 text-sm font-semibold text-[#10211c]">{cacheModeLabels[processingCacheMode]}</p>
-      <p class="mt-1 text-xs text-slate-500">{canUseBypassCacheMode ? "Bypass tersedia untuk Pro." : "Default aman untuk pemrosesan rutin."}</p>
-    </div>
-  </div>
-  <!-- Mobile Navbar (simplified - sidebar handles desktop nav) -->
-  <nav
-    class="hidden border-b border-slate-200 bg-white/80 backdrop-blur-sm px-3 sm:px-6 py-3 sm:py-4 justify-between items-center sticky top-0 z-10 lg:hidden"
-  >
-    <div class="text-sm font-semibold text-slate-800">Dashboard</div>
-    <div class="text-xs text-slate-400">OCR Ekstrak Data</div>
-  </nav>
+    </Card>
 
-  <!-- Welcome Header -->
-  <div
-    class="hidden"
-  >
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="font-serif text-lg sm:text-2xl font-bold mb-1">
-            Selamat datang{user?.full_name ? `, ${user.full_name}` : ""} 👋
-          </h1>
-          <p class="text-emerald-100 text-sm sm:text-base">
-            Upload dan ekstrak data jamaah dengan AI
-          </p>
-        </div>
-        {#if isProOrHigher(localSubscription?.plan)}
-          <div
-            class="hidden sm:flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full"
-          >
-            <Crown class="h-4 w-4 text-yellow-300" />
-            <span class="text-sm font-medium">Pro</span>
-          </div>
-        {/if}
+    <Card>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="mode-icon"><Sparkles class="h-4 w-4" /></div>
+        <p style="margin:0;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--c-faint);">Mode AI</p>
       </div>
-    </div>
+      <p style="margin:8px 0 0;font-size:14px;font-weight:700;color:var(--c-ink);">{cacheModeLabels[processingCacheMode]}</p>
+      <p style="margin:4px 0 0;font-size:12px;color:var(--c-muted);">{canUseBypassCacheMode ? "Bypass tersedia untuk Pro." : "Default aman untuk pemrosesan rutin."}</p>
+    </Card>
   </div>
 
   <!-- Subscription Banner -->
-  <div class="mb-6">
+  <div style="margin-bottom:1.5rem;">
     <SubscriptionBanner
       subscription={localSubscription}
       onUpgrade={() => (showUpgradeModal = true)}
@@ -430,75 +348,54 @@
 
   <!-- Main Content -->
   {#if isBlocked}
-    <div class="py-8 text-center">
-      <div
-        class="rounded-2xl border border-slate-200/70 bg-white p-8 shadow-sm sm:p-12"
-      >
-        <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#F7EFD6] text-[#C99A2E]">
-          <Lock class="h-8 w-8" />
-        </div>
-        <h2 class="text-lg sm:text-xl font-bold text-[#10211c] mb-2">
-          Akses Terbatas
-        </h2>
-        <p class="text-slate-500 mb-6 text-sm sm:text-base">
-          Batas penggunaan gratis telah tercapai. Upgrade ke Pro untuk
-          melanjutkan.
-        </p>
-        <button
-          onclick={() => (showUpgradeModal = true)}
-          class="mx-auto flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
-        >
-          <Crown class="h-5 w-5 text-[#F7EFD6]" />
-          Upgrade ke Pro - Rp299.000/bulan
-        </button>
+    <Card style="text-align:center;padding:48px 24px;">
+      <div class="locked-icon"><Lock class="h-8 w-8" /></div>
+      <h2 style="margin:0 0 8px;font-size:19px;font-weight:800;color:var(--c-ink);">Akses Terbatas</h2>
+      <p style="margin:0 auto 24px;max-width:420px;font-size:14px;color:var(--c-muted);">
+        Batas penggunaan gratis telah tercapai. Upgrade untuk melanjutkan.
+      </p>
+      <div style="display:inline-flex;">
+        <Button variant="primary" icon={Crown} onclick={() => (showUpgradeModal = true)}>
+          Upgrade
+        </Button>
       </div>
-    </div>
+    </Card>
   {:else}
     <!-- Group Selector -->
-    <div class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
+    <Card style="margin-bottom:1.5rem;">
       <GroupSelector
         bind:selectedGroup
         onGroupSelect={(g) => (selectedGroup = g)}
         onViewGroup={viewGroupData}
-        isPro={isProOrHigher(localSubscription?.plan) &&
-          localSubscription?.status === "active"}
+        isPro={isPro && localSubscription?.status === "active"}
       />
-    </div>
+    </Card>
 
     <!-- Success Banner -->
     {#if groupSaveSuccess}
-      <div class="mb-5">
-        <div
-          class="flex items-center gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-4"
-        >
-          <CheckCircle class="h-5 w-5 text-primary-600 flex-shrink-0" />
-          <span class="text-sm text-primary-700">{groupSaveSuccess}</span>
-        </div>
+      <div class="success-banner">
+        <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
+        <span style="font-size:14px;color:var(--c-primary-deep);">{groupSaveSuccess}</span>
       </div>
     {/if}
 
-    <div class="mb-6">
-      <details class="rounded-2xl border border-slate-200/70 bg-white px-5 py-4 shadow-sm">
-        <summary class="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer select-none">
-          <Sparkles class="h-4 w-4 text-primary-600" />
-          Advanced OCR Settings
-        </summary>
-        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label class="text-sm text-slate-600" for="cache-mode">Mode cache AI (Gemini)</label>
-          <select
-            id="cache-mode"
-            bind:value={processingCacheMode}
-            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100"
-          >
-            <option value="default">default</option>
-            <option value="refresh">refresh</option>
-            <option value="bypass" disabled={!canUseBypassCacheMode}>bypass (Pro)</option>
-          </select>
-        </div>
-        <p class="mt-2 text-xs text-slate-500">{cacheModeHint}</p>
-        <p class="mt-1 text-xs text-slate-500">{cacheModeNotice}</p>
-      </details>
-    </div>
+    <!-- Advanced OCR Settings -->
+    <details class="adv-settings">
+      <summary>
+        <Sparkles class="h-4 w-4" style="color:var(--c-primary)" />
+        Advanced OCR Settings
+      </summary>
+      <div class="adv-row">
+        <label for="cache-mode">Mode cache AI (Gemini)</label>
+        <select id="cache-mode" bind:value={processingCacheMode}>
+          <option value="default">default</option>
+          <option value="refresh">refresh</option>
+          <option value="bypass" disabled={!canUseBypassCacheMode}>bypass (Pro)</option>
+        </select>
+      </div>
+      <p class="adv-hint">{cacheModeHint}</p>
+      <p class="adv-hint">{cacheModeNotice}</p>
+    </details>
 
     <FileUpload
       bind:files
@@ -511,25 +408,14 @@
 
   <!-- Retry Banner -->
   {#if failedFileNames.length > 0 && !isProcessing && !showModal}
-    <div class="mt-5">
-      <div
-        class="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 p-4"
-      >
-        <div class="flex items-center gap-2">
-          <AlertCircle class="h-5 w-5 flex-shrink-0 text-red-500" />
-          <span class="text-sm text-red-700">
-            <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(
-              ", ",
-            )}
-          </span>
-        </div>
-        <button
-          onclick={retryFailed}
-          class="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600"
-        >
-          Coba Lagi
-        </button>
+    <div class="retry-banner">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+        <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
+        <span style="font-size:14px;color:var(--c-danger);">
+          <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(", ")}
+        </span>
       </div>
+      <Button variant="danger" onclick={retryFailed}>Coba Lagi</Button>
     </div>
   {/if}
 </div>
@@ -548,194 +434,69 @@
     showModal = false;
     showUpgradeModal = true;
   }}
-  readOnly={!isProOrHigher(localSubscription?.plan)}
+  readOnly={!isPro}
   {validationWarnings}
   {fileResults}
   {errorMessage}
 />
 
-<!-- Upgrade Modal -->
-{#if showUpgradeModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-    onclick={closeUpgradeModal}
-    role="button"
-    tabindex="-1"
-    aria-label="Tutup modal"
-  >
-    <div
-      class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-      onclick={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="upgrade-title"
-      tabindex="-1"
-    >
-      <div class="flex justify-between items-center mb-4">
-        <div class="flex items-center gap-2">
-          <Crown class="h-5 w-5 text-[#C99A2E]" />
-          <h3 class="font-bold text-lg text-[#10211c]">Upgrade ke Pro</h3>
-        </div>
-        <button
-          onclick={closeUpgradeModal}
-          class="text-slate-400 hover:text-slate-600"
-          aria-label="Close"
-        >
-          <X class="h-5 w-5" />
-        </button>
-      </div>
-
-      {#if paymentStatus === "paid"}
-        <div class="text-center py-6">
-          <div
-            class="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4"
-          >
-            <CheckCircle class="h-8 w-8 text-primary-600" />
-          </div>
-          <h4 class="text-lg font-bold text-[#10211c] mb-1">
-            Pembayaran Berhasil!
-          </h4>
-          <p class="text-sm text-slate-500">
-            Langganan Pro aktif selama 30 hari.
-          </p>
-          <button
-            onclick={closeUpgradeModal}
-            class="mt-4 w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-xl transition-all"
-          >
-            Mulai Menggunakan Pro
-          </button>
-        </div>
-      {:else}
-        <!-- Plan Toggle -->
-        <div class="flex bg-slate-100 rounded-xl p-1 mb-4">
-          <button
-            type="button"
-            onclick={() => (selectedPlan = "monthly")}
-            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all {selectedPlan ===
-            'monthly'
-              ? 'bg-white shadow text-slate-800'
-              : 'text-slate-500 hover:text-slate-700'}">Bulanan</button
-          >
-          <button
-            type="button"
-            onclick={() => (selectedPlan = "annual")}
-            class="flex-1 py-2 text-sm font-medium rounded-lg transition-all relative {selectedPlan ===
-            'annual'
-              ? 'bg-white shadow text-slate-800'
-              : 'text-slate-500 hover:text-slate-700'}"
-          >
-            Tahunan
-            <span
-              class="absolute -top-2 -right-1 text-[10px] bg-[#C99A2E] text-white px-1.5 py-0.5 rounded-full font-bold"
-              >HEMAT</span
-            >
-          </button>
-        </div>
-
-        <div
-          class="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-4"
-        >
-          {#if selectedPlan === "annual"}
-            <p class="text-2xl font-bold text-primary-800">
-               Rp 2.990.000<span class="text-sm font-normal text-primary-600">
-                 / tahun</span
-              >
-            </p>
-            <p class="text-sm text-primary-700 mt-1">
-              Hemat ~Rp 598.000 — setara ~Rp 249.000/bulan
-            </p>
-          {:else}
-            <p class="text-2xl font-bold text-primary-800">
-               Rp 299.000<span class="text-sm font-normal text-primary-600">
-                 / bulan</span
-              >
-            </p>
-            <p class="text-sm text-primary-700 mt-1">
-              Unlimited scan dokumen, prioritas support
-            </p>
-          {/if}
-        </div>
-
-        <div class="space-y-2 mb-5">
-          <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Unlimited
-            scan dokumen
-          </div>
-          <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Unlimited
-            grup jamaah
-          </div>
-          <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Export
-            Excel
-          </div>
-          <div class="flex items-center gap-2 text-sm text-slate-600">
-            <CheckCircle class="h-4 w-4 text-primary-600 flex-shrink-0" /> Prioritas
-            support
-          </div>
-        </div>
-
-        {#if paymentError}
-          <div
-            class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm text-center border border-red-100"
-          >
-            {paymentError}
-          </div>
-        {/if}
-
-        {#if paymentStatus === "pending"}
-          <div
-            class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-center"
-          >
-            <Loader2 class="h-5 w-5 animate-spin text-amber-500 mx-auto mb-2" />
-            <p class="text-sm font-medium text-amber-700">
-              Menunggu pembayaran...
-            </p>
-            <p class="text-xs text-amber-500 mt-1">
-              Selesaikan pembayaran di tab yang terbuka
-            </p>
-          </div>
-          <button
-            onclick={async () => {
-              try {
-                const s = await ApiService.checkPaymentStatus(paymentOrderId);
-                if (s.status === "paid") {
-                  paymentStatus = "paid";
-                  clearInterval(paymentPollInterval);
-                  localSubscription = await ApiService.getSubscriptionStatus();
-                }
-              } catch (e) {}
-            }}
-            class="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-          >
-            Cek Status Pembayaran
-          </button>
-        {:else}
-          <button
-            onclick={startPayment}
-            disabled={paymentLoading}
-            class="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-          >
-            {#if paymentLoading}
-              <Loader2 class="h-5 w-5 animate-spin" /> Memproses...
-            {:else}
-              <ExternalLink class="h-5 w-5" /> Bayar Sekarang
-            {/if}
-          </button>
-        {/if}
-
-        <p class="text-xs text-slate-400 text-center mt-3">
-          Pembayaran diproses oleh Pakasir (QRIS / VA / PayPal)
-        </p>
-      {/if}
-    </div>
-  </div>
-{/if}
+<!-- Upgrade Modal (shared 5-tier component) -->
+<UpgradeModal
+  show={showUpgradeModal}
+  onClose={() => (showUpgradeModal = false)}
+  onSuccess={(sub) => {
+    localSubscription = sub;
+    showUpgradeModal = false;
+  }}
+/>
 
 <style>
-  /* Animated scan-line beam on the AI scanner icon tile */
+  .scanner-page {
+    min-height: 100%;
+    padding: 1rem;
+  }
+  @media (min-width: 1024px) {
+    .scanner-page {
+      padding: 2rem;
+    }
+  }
+
+  /* info grid */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--gap, 1.25rem);
+    margin-bottom: 1.5rem;
+  }
+  @media (min-width: 1024px) {
+    .info-grid {
+      grid-template-columns: 2fr 1fr;
+    }
+  }
+
+  /* scan tile with animated beam */
+  .scan-tile {
+    position: relative;
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: var(--radius, 12px);
+    background: var(--c-primary-deep);
+    color: #fff;
+  }
   .scan-beam {
+    pointer-events: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: var(--c-accent);
+    box-shadow: 0 0 10px 2px var(--c-accent);
     animation: scan-sweep 1.8s ease-in-out infinite;
   }
   @keyframes scan-sweep {
@@ -746,5 +507,128 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .scan-beam { animation: none; opacity: 0; }
+  }
+
+  .flow-chips {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .flow-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-muted);
+    background: var(--c-bg-2);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius-sm, 8px);
+  }
+
+  .mode-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm, 8px);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+  }
+
+  .locked-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+  }
+
+  .success-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+    border: 1px solid var(--c-primary-soft);
+    background: var(--c-primary-soft);
+    border-radius: var(--radius-lg, 16px);
+  }
+
+  /* advanced settings */
+  .adv-settings {
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.25rem;
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius-lg, 16px);
+    box-shadow: var(--shadow-sm);
+  }
+  .adv-settings summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--c-ink-soft);
+    cursor: pointer;
+    user-select: none;
+  }
+  .adv-row {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  @media (min-width: 640px) {
+    .adv-row {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+  .adv-row label {
+    font-size: 14px;
+    color: var(--c-muted);
+  }
+  .adv-row select {
+    border: 1px solid var(--c-line);
+    background: var(--c-bg);
+    color: var(--c-ink-soft);
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: var(--radius, 12px);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .adv-row select:focus {
+    border-color: var(--c-primary);
+    background: var(--c-surface);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+  .adv-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--c-muted);
+  }
+
+  .retry-banner {
+    margin-top: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 1rem;
+    border: 1px solid var(--c-danger-soft);
+    background: var(--c-danger-soft);
+    border-radius: var(--radius-lg, 16px);
   }
 </style>

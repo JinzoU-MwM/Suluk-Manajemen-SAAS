@@ -1,8 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import {
-    Building2, Plus, Search, AlertCircle, ChevronRight, X,
-    Pencil, Trash2, Banknote, Calendar, Filter, CreditCard,
+    Building2, Plus, Search, AlertCircle, ChevronRight,
+    Pencil, Trash2, Banknote, Calendar,
     Truck, Wallet, Boxes,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
@@ -10,6 +10,11 @@
   import IDRInput from '../components/IDRInput.svelte';
   import PageHeader from '../components/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
+  import Badge from '../components/ui/Badge.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
+  import ProgressBar from '../components/ui/ProgressBar.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService } from '../services/api.js';
 
@@ -313,142 +318,133 @@
     perlengkapan: 'Perlengkapan', katering: 'Katering', lainnya: 'Lainnya',
   };
 
-  const typeColor = {
-    maskapai: 'bg-blue-50 text-blue-700',
-    hotel: 'bg-emerald-50 text-emerald-700',
-    transport: 'bg-amber-50 text-amber-700',
-    perlengkapan: 'bg-purple-50 text-purple-700',
-    katering: 'bg-rose-50 text-rose-700',
-    lainnya: 'bg-slate-100 text-slate-600',
+  // type → Badge tone (success|info|warning|danger|muted)
+  const typeTone = {
+    maskapai: 'info',
+    hotel: 'success',
+    transport: 'warning',
+    perlengkapan: 'info',
+    katering: 'danger',
+    lainnya: 'muted',
   };
 
   const typeIcon = {
     maskapai: Truck, hotel: Building2, transport: Truck,
     perlengkapan: Boxes, katering: Boxes, lainnya: Building2,
   };
+
+  // FilterTabs expects { value, label, count? }
+  let typeTabs = $derived(VENDOR_TYPES.map(t => ({ value: t.id, label: t.label })));
+  let billTabs = $derived(BILL_STATUSES.map(s => ({ value: s.id, label: s.label })));
 </script>
 
-<div class="flex h-screen flex-col">
+<div class="flex h-full flex-col" style="background:var(--c-bg)">
   <!-- Header -->
-  <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
+  <div class="flex-shrink-0 px-4 pt-6 lg:px-8" style="background:var(--c-bg)">
     <PageHeader
       kicker="Operasional"
-      title="Vendor & Biaya Ops"
-      subtitle="Kelola vendor dan catat pengeluaran operasional per trip"
+      title="Vendor &amp; Pemasok"
+      subtitle="Kelola maskapai, hotel, transport, dan pemasok lain beserta tagihan biaya operasional per trip."
     >
       {#snippet actions()}
         {#if !isLoading}
-          <button
-            type="button"
-            onclick={openCreateVendor}
-            class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
-          >
-            <Plus class="h-4 w-4" /> Tambah Vendor
-          </button>
+          <Button variant="primary" icon={Plus} onclick={openCreateVendor}>Tambah Vendor</Button>
         {/if}
       {/snippet}
     </PageHeader>
 
     <!-- Summary cards (Suluk design) -->
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard icon={Truck} label="Total Vendor" value={`${vendors.length}`} accent="#1B7F5A" />
-      <StatCard icon={Wallet} label="Total Outstanding" value={formatIDR(debtSummary?.total_outstanding_idr || 0)} accent="#c0392b" />
-      <StatCard icon={AlertCircle} label="Overdue" value={`${overdueCount} tagihan`} accent="#C99A2E" />
-      <StatCard icon={Boxes} label="Kategori" value={`${VENDOR_TYPES.length - 1}`} accent="#2563a8" />
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard icon={Truck} label="Total Vendor" value={`${vendors.length}`} accent="var(--c-primary)" />
+      <StatCard icon={Wallet} label="Total Outstanding" value={formatIDR(debtSummary?.total_outstanding_idr || 0)} accent="var(--c-danger)" />
+      <StatCard icon={AlertCircle} label="Overdue" value={`${overdueCount} tagihan`} accent="var(--c-accent)" />
+      <StatCard icon={Boxes} label="Kategori" value={`${VENDOR_TYPES.length - 1}`} accent="var(--c-info)" />
     </div>
 
     <!-- Search + filter -->
-    <div class="mt-4 flex gap-3">
-      <div class="relative flex-1 min-w-0">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+      <FilterTabs tabs={typeTabs} value={filterType} onChange={(v) => (filterType = v)} />
+      <div class="relative min-w-[220px] flex-1 sm:max-w-xs">
+        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style="color:var(--c-faint)" />
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Cari nama vendor atau PIC..."
-          class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          placeholder="Cari nama vendor atau PIC…"
+          class="w-full rounded-xl py-2.5 pl-9 pr-3 text-sm outline-none transition-colors"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
-      </div>
-      <div class="flex gap-1 overflow-x-auto">
-        {#each VENDOR_TYPES as t}
-          <button
-            type="button"
-            onclick={() => (filterType = t.id)}
-            class="flex-shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-all
-              {filterType === t.id ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
-          >
-            {t.label}
-          </button>
-        {/each}
       </div>
     </div>
   </div>
 
   <!-- Vendor table -->
-  <div class="flex-1 overflow-auto p-6">
+  <div class="flex-1 overflow-auto px-4 py-6 lg:px-8">
     {#if isLoading}
       <div class="space-y-3">
         {#each [1,2,3,4,5] as _}
-          <div class="h-16 animate-pulse rounded-2xl bg-slate-100"></div>
+          <div class="h-16 animate-pulse rounded-2xl" style="background:var(--c-bg-2)"></div>
         {/each}
       </div>
     {:else if filteredVendors.length === 0}
-      <div class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-24 text-slate-400 shadow-sm">
-        <Building2 class="mb-3 h-12 w-12 opacity-30" />
-        <p class="font-medium">Tidak ada vendor</p>
-        <p class="mt-1 text-sm">Klik "Tambah Vendor" untuk menambahkan vendor pertama</p>
+      <div class="rounded-2xl" style="border:1px solid var(--c-line);background:var(--c-surface);box-shadow:var(--shadow-sm)">
+        <EmptyState
+          icon={Building2}
+          title="Tidak ada vendor"
+          text={'Klik "Tambah Vendor" untuk menambahkan vendor pertama.'}
+        />
       </div>
     {:else}
-      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-2xl" style="border:1px solid var(--c-line);background:var(--c-surface);box-shadow:var(--shadow-sm)">
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[700px]">
+          <table class="w-full min-w-[720px] text-sm">
             <thead>
-              <tr class="border-b border-slate-100 text-left">
-                <th class="px-6 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Vendor</th>
-                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Tipe</th>
-                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">PIC</th>
-                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Kontak</th>
-                <th class="px-4 py-3.5"></th>
+              <tr class="text-left" style="border-bottom:1px solid var(--c-line-soft)">
+                <th class="px-6 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide" style="color:var(--c-faint)">Vendor</th>
+                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide" style="color:var(--c-faint)">Kategori</th>
+                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide" style="color:var(--c-faint)">PIC</th>
+                <th class="px-4 py-3.5 text-[11.5px] font-semibold uppercase tracking-wide" style="color:var(--c-faint)">Kontak</th>
+                <th class="px-6 py-3.5 text-right text-[11.5px] font-semibold uppercase tracking-wide" style="color:var(--c-faint)">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {#each filteredVendors as v}
                 {@const VIcon = typeIcon[v.type] || Building2}
                 <tr
-                  class="group cursor-pointer bg-white transition-colors hover:bg-primary-50/40"
+                  class="suluk-row cursor-pointer transition-colors"
+                  style="border-bottom:1px solid var(--c-line-soft)"
                   onclick={() => openDetail(v)}
                 >
-                  <td class="border-b border-slate-100 px-6 py-3.5">
+                  <td class="px-6 py-3.5">
                     <div class="flex items-center gap-3">
-                      <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style="background:#C99A2E18;color:#C99A2E">
+                      <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style="background:var(--c-accent-soft);color:var(--c-accent)">
                         <VIcon class="h-[19px] w-[19px]" />
                       </div>
                       <div class="min-w-0">
-                        <p class="truncate text-sm font-bold text-[#10211c]">{v.name}</p>
+                        <p class="truncate text-sm font-bold" style="color:var(--c-ink)">{v.name}</p>
                         {#if v.npwp}
-                          <p class="truncate text-xs text-slate-400">NPWP: {v.npwp}</p>
+                          <p class="truncate text-xs" style="color:var(--c-faint)">NPWP: {v.npwp}</p>
                         {/if}
                       </div>
                     </div>
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
-                    <span class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold {typeColor[v.type] || typeColor.lainnya}">
-                      {typeLabel[v.type] || v.type}
-                    </span>
+                  <td class="px-4 py-3.5">
+                    <Badge tone={typeTone[v.type] || 'muted'} label={typeLabel[v.type] || v.type} />
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
-                    <p class="text-sm text-slate-700">{v.pic_name || '—'}</p>
+                  <td class="px-4 py-3.5">
+                    <p class="text-sm" style="color:var(--c-ink-soft)">{v.pic_name || '—'}</p>
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
-                    <p class="text-sm text-slate-600">{v.pic_phone || '—'}</p>
+                  <td class="px-4 py-3.5">
+                    <p class="text-sm tabular" style="color:var(--c-muted)">{v.pic_phone || '—'}</p>
                     {#if v.pic_email}
-                      <p class="text-xs text-slate-400">{v.pic_email}</p>
+                      <p class="text-xs" style="color:var(--c-faint)">{v.pic_email}</p>
                     {/if}
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right">
+                  <td class="px-6 py-3.5 text-right">
                     <button
                       type="button"
                       onclick={(e) => { e.stopPropagation(); openDetail(v); }}
-                      class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
+                      class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                      style="color:var(--c-primary)"
                     >
                       Detail <ChevronRight class="h-3 w-3" />
                     </button>
@@ -472,20 +468,22 @@
 >
   <div class="p-6 space-y-4">
     <div class="flex flex-col gap-1">
-      <label for="v-name" class="text-sm font-medium text-slate-700">Nama Vendor <span class="text-red-500">*</span></label>
+      <label for="v-name" class="text-sm font-medium" style="color:var(--c-ink-soft)">Nama Vendor <span style="color:var(--c-danger)">*</span></label>
       <input
         id="v-name"
         type="text" bind:value={vendorForm.name}
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+        class="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
       />
     </div>
 
     <div class="flex flex-col gap-1">
-      <label for="v-type" class="text-sm font-medium text-slate-700">Tipe</label>
+      <label for="v-type" class="text-sm font-medium" style="color:var(--c-ink-soft)">Tipe</label>
       <select
         id="v-type"
         bind:value={vendorForm.type}
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+        class="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
       >
         {#each VENDOR_TYPES.slice(1) as t}
           <option value={t.id}>{t.label}</option>
@@ -495,108 +493,106 @@
 
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1">
-        <label for="v-npwp" class="text-sm font-medium text-slate-700">NPWP</label>
+        <label for="v-npwp" class="text-sm font-medium" style="color:var(--c-ink-soft)">NPWP</label>
         <input
           id="v-npwp"
           type="text" bind:value={vendorForm.npwp}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
       </div>
       <div class="flex flex-col gap-1">
-        <label for="v-pic-phone" class="text-sm font-medium text-slate-700">Telepon PIC</label>
+        <label for="v-pic-phone" class="text-sm font-medium" style="color:var(--c-ink-soft)">Telepon PIC</label>
         <input
           id="v-pic-phone"
           type="text" bind:value={vendorForm.pic_phone}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
       </div>
     </div>
 
     <div class="flex flex-col gap-1">
-      <label for="v-address" class="text-sm font-medium text-slate-700">Alamat</label>
+      <label for="v-address" class="text-sm font-medium" style="color:var(--c-ink-soft)">Alamat</label>
       <textarea
         id="v-address"
         bind:value={vendorForm.address}
         rows="2"
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400 resize-none"
+        class="resize-none rounded-xl px-3 py-2.5 text-sm outline-none"
+        style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
       ></textarea>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1">
-        <label for="v-pic-name" class="text-sm font-medium text-slate-700">Nama PIC</label>
+        <label for="v-pic-name" class="text-sm font-medium" style="color:var(--c-ink-soft)">Nama PIC</label>
         <input
           id="v-pic-name"
           type="text" bind:value={vendorForm.pic_name}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
       </div>
       <div class="flex flex-col gap-1">
-        <label for="v-pic-email" class="text-sm font-medium text-slate-700">Email PIC</label>
+        <label for="v-pic-email" class="text-sm font-medium" style="color:var(--c-ink-soft)">Email PIC</label>
         <input
           id="v-pic-email"
           type="email" bind:value={vendorForm.pic_email}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
       </div>
     </div>
 
-    <div class="rounded-xl bg-slate-50 p-4 space-y-3">
-      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Informasi Bank</h4>
+    <div class="space-y-3 rounded-xl p-4" style="background:var(--c-bg-2)">
+      <h4 class="text-xs font-bold uppercase tracking-wider" style="color:var(--c-faint)">Informasi Bank</h4>
       <div class="flex flex-col gap-1">
-        <label for="v-bank-name" class="text-sm font-medium text-slate-700">Nama Bank</label>
+        <label for="v-bank-name" class="text-sm font-medium" style="color:var(--c-ink-soft)">Nama Bank</label>
         <input
           id="v-bank-name"
           type="text" bind:value={vendorForm.bank_name}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div class="flex flex-col gap-1">
-          <label for="v-bank-account-number" class="text-sm font-medium text-slate-700">No. Rekening</label>
+          <label for="v-bank-account-number" class="text-sm font-medium" style="color:var(--c-ink-soft)">No. Rekening</label>
           <input
             id="v-bank-account-number"
             type="text" bind:value={vendorForm.bank_account_number}
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+            class="rounded-xl px-3 py-2.5 text-sm outline-none"
+            style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
           />
         </div>
         <div class="flex flex-col gap-1">
-          <label for="v-bank-account-name" class="text-sm font-medium text-slate-700">Atas Nama</label>
+          <label for="v-bank-account-name" class="text-sm font-medium" style="color:var(--c-ink-soft)">Atas Nama</label>
           <input
             id="v-bank-account-name"
             type="text" bind:value={vendorForm.bank_account_name}
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+            class="rounded-xl px-3 py-2.5 text-sm outline-none"
+            style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
           />
         </div>
       </div>
     </div>
 
     <div class="flex flex-col gap-1">
-      <label for="v-notes" class="text-sm font-medium text-slate-700">Catatan</label>
+      <label for="v-notes" class="text-sm font-medium" style="color:var(--c-ink-soft)">Catatan</label>
       <textarea
         id="v-notes"
         bind:value={vendorForm.notes}
         rows="2"
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400 resize-none"
+        class="resize-none rounded-xl px-3 py-2.5 text-sm outline-none"
+        style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
       ></textarea>
     </div>
 
     <div class="flex gap-2 pt-2">
-      <button
-        type="button"
-        onclick={() => (showVendorForm = false)}
-        class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-      >
-        Batal
-      </button>
-      <button
-        type="button"
-        onclick={saveVendor}
-        disabled={savingVendor}
-        class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-      >
-        {savingVendor ? 'Menyimpan...' : 'Simpan'}
-      </button>
+      <Button variant="ghost" full onclick={() => (showVendorForm = false)}>Batal</Button>
+      <Button variant="primary" full disabled={savingVendor} onclick={saveVendor}>
+        {savingVendor ? 'Menyimpan…' : 'Simpan'}
+      </Button>
     </div>
   </div>
 </SlideDrawer>
@@ -611,95 +607,70 @@
   {#if selectedVendor}
     <div class="p-6">
       <!-- Tabs -->
-      <div class="mb-5 flex gap-1">
-        <button
-          type="button"
-          onclick={() => (detailTab = 'info')}
-          class="rounded-lg px-4 py-1.5 text-xs font-semibold transition-all
-            {detailTab === 'info' ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
-        >
-          Info Vendor
-        </button>
-        <button
-          type="button"
-          onclick={() => (detailTab = 'bills')}
-          class="rounded-lg px-4 py-1.5 text-xs font-semibold transition-all
-            {detailTab === 'bills' ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
-        >
-          Tagihan ({vendorBills.length})
-        </button>
+      <div class="mb-5">
+        <FilterTabs
+          tabs={[{ value: 'info', label: 'Info Vendor' }, { value: 'bills', label: 'Tagihan', count: vendorBills.length }]}
+          value={detailTab}
+          onChange={(v) => (detailTab = v)}
+        />
       </div>
 
       {#if detailTab === 'info'}
         <!-- Vendor Info -->
         <div class="space-y-4">
-          <div class="rounded-xl bg-slate-50 p-4 space-y-2">
+          <div class="space-y-2 rounded-xl p-4" style="background:var(--c-bg-2)">
             <div class="flex items-center justify-between">
-              <span class="inline-block rounded-md px-2 py-0.5 text-xs font-semibold {typeColor[selectedVendor.type] || typeColor.lainnya}">
-                {typeLabel[selectedVendor.type] || selectedVendor.type}
-              </span>
-              <div class="flex gap-1">
-                <button
-                  type="button"
-                  onclick={() => { showDetail = false; openEditVendor(selectedVendor); }}
-                  class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 hover:bg-primary-50"
-                >
-                  <Pencil class="h-3.5 w-3.5" /> Edit
-                </button>
-                <button
-                  type="button"
-                  onclick={() => deleteVendor(selectedVendor)}
-                  class="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 class="h-3.5 w-3.5" /> Hapus
-                </button>
+              <Badge tone={typeTone[selectedVendor.type] || 'muted'} label={typeLabel[selectedVendor.type] || selectedVendor.type} />
+              <div class="flex gap-1.5">
+                <Button variant="ghost" size="sm" icon={Pencil} onclick={() => { showDetail = false; openEditVendor(selectedVendor); }}>Edit</Button>
+                <Button variant="danger" size="sm" icon={Trash2} onclick={() => deleteVendor(selectedVendor)}>Hapus</Button>
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               {#if selectedVendor.npwp}
-                <div><span class="text-slate-400">NPWP</span><br /><span class="font-medium text-slate-700">{selectedVendor.npwp}</span></div>
+                <div><span style="color:var(--c-faint)">NPWP</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.npwp}</span></div>
               {/if}
               {#if selectedVendor.pic_name}
-                <div><span class="text-slate-400">PIC</span><br /><span class="font-medium text-slate-700">{selectedVendor.pic_name}</span></div>
+                <div><span style="color:var(--c-faint)">PIC</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.pic_name}</span></div>
               {/if}
               {#if selectedVendor.pic_phone}
-                <div><span class="text-slate-400">Telepon</span><br /><span class="font-medium text-slate-700">{selectedVendor.pic_phone}</span></div>
+                <div><span style="color:var(--c-faint)">Telepon</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.pic_phone}</span></div>
               {/if}
               {#if selectedVendor.pic_email}
-                <div><span class="text-slate-400">Email</span><br /><span class="font-medium text-slate-700">{selectedVendor.pic_email}</span></div>
+                <div><span style="color:var(--c-faint)">Email</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.pic_email}</span></div>
               {/if}
             </div>
 
             {#if selectedVendor.address}
               <div class="text-sm">
-                <span class="text-slate-400">Alamat</span><br />
-                <span class="font-medium text-slate-700">{selectedVendor.address}</span>
+                <span style="color:var(--c-faint)">Alamat</span><br />
+                <span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.address}</span>
               </div>
             {/if}
           </div>
 
           {#if selectedVendor.bank_name || selectedVendor.bank_account_number}
-            <div class="rounded-xl border border-slate-100 p-4 space-y-2">
-              <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Informasi Bank</h4>
+            <div class="space-y-2 rounded-xl p-4" style="border:1px solid var(--c-line-soft)">
+              <h4 class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--c-faint)">Informasi Bank</h4>
               <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 {#if selectedVendor.bank_name}
-                  <div><span class="text-slate-400">Bank</span><br /><span class="font-medium text-slate-700">{selectedVendor.bank_name}</span></div>
+                  <div><span style="color:var(--c-faint)">Bank</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.bank_name}</span></div>
                 {/if}
                 {#if selectedVendor.bank_account_number}
-                  <div><span class="text-slate-400">No. Rekening</span><br /><span class="font-medium text-slate-700">{selectedVendor.bank_account_number}</span></div>
+                  <div><span style="color:var(--c-faint)">No. Rekening</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.bank_account_number}</span></div>
                 {/if}
                 {#if selectedVendor.bank_account_name}
-                  <div><span class="text-slate-400">Atas Nama</span><br /><span class="font-medium text-slate-700">{selectedVendor.bank_account_name}</span></div>
+                  <div><span style="color:var(--c-faint)">Atas Nama</span><br /><span class="font-medium" style="color:var(--c-ink-soft)">{selectedVendor.bank_account_name}</span></div>
                 {/if}
               </div>
             </div>
           {/if}
 
           {#if selectedVendor.notes}
-            <div class="rounded-xl border border-slate-100 p-4">
-              <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Catatan</h4>
-              <p class="mt-1 text-sm text-slate-600">{selectedVendor.notes}</p>
+            <div class="rounded-xl p-4" style="border:1px solid var(--c-line-soft)">
+              <h4 class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--c-faint)">Catatan</h4>
+              <p class="mt-1 text-sm" style="color:var(--c-muted)">{selectedVendor.notes}</p>
             </div>
           {/if}
         </div>
@@ -707,57 +678,39 @@
       {:else if detailTab === 'bills'}
         <!-- Bills List -->
         <div>
-          <div class="mb-4 flex items-center justify-between">
-            <div class="flex gap-1">
-              {#each BILL_STATUSES as s}
-                <button
-                  type="button"
-                  onclick={() => (billFilter = s.id)}
-                  class="rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all
-                    {billFilter === s.id ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
-                >
-                  {s.label}
-                </button>
-              {/each}
-            </div>
-            <button
-              type="button"
-              onclick={() => openCreateBill(selectedVendor.id)}
-              class="flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
-            >
-              <Plus class="h-3.5 w-3.5" /> Tagihan
-            </button>
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <FilterTabs tabs={billTabs} value={billFilter} onChange={(v) => (billFilter = v)} />
+            <Button variant="primary" size="sm" icon={Plus} onclick={() => openCreateBill(selectedVendor.id)}>Tagihan</Button>
           </div>
 
           {#if billsLoading}
             <div class="space-y-2">
               {#each [1,2] as _}
-                <div class="h-20 animate-pulse rounded-xl bg-slate-100"></div>
+                <div class="h-20 animate-pulse rounded-xl" style="background:var(--c-bg-2)"></div>
               {/each}
             </div>
           {:else if filteredBills.length === 0}
-            <div class="flex flex-col items-center justify-center py-12 text-slate-400">
-              <Banknote class="mb-2 h-8 w-8 opacity-30" />
-              <p class="text-sm font-medium">Belum ada tagihan</p>
-            </div>
+            <EmptyState icon={Banknote} title="Belum ada tagihan" />
           {:else}
             <div class="space-y-2">
               {#each filteredBills as bill}
+                {@const total = bill.amount_idr || bill.amount}
                 <div
                   role="button"
                   tabindex="0"
-                  class="rounded-xl border {expandedBillId === bill.id ? 'border-primary-200 bg-primary-50/50' : 'border-slate-100 bg-white'} overflow-hidden transition-all cursor-pointer outline-none focus:ring-2 focus:ring-primary-400"
+                  class="overflow-hidden rounded-xl outline-none transition-all cursor-pointer"
+                  style="border:1px solid {expandedBillId === bill.id ? 'var(--c-primary-soft)' : 'var(--c-line-soft)'};background:{expandedBillId === bill.id ? 'var(--c-primary-tint)' : 'var(--c-surface)'}"
                   onclick={() => toggleBillDetail(bill.id)}
                   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBillDetail(bill.id); } }}
                 >
                   <div class="p-4">
                     <div class="flex items-start justify-between">
-                      <div class="flex-1 min-w-0">
+                      <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                          <span class="text-sm font-semibold text-slate-800">{bill.description}</span>
+                          <span class="text-sm font-semibold" style="color:var(--c-ink)">{bill.description}</span>
                           <StatusBadge status={bill.status} size="xs" />
                         </div>
-                        <div class="mt-1 flex items-center gap-3 text-xs text-slate-400">
+                        <div class="mt-1 flex items-center gap-3 text-xs" style="color:var(--c-faint)">
                           {#if bill.due_date}
                             <span class="flex items-center gap-1"><Calendar class="h-3 w-3" /> Jatuh tempo {formatDate(bill.due_date)}</span>
                           {/if}
@@ -766,43 +719,44 @@
                           {/if}
                         </div>
                       </div>
-                      <div class="text-right flex-shrink-0 ml-4">
-                        <p class="text-sm font-bold text-slate-800">{formatIDR(bill.amount_idr || bill.amount)}</p>
-                        <p class="text-xs text-slate-400">
-                          Terbayar {formatIDR(bill.paid_amount)} · Sisa <span class="font-semibold text-red-600">{formatIDR((bill.amount_idr || bill.amount) - bill.paid_amount)}</span>
+                      <div class="ml-4 flex-shrink-0 text-right">
+                        <p class="text-sm font-bold tabular" style="color:var(--c-ink)">{formatIDR(total)}</p>
+                        <p class="text-xs" style="color:var(--c-faint)">
+                          Terbayar {formatIDR(bill.paid_amount)} · Sisa <span class="font-semibold" style="color:var(--c-danger)">{formatIDR(total - bill.paid_amount)}</span>
                         </p>
                       </div>
                     </div>
                     <!-- Progress -->
-                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        class="h-full rounded-full {bill.status === 'lunas' ? 'bg-emerald-400' : 'bg-amber-400'}"
-                        style="width: {Math.min(100, Math.round((bill.paid_amount / Math.max(bill.amount_idr || bill.amount, 1)) * 100))}%"
-                      ></div>
+                    <div class="mt-2.5">
+                      <ProgressBar
+                        value={bill.paid_amount}
+                        max={Math.max(total, 1)}
+                        color={bill.status === 'lunas' ? 'var(--c-success)' : 'var(--c-accent)'}
+                      />
                     </div>
                   </div>
 
                   <!-- Expanded: Payments -->
                   {#if expandedBillId === bill.id}
-                    <div class="border-t border-primary-100 px-4 py-3 space-y-3">
+                    <div class="space-y-3 px-4 py-3" style="border-top:1px solid var(--c-primary-soft)">
                       {#if paymentsLoading}
-                        <div class="h-12 animate-pulse rounded-lg bg-slate-100"></div>
+                        <div class="h-12 animate-pulse rounded-lg" style="background:var(--c-bg-2)"></div>
                       {:else}
-                        <h5 class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Riwayat Pembayaran</h5>
+                        <h5 class="text-[10px] font-bold uppercase tracking-wider" style="color:var(--c-faint)">Riwayat Pembayaran</h5>
                         {#if billPayments.length === 0}
-                          <p class="text-xs text-slate-400">Belum ada pembayaran</p>
+                          <p class="text-xs" style="color:var(--c-faint)">Belum ada pembayaran</p>
                         {:else}
                           <div class="space-y-1.5">
                             {#each billPayments as p}
-                              <div class="flex items-center justify-between rounded-lg bg-white px-3 py-2">
+                              <div class="flex items-center justify-between rounded-lg px-3 py-2" style="background:var(--c-surface)">
                                 <div>
-                                  <p class="text-xs font-semibold text-slate-700">{formatDate(p.payment_date)}</p>
+                                  <p class="text-xs font-semibold" style="color:var(--c-ink-soft)">{formatDate(p.payment_date)}</p>
                                   {#if p.source_account}
-                                    <p class="text-[11px] text-slate-400">Dari: {p.source_account}</p>
+                                    <p class="text-[11px]" style="color:var(--c-faint)">Dari: {p.source_account}</p>
                                   {/if}
                                 </div>
                                 <div class="text-right">
-                                  <p class="text-sm font-bold text-emerald-600">{formatIDR(p.amount_idr || p.amount)}</p>
+                                  <p class="text-sm font-bold tabular" style="color:var(--c-success)">{formatIDR(p.amount_idr || p.amount)}</p>
                                 </div>
                               </div>
                             {/each}
@@ -815,38 +769,42 @@
                           <button
                             type="button"
                             onclick={(e) => { e.stopPropagation(); openPayForm(bill.id); }}
-                            class="flex w-full items-center justify-center gap-2 rounded-xl border border-primary-200 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                            class="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold transition-colors"
+                            style="border:1px solid var(--c-primary-soft);color:var(--c-primary-deep)"
                           >
                             <Plus class="h-3.5 w-3.5" /> Rekam Pembayaran
                           </button>
                         {/if}
 
                         {#if showPaymentForm && payBillId === bill.id}
-                          <div role="presentation" class="rounded-xl bg-white p-3 border border-primary-100 space-y-2" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-                            <h5 class="text-xs font-bold text-primary-800">Pembayaran Baru</h5>
+                          <div role="presentation" class="space-y-2 rounded-xl p-3" style="background:var(--c-surface);border:1px solid var(--c-primary-soft)" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+                            <h5 class="text-xs font-bold" style="color:var(--c-primary-deep)">Pembayaran Baru</h5>
                             <IDRInput label="Nominal" bind:value={payForm.amount} required />
                             <div class="flex flex-col gap-1">
-                              <label for="pay-bill-date" class="text-xs font-medium text-slate-700">Tanggal Bayar</label>
+                              <label for="pay-bill-date" class="text-xs font-medium" style="color:var(--c-ink-soft)">Tanggal Bayar</label>
                               <input
                                 id="pay-bill-date"
                                 type="date" bind:value={payForm.payment_date}
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400"
+                                class="rounded-xl px-3 py-2 text-sm outline-none"
+                                style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
                               />
                             </div>
                             <div class="flex flex-col gap-1">
-                              <label for="pay-bill-source" class="text-xs font-medium text-slate-700">Sumber Dana</label>
+                              <label for="pay-bill-source" class="text-xs font-medium" style="color:var(--c-ink-soft)">Sumber Dana</label>
                               <input
                                 id="pay-bill-source"
                                 type="text" bind:value={payForm.source_account}
-                                placeholder="Kas / Rekening..."
-                                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400"
+                                placeholder="Kas / Rekening…"
+                                class="rounded-xl px-3 py-2 text-sm outline-none"
+                                style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
                               />
                             </div>
                             <div class="flex gap-2 pt-1">
                               <button
                                 type="button"
                                 onclick={(e) => { e.stopPropagation(); showPaymentForm = false; }}
-                                class="flex-1 rounded-lg border border-slate-200 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                class="flex-1 rounded-lg py-1.5 text-xs font-semibold"
+                                style="border:1px solid var(--c-line);color:var(--c-muted)"
                               >
                                 Batal
                               </button>
@@ -854,9 +812,10 @@
                                 type="button"
                                 onclick={(e) => { e.stopPropagation(); savePayment(); }}
                                 disabled={savingPayment}
-                                class="flex-1 rounded-lg bg-primary-600 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                                class="flex-1 rounded-lg py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                                style="background:var(--c-primary)"
                               >
-                                {savingPayment ? '...' : 'Simpan'}
+                                {savingPayment ? '…' : 'Simpan'}
                               </button>
                             </div>
                           </div>
@@ -883,12 +842,13 @@
 >
   <div class="p-6 space-y-4">
     <div class="flex flex-col gap-1">
-      <label for="b-desc" class="text-sm font-medium text-slate-700">Deskripsi <span class="text-red-500">*</span></label>
+      <label for="b-desc" class="text-sm font-medium" style="color:var(--c-ink-soft)">Deskripsi <span style="color:var(--c-danger)">*</span></label>
       <input
         id="b-desc"
         type="text" bind:value={billForm.description}
         placeholder="e.g. Tiket pesawat Umroh Ramadan"
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+        class="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
       />
     </div>
 
@@ -896,11 +856,12 @@
 
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1">
-        <label for="b-curr" class="text-sm font-medium text-slate-700">Mata Uang</label>
+        <label for="b-curr" class="text-sm font-medium" style="color:var(--c-ink-soft)">Mata Uang</label>
         <select
           id="b-curr"
           bind:value={billForm.currency}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         >
           <option value="IDR">IDR</option>
           <option value="USD">USD</option>
@@ -908,32 +869,35 @@
         </select>
       </div>
       <div class="flex flex-col gap-1">
-        <label for="b-rate" class="text-sm font-medium text-slate-700">Kurs</label>
+        <label for="b-rate" class="text-sm font-medium" style="color:var(--c-ink-soft)">Kurs</label>
         <input
           id="b-rate"
           type="number" bind:value={billForm.exchange_rate}
           step="0.01"
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         />
       </div>
     </div>
 
     <div class="flex flex-col gap-1">
-      <label for="b-due" class="text-sm font-medium text-slate-700">Jatuh Tempo</label>
+      <label for="b-due" class="text-sm font-medium" style="color:var(--c-ink-soft)">Jatuh Tempo</label>
       <input
         id="b-due"
         type="date" bind:value={billForm.due_date}
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+        class="rounded-xl px-3 py-2.5 text-sm outline-none"
+        style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
       />
     </div>
 
     {#if packages.length > 0}
       <div class="flex flex-col gap-1">
-        <label for="b-pkg" class="text-sm font-medium text-slate-700">Trip (opsional)</label>
+        <label for="b-pkg" class="text-sm font-medium" style="color:var(--c-ink-soft)">Trip (opsional)</label>
         <select
           id="b-pkg"
           bind:value={billForm.package_id}
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
+          class="rounded-xl px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
         >
           <option value="">— Pilih Trip —</option>
           {#each packages as pkg}
@@ -944,21 +908,19 @@
     {/if}
 
     <div class="flex gap-2 pt-2">
-      <button
-        type="button"
-        onclick={() => (showBillForm = false)}
-        class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-      >
-        Batal
-      </button>
-      <button
-        type="button"
-        onclick={saveBill}
-        disabled={savingBill}
-        class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-      >
-        {savingBill ? 'Menyimpan...' : 'Simpan'}
-      </button>
+      <Button variant="ghost" full onclick={() => (showBillForm = false)}>Batal</Button>
+      <Button variant="primary" full disabled={savingBill} onclick={saveBill}>
+        {savingBill ? 'Menyimpan…' : 'Simpan'}
+      </Button>
     </div>
   </div>
 </SlideDrawer>
+
+<style>
+  .suluk-row:hover {
+    background: var(--c-primary-tint);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+</style>

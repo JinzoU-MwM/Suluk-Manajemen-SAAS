@@ -9,6 +9,10 @@
   import PageHeader from '../components/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
+  import Card from '../components/ui/Card.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService, authHeaders } from '../services/api.js';
 
@@ -132,179 +136,404 @@
       showToast('Gagal mengunduh: ' + e.message, 'error');
     }
   }
+
+  const payrollTabs = [
+    { value: 'employees', label: 'Karyawan' },
+    { value: 'slips', label: 'Slip Gaji' },
+    { value: 'advances', label: 'Kasbon' },
+  ];
 </script>
 
-<div class="flex flex-col gap-6 p-4 lg:p-8">
+<div class="payroll-page">
   <PageHeader kicker="Penggajian" title="Penggajian" subtitle="Kelola karyawan, gaji, dan kasbon." />
 
   {#if loading}
-    <div class="flex items-center justify-center py-16"><div class="h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div></div>
+    <div class="payroll-loading"><div class="payroll-spinner"></div></div>
   {:else}
     <!-- Summary -->
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <StatCard icon={Users} label="Karyawan Aktif" value={`${summary.active_employees}/${summary.total_employees}`} accent="#1B7F5A" />
-      <StatCard icon={Banknote} label="Gaji Bulan Ini" value={formatIDR(summary.monthly_payroll)} accent="#2563a8" />
-      <StatCard icon={Clock} label="Kasbon Outstanding" value={formatIDR(summary.outstanding_advances)} accent="#C99A2E" />
-      <StatCard icon={Wallet} label="Total Kasbon" value={formatIDR(summary.total_advances)} accent="#1B7F5A" />
+    <div class="payroll-stats">
+      <StatCard icon={Users} label="Karyawan Aktif" value={`${summary.active_employees}/${summary.total_employees}`} accent="var(--c-primary)" />
+      <StatCard icon={Banknote} label="Gaji Bulan Ini" value={formatIDR(summary.monthly_payroll)} accent="var(--c-info)" />
+      <StatCard icon={Clock} label="Kasbon Outstanding" value={formatIDR(summary.outstanding_advances)} accent="var(--c-accent)" />
+      <StatCard icon={Wallet} label="Total Kasbon" value={formatIDR(summary.total_advances)} accent="var(--c-primary)" />
     </div>
 
-    <!-- Tabs -->
-    <div class="flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
-      <button type="button" onclick={() => tab = 'employees'} class="rounded-lg px-4 py-2 text-xs font-semibold {tab === 'employees' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}">Karyawan</button>
-      <button type="button" onclick={() => tab = 'slips'} class="rounded-lg px-4 py-2 text-xs font-semibold {tab === 'slips' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}">Slip Gaji</button>
-      <button type="button" onclick={() => tab = 'advances'} class="rounded-lg px-4 py-2 text-xs font-semibold {tab === 'advances' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}">Kasbon</button>
+    <!-- Tabs + actions -->
+    <div class="payroll-toolbar">
+      <FilterTabs tabs={payrollTabs} value={tab} onChange={(v) => tab = v} />
+
+      {#if tab === 'employees'}
+        <Button variant="primary" icon={Plus} onclick={openNewEmployee}>Tambah Karyawan</Button>
+      {:else if tab === 'slips'}
+        <Button variant="primary" icon={FileText} onclick={() => { slipForm = { employee_id: '', period: new Date().toISOString().slice(0, 7), package_id: '', notes: '' }; showSlipDrawer = true; }}>Buat Slip</Button>
+      {:else}
+        <Button variant="primary" icon={Wallet} onclick={() => { advanceForm = { employee_id: '', amount: 0, reason: '' }; showAdvanceDrawer = true; }}>Catat Kasbon</Button>
+      {/if}
     </div>
 
     <!-- Employees Tab -->
     {#if tab === 'employees'}
-      <div class="flex justify-end"><button type="button" onclick={openNewEmployee} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"><Plus class="h-4 w-4" /> Tambah Karyawan</button></div>
-      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-        {#if employees.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Users class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada karyawan</p></div>
-        {:else}
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-slate-100"><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Nama</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jabatan</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Tipe</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Gaji Pokok</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Tunjangan</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"></th></tr></thead>
-            <tbody>
-              {#each employees as e}
-                <tr class="transition-colors hover:bg-primary-50/30">
-                  <td class="border-b border-slate-100 px-4 py-3.5"><div class="flex items-center gap-3"><Avatar name={e.name} size={38} /><span class="font-bold text-[#10211c]">{e.name}</span></div></td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-slate-600">{e.position}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5"><span class="rounded-full px-2 py-0.5 text-xs font-medium {e.type === 'tetap' ? 'bg-primary-50 text-primary-700' : 'bg-purple-50 text-purple-700'}">{e.type === 'tetap' ? 'Tetap' : 'Freelance'}</span></td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right font-semibold text-slate-700" style="font-variant-numeric:tabular-nums">{formatIDR(e.base_salary)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-slate-600" style="font-variant-numeric:tabular-nums">{formatIDR(e.allowance)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right"><button type="button" onclick={() => editEmployee(e)} class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><Pencil class="h-4 w-4" /></button></td>
+      {#if employees.length === 0}
+        <Card><EmptyState icon={Users} title="Belum ada karyawan" text="Tambahkan karyawan untuk mulai mengelola penggajian." /></Card>
+      {:else}
+        <Card pad={false} style="padding:8px 4px">
+          <div class="payroll-table-wrap">
+            <table class="payroll-table">
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>Jabatan</th>
+                  <th>Tipe</th>
+                  <th class="ta-right">Gaji Pokok</th>
+                  <th class="ta-right">Tunjangan</th>
+                  <th class="ta-right"></th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      </div>
+              </thead>
+              <tbody>
+                {#each employees as e}
+                  <tr class="payroll-row">
+                    <td>
+                      <div class="cell-id">
+                        <Avatar name={e.name} size={38} />
+                        <span class="cell-name">{e.name}</span>
+                      </div>
+                    </td>
+                    <td>{e.position}</td>
+                    <td>
+                      <span class="type-pill" style={e.type === 'tetap' ? 'background:var(--c-primary-soft);color:var(--c-primary-deep)' : 'background:var(--c-info-soft);color:var(--c-info)'}>{e.type === 'tetap' ? 'Tetap' : 'Freelance'}</span>
+                    </td>
+                    <td class="ta-right tabular cell-strong">{formatIDR(e.base_salary)}</td>
+                    <td class="ta-right tabular">{formatIDR(e.allowance)}</td>
+                    <td class="ta-right">
+                      <button type="button" onclick={() => editEmployee(e)} class="icon-btn" aria-label="Edit karyawan"><Pencil size={16} /></button>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      {/if}
     {/if}
 
     <!-- Slips Tab -->
     {#if tab === 'slips'}
-      <div class="flex justify-end"><button type="button" onclick={() => { slipForm = { employee_id: '', period: new Date().toISOString().slice(0, 7), package_id: '', notes: '' }; showSlipDrawer = true; }} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"><FileText class="h-4 w-4" /> Buat Slip</button></div>
-      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-        {#if slips.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Receipt class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada slip gaji</p></div>
-        {:else}
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-slate-100"><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Karyawan</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Periode</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Gaji Kotor</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">PPh21</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">BPJS</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Bersih</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"></th></tr></thead>
-            <tbody>
-              {#each slips as s}
-                <tr class="transition-colors hover:bg-primary-50/30">
-                  <td class="border-b border-slate-100 px-4 py-3.5"><div class="flex items-center gap-3"><Avatar name={s.employee_name} size={38} /><span class="font-bold text-[#10211c]">{s.employee_name}</span></div></td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-slate-600">{s.period}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-slate-700" style="font-variant-numeric:tabular-nums">{formatIDR(s.base_salary + s.allowance)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-red-600" style="font-variant-numeric:tabular-nums">{formatIDR(s.pph21_amount)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right text-red-600" style="font-variant-numeric:tabular-nums">{formatIDR(s.bpjs_amount)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right font-bold text-primary-600" style="font-variant-numeric:tabular-nums">{formatIDR(s.net_salary)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5"><StatusBadge status={s.status} size="xs" /></td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right">
-                    {#if s.status === 'draft'}
-                      <button type="button" onclick={() => finalizeSlip(s.id)} class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">Final</button>
-                    {:else if s.status === 'final'}
-                      <button type="button" onclick={() => downloadSlipPDF(s)} class="rounded-lg bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200">PDF</button>
-                    {/if}
-                  </td>
+      {#if slips.length === 0}
+        <Card><EmptyState icon={Receipt} title="Belum ada slip gaji" text="Buat slip gaji untuk karyawan pada periode terpilih." /></Card>
+      {:else}
+        <Card pad={false} style="padding:8px 4px">
+          <div class="payroll-table-wrap">
+            <table class="payroll-table">
+              <thead>
+                <tr>
+                  <th>Karyawan</th>
+                  <th>Periode</th>
+                  <th class="ta-right">Gaji Kotor</th>
+                  <th class="ta-right">PPh21</th>
+                  <th class="ta-right">BPJS</th>
+                  <th class="ta-right">Bersih</th>
+                  <th>Status</th>
+                  <th class="ta-right"></th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      </div>
+              </thead>
+              <tbody>
+                {#each slips as s}
+                  <tr class="payroll-row">
+                    <td>
+                      <div class="cell-id">
+                        <Avatar name={s.employee_name} size={38} />
+                        <span class="cell-name">{s.employee_name}</span>
+                      </div>
+                    </td>
+                    <td>{s.period}</td>
+                    <td class="ta-right tabular">{formatIDR(s.base_salary + s.allowance)}</td>
+                    <td class="ta-right tabular cell-danger">{formatIDR(s.pph21_amount)}</td>
+                    <td class="ta-right tabular cell-danger">{formatIDR(s.bpjs_amount)}</td>
+                    <td class="ta-right tabular cell-net">{formatIDR(s.net_salary)}</td>
+                    <td><StatusBadge status={s.status} size="xs" /></td>
+                    <td class="ta-right">
+                      {#if s.status === 'draft'}
+                        <Button size="sm" variant="soft" onclick={() => finalizeSlip(s.id)}>Final</Button>
+                      {:else if s.status === 'final'}
+                        <Button size="sm" variant="ghost" onclick={() => downloadSlipPDF(s)}>PDF</Button>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      {/if}
     {/if}
 
     <!-- Advances Tab -->
     {#if tab === 'advances'}
-      <div class="flex justify-end"><button type="button" onclick={() => { advanceForm = { employee_id: '', amount: 0, reason: '' }; showAdvanceDrawer = true; }} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"><Wallet class="h-4 w-4" /> Catat Kasbon</button></div>
-      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-        {#if advances.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Wallet class="h-10 w-10 mb-2" /><p class="text-sm">Belum ada kasbon</p></div>
-        {:else}
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-slate-100"><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Karyawan</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jumlah</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Sisa</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Alasan</th><th class="px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th><th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"></th></tr></thead>
-            <tbody>
-              {#each advances as a}
-                <tr class="transition-colors hover:bg-primary-50/30">
-                  <td class="border-b border-slate-100 px-4 py-3.5"><div class="flex items-center gap-3"><Avatar name={a.employee_name} size={38} /><span class="font-bold text-[#10211c]">{a.employee_name}</span></div></td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right font-semibold text-slate-700" style="font-variant-numeric:tabular-nums">{formatIDR(a.amount)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right {a.remaining > 0 ? 'text-amber-600 font-semibold' : 'text-slate-400'}" style="font-variant-numeric:tabular-nums">{formatIDR(a.remaining)}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 max-w-[200px] truncate text-xs text-slate-500">{a.reason || '-'}</td>
-                  <td class="border-b border-slate-100 px-4 py-3.5"><StatusBadge status={a.status} size="xs" /></td>
-                  <td class="border-b border-slate-100 px-4 py-3.5 text-right">{#if a.remaining > 0}<button type="button" onclick={() => openRepay(a)} class="rounded-lg bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-200">Bayar</button>{/if}</td>
+      {#if advances.length === 0}
+        <Card><EmptyState icon={Wallet} title="Belum ada kasbon" text="Catat kasbon karyawan untuk melacak sisa pinjaman." /></Card>
+      {:else}
+        <Card pad={false} style="padding:8px 4px">
+          <div class="payroll-table-wrap">
+            <table class="payroll-table">
+              <thead>
+                <tr>
+                  <th>Karyawan</th>
+                  <th class="ta-right">Jumlah</th>
+                  <th class="ta-right">Sisa</th>
+                  <th>Alasan</th>
+                  <th>Status</th>
+                  <th class="ta-right"></th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      </div>
+              </thead>
+              <tbody>
+                {#each advances as a}
+                  <tr class="payroll-row">
+                    <td>
+                      <div class="cell-id">
+                        <Avatar name={a.employee_name} size={38} />
+                        <span class="cell-name">{a.employee_name}</span>
+                      </div>
+                    </td>
+                    <td class="ta-right tabular cell-strong">{formatIDR(a.amount)}</td>
+                    <td class="ta-right tabular" style={a.remaining > 0 ? 'color:var(--c-warning);font-weight:700' : 'color:var(--c-faint)'}>{formatIDR(a.remaining)}</td>
+                    <td class="cell-reason">{a.reason || '-'}</td>
+                    <td><StatusBadge status={a.status} size="xs" /></td>
+                    <td class="ta-right">
+                      {#if a.remaining > 0}
+                        <Button size="sm" variant="soft" onclick={() => openRepay(a)}>Bayar</Button>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      {/if}
     {/if}
   {/if}
 </div>
 
 <!-- Employee Drawer -->
 <SlideDrawer open={showEmployeeDrawer} onClose={() => showEmployeeDrawer = false} title={editingEmployee ? 'Edit Karyawan' : 'Tambah Karyawan'} width="520px">
-  <div class="flex flex-col gap-4 p-4">
-    <div class="flex flex-col gap-1"><label for="emp-name" class="text-xs font-medium text-slate-700">Nama</label><input id="emp-name" type="text" bind:value={employeeForm.name} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex flex-col gap-1"><label for="emp-pos" class="text-xs font-medium text-slate-700">Jabatan</label><input id="emp-pos" type="text" bind:value={employeeForm.position} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex flex-col gap-1"><label for="emp-type" class="text-xs font-medium text-slate-700">Tipe</label><select id="emp-type" bind:value={employeeForm.type} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"><option value="tetap">Tetap</option><option value="freelance">Freelance</option></select></div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="flex flex-col gap-1"><label for="emp-base" class="text-xs font-medium text-slate-700">Gaji Pokok</label><input id="emp-base" type="number" bind:value={employeeForm.base_salary} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-      <div class="flex flex-col gap-1"><label for="emp-allow" class="text-xs font-medium text-slate-700">Tunjangan</label><input id="emp-allow" type="number" bind:value={employeeForm.allowance} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+  <div class="drawer-form">
+    <div class="field"><label for="emp-name">Nama</label><input id="emp-name" type="text" bind:value={employeeForm.name} /></div>
+    <div class="field"><label for="emp-pos">Jabatan</label><input id="emp-pos" type="text" bind:value={employeeForm.position} /></div>
+    <div class="field"><label for="emp-type">Tipe</label><select id="emp-type" bind:value={employeeForm.type}><option value="tetap">Tetap</option><option value="freelance">Freelance</option></select></div>
+    <div class="field-grid">
+      <div class="field"><label for="emp-base">Gaji Pokok</label><input id="emp-base" type="number" bind:value={employeeForm.base_salary} /></div>
+      <div class="field"><label for="emp-allow">Tunjangan</label><input id="emp-allow" type="number" bind:value={employeeForm.allowance} /></div>
     </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="flex flex-col gap-1"><label for="emp-bpjs-tk" class="text-xs font-medium text-slate-700">BPJS TK</label><input id="emp-bpjs-tk" type="number" bind:value={employeeForm.bpjs_tk} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-      <div class="flex flex-col gap-1"><label for="emp-bpjs-kes" class="text-xs font-medium text-slate-700">BPJS Kes</label><input id="emp-bpjs-kes" type="number" bind:value={employeeForm.bpjs_kes} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <div class="field-grid">
+      <div class="field"><label for="emp-bpjs-tk">BPJS TK</label><input id="emp-bpjs-tk" type="number" bind:value={employeeForm.bpjs_tk} /></div>
+      <div class="field"><label for="emp-bpjs-kes">BPJS Kes</label><input id="emp-bpjs-kes" type="number" bind:value={employeeForm.bpjs_kes} /></div>
     </div>
-    <div class="flex flex-col gap-1"><label for="emp-pph21" class="text-xs font-medium text-slate-700">PPh21 (%)</label><input id="emp-pph21" type="number" bind:value={employeeForm.pph21_rate} step="0.01" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="grid grid-cols-2 gap-3">
-      <div class="flex flex-col gap-1"><label for="emp-phone" class="text-xs font-medium text-slate-700">Telepon</label><input id="emp-phone" type="text" bind:value={employeeForm.phone} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-      <div class="flex flex-col gap-1"><label for="emp-email" class="text-xs font-medium text-slate-700">Email</label><input id="emp-email" type="email" bind:value={employeeForm.email} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <div class="field"><label for="emp-pph21">PPh21 (%)</label><input id="emp-pph21" type="number" bind:value={employeeForm.pph21_rate} step="0.01" /></div>
+    <div class="field-grid">
+      <div class="field"><label for="emp-phone">Telepon</label><input id="emp-phone" type="text" bind:value={employeeForm.phone} /></div>
+      <div class="field"><label for="emp-email">Email</label><input id="emp-email" type="email" bind:value={employeeForm.email} /></div>
     </div>
-    <div class="flex gap-2 pt-2">
-      <button type="button" onclick={() => showEmployeeDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
-      <button type="button" onclick={saveEmployee} disabled={savingEmployee} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingEmployee ? '...' : 'Simpan'}</button>
+    <div class="drawer-actions">
+      <Button variant="ghost" full onclick={() => showEmployeeDrawer = false}>Batal</Button>
+      <Button variant="primary" full disabled={savingEmployee} onclick={saveEmployee}>{savingEmployee ? '...' : 'Simpan'}</Button>
     </div>
   </div>
 </SlideDrawer>
 
 <!-- Slip Drawer -->
 <SlideDrawer open={showSlipDrawer} onClose={() => showSlipDrawer = false} title="Buat Slip Gaji" width="480px">
-  <div class="flex flex-col gap-4 p-4">
-    <div class="flex flex-col gap-1"><label for="slip-emp" class="text-xs font-medium text-slate-700">Karyawan</label><select id="slip-emp" bind:value={slipForm.employee_id} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"><option value="">Pilih Karyawan</option>{#each employees as e}<option value={e.id}>{e.name} — {e.position}</option>{/each}</select></div>
-    <div class="flex flex-col gap-1"><label for="slip-period" class="text-xs font-medium text-slate-700">Periode</label><input id="slip-period" type="month" bind:value={slipForm.period} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex flex-col gap-1"><label for="slip-notes" class="text-xs font-medium text-slate-700">Catatan</label><input id="slip-notes" type="text" bind:value={slipForm.notes} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex gap-2 pt-2">
-      <button type="button" onclick={() => showSlipDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
-      <button type="button" onclick={generateSlip} disabled={savingSlip || !slipForm.employee_id} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingSlip ? '...' : 'Generate'}</button>
+  <div class="drawer-form">
+    <div class="field"><label for="slip-emp">Karyawan</label><select id="slip-emp" bind:value={slipForm.employee_id}><option value="">Pilih Karyawan</option>{#each employees as e}<option value={e.id}>{e.name} — {e.position}</option>{/each}</select></div>
+    <div class="field"><label for="slip-period">Periode</label><input id="slip-period" type="month" bind:value={slipForm.period} /></div>
+    <div class="field"><label for="slip-notes">Catatan</label><input id="slip-notes" type="text" bind:value={slipForm.notes} /></div>
+    <div class="drawer-actions">
+      <Button variant="ghost" full onclick={() => showSlipDrawer = false}>Batal</Button>
+      <Button variant="primary" full disabled={savingSlip || !slipForm.employee_id} onclick={generateSlip}>{savingSlip ? '...' : 'Generate'}</Button>
     </div>
   </div>
 </SlideDrawer>
 
 <!-- Advance Drawer -->
 <SlideDrawer open={showAdvanceDrawer} onClose={() => showAdvanceDrawer = false} title="Catat Kasbon" width="480px">
-  <div class="flex flex-col gap-4 p-4">
-    <div class="flex flex-col gap-1"><label for="adv-emp" class="text-xs font-medium text-slate-700">Karyawan</label><select id="adv-emp" bind:value={advanceForm.employee_id} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"><option value="">Pilih Karyawan</option>{#each employees as e}<option value={e.id}>{e.name}</option>{/each}</select></div>
-    <div class="flex flex-col gap-1"><label for="adv-amt" class="text-xs font-medium text-slate-700">Jumlah</label><input id="adv-amt" type="number" bind:value={advanceForm.amount} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex flex-col gap-1"><label for="adv-reason" class="text-xs font-medium text-slate-700">Alasan</label><input id="adv-reason" type="text" bind:value={advanceForm.reason} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex gap-2 pt-2">
-      <button type="button" onclick={() => showAdvanceDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
-      <button type="button" onclick={createAdvance} disabled={savingAdvance || !advanceForm.employee_id || advanceForm.amount <= 0} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingAdvance ? '...' : 'Catat'}</button>
+  <div class="drawer-form">
+    <div class="field"><label for="adv-emp">Karyawan</label><select id="adv-emp" bind:value={advanceForm.employee_id}><option value="">Pilih Karyawan</option>{#each employees as e}<option value={e.id}>{e.name}</option>{/each}</select></div>
+    <div class="field"><label for="adv-amt">Jumlah</label><input id="adv-amt" type="number" bind:value={advanceForm.amount} /></div>
+    <div class="field"><label for="adv-reason">Alasan</label><input id="adv-reason" type="text" bind:value={advanceForm.reason} /></div>
+    <div class="drawer-actions">
+      <Button variant="ghost" full onclick={() => showAdvanceDrawer = false}>Batal</Button>
+      <Button variant="primary" full disabled={savingAdvance || !advanceForm.employee_id || advanceForm.amount <= 0} onclick={createAdvance}>{savingAdvance ? '...' : 'Catat'}</Button>
     </div>
   </div>
 </SlideDrawer>
 
 <!-- Repay Drawer -->
 <SlideDrawer open={showRepayDrawer} onClose={() => showRepayDrawer = false} title="Bayar Kasbon" width="480px">
-  <div class="flex flex-col gap-4 p-4">
+  <div class="drawer-form">
     {#if repayingAdvance}
-      <div class="rounded-xl bg-slate-50 p-3"><p class="text-xs text-slate-500">Karyawan: <span class="font-semibold text-slate-800">{repayingAdvance.employee_name}</span></p><p class="text-xs text-slate-500">Sisa: <span class="font-semibold text-amber-600">{formatIDR(repayingAdvance.remaining)}</span></p></div>
+      <div class="repay-summary">
+        <p>Karyawan: <span class="rs-name">{repayingAdvance.employee_name}</span></p>
+        <p>Sisa: <span class="rs-amount">{formatIDR(repayingAdvance.remaining)}</span></p>
+      </div>
     {/if}
-    <div class="flex flex-col gap-1"><label for="repay-amt" class="text-xs font-medium text-slate-700">Jumlah Bayar</label><input id="repay-amt" type="number" bind:value={repayForm.amount} max={repayingAdvance?.remaining || 0} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
-    <div class="flex gap-2 pt-2">
-      <button type="button" onclick={() => showRepayDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
-      <button type="button" onclick={submitRepay} disabled={savingRepay || repayForm.amount <= 0} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingRepay ? '...' : 'Bayar'}</button>
+    <div class="field"><label for="repay-amt">Jumlah Bayar</label><input id="repay-amt" type="number" bind:value={repayForm.amount} max={repayingAdvance?.remaining || 0} /></div>
+    <div class="drawer-actions">
+      <Button variant="ghost" full onclick={() => showRepayDrawer = false}>Batal</Button>
+      <Button variant="primary" full disabled={savingRepay || repayForm.amount <= 0} onclick={submitRepay}>{savingRepay ? '...' : 'Bayar'}</Button>
     </div>
   </div>
 </SlideDrawer>
+
+<style>
+  .payroll-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap, 24px);
+    padding: 16px;
+  }
+  @media (min-width: 1024px) {
+    .payroll-page { padding: 32px; }
+  }
+
+  .payroll-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 0;
+  }
+  .payroll-spinner {
+    height: 32px;
+    width: 32px;
+    border-radius: 999px;
+    border: 2px solid var(--c-primary);
+    border-top-color: transparent;
+    animation: payroll-spin 0.7s linear infinite;
+  }
+  @keyframes payroll-spin { to { transform: rotate(360deg); } }
+
+  .payroll-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  @media (min-width: 1024px) {
+    .payroll-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  .payroll-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .payroll-table-wrap { overflow-x: auto; }
+  .payroll-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .payroll-table thead th {
+    text-align: left;
+    padding: 0 16px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--c-line);
+  }
+  .payroll-table tbody td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--c-line-soft);
+    color: var(--c-ink-soft);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .payroll-row { transition: background 0.12s; }
+  .payroll-row:hover { background: var(--c-primary-tint); }
+
+  .ta-right { text-align: right !important; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  .cell-id { display: flex; align-items: center; gap: 12px; }
+  .cell-name { font-weight: 700; color: var(--c-ink); }
+  .cell-strong { font-weight: 600; color: var(--c-ink-soft); }
+  .cell-danger { color: var(--c-danger); }
+  .cell-net { font-weight: 800; color: var(--c-primary); }
+  .cell-reason {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    color: var(--c-muted);
+  }
+
+  .type-pill {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    padding: 6px;
+    color: var(--c-faint);
+    transition: background 0.12s, color 0.12s;
+  }
+  .icon-btn:hover { background: var(--c-bg-2); color: var(--c-ink-soft); }
+
+  /* Drawer forms */
+  .drawer-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .field label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--c-ink-soft);
+  }
+  .field input,
+  .field select {
+    border-radius: var(--radius, 12px);
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--c-ink);
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  .field input:focus,
+  .field select:focus { border-color: var(--c-primary); }
+
+  .drawer-actions { display: flex; gap: 8px; padding-top: 8px; }
+
+  .repay-summary {
+    border-radius: var(--radius, 12px);
+    background: var(--c-bg-2);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .repay-summary p { font-size: 12px; color: var(--c-muted); }
+  .rs-name { font-weight: 600; color: var(--c-ink); }
+  .rs-amount { font-weight: 600; color: var(--c-warning); }
+</style>

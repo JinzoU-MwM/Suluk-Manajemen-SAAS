@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import {
     CheckCircle,
+    ChevronRight,
     Clock,
     Copy,
     Eye,
@@ -20,6 +21,11 @@
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import PageHeader from '../components/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
+  import Card from '../components/ui/Card.svelte';
+  import Badge from '../components/ui/Badge.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
   import { ApiService } from '../services/api';
   import { showToast } from '../services/toast.svelte.js';
 
@@ -134,14 +140,17 @@
     return PACKAGE_TYPES.find((item) => item.value === value)?.label || 'Semua Paket';
   }
 
-  function statusTone(status) {
+  // Maps a contract status to the design Badge status text.
+  function badgeStatus(status) {
     switch (status) {
       case 'ditandatangani':
-        return 'bg-emerald-50 text-emerald-700';
+        return 'Ditandatangani';
+      case 'terkirim':
+        return 'Terkirim';
       case 'expired':
-        return 'bg-rose-50 text-rose-700';
+        return 'Expired';
       default:
-        return 'bg-amber-50 text-amber-700';
+        return statusLabel(status);
     }
   }
 
@@ -197,6 +206,11 @@
     } finally {
       isLoadingContracts = false;
     }
+  }
+
+  function changeStatus(value) {
+    selectedStatus = value;
+    loadContracts();
   }
 
   function openCreateDrawer() {
@@ -364,214 +378,203 @@
   }
 </script>
 
-<div class="flex h-screen flex-col bg-slate-50">
-  <div class="flex-1 overflow-y-auto px-6 py-6">
+<div class="contracts-page" style="min-height:100%;background:var(--c-bg)">
+  <div class="px-4 py-6 lg:px-8">
     <PageHeader
       kicker="E-Kontrak"
       title="Kontrak & Akad"
-      subtitle="Kelola template, generate kontrak per jamaah, dan bagikan link tanda tangan 7 hari."
+      subtitle="Kelola template akad, generate kontrak per jamaah, dan pantau status penandatanganan digital."
     >
       {#snippet actions()}
         {#if canEditContracts}
-          <button
-            type="button"
-            onclick={() => openGenerateDrawer()}
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <Send class="h-4 w-4" />
-            Generate Kontrak
-          </button>
-          <button
-            type="button"
-            onclick={openCreateDrawer}
-            class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-colors hover:bg-primary-700"
-          >
-            <Plus class="h-4 w-4" />
-            Template Baru
-          </button>
+          <Button variant="ghost" icon={Send} onclick={() => openGenerateDrawer()}>Generate Kontrak</Button>
+          <Button variant="primary" icon={Plus} onclick={openCreateDrawer}>Template Baru</Button>
         {/if}
       {/snippet}
     </PageHeader>
 
+    <!-- Summary cards (Suluk design) -->
     <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <StatCard icon={FileSignature} label="Total Kontrak" value={String(summaryStats.totalKontrak)} accent="#1B7F5A" />
-      <StatCard icon={CheckCircle} label="Ditandatangani" value={String(summaryStats.ditandatangani)} accent="#1B7F5A" />
-      <StatCard icon={Clock} label="Menunggu TTD" value={String(summaryStats.menungguTtd)} accent="#C99A2E" />
-      <StatCard icon={ShieldCheck} label="Expired" value={String(summaryStats.expired)} accent="#c0392b" />
+      <StatCard icon={FileSignature} label="Total Kontrak" value={String(summaryStats.totalKontrak)} accent="var(--c-primary)" />
+      <StatCard icon={CheckCircle} label="Ditandatangani" value={String(summaryStats.ditandatangani)} accent="var(--c-success)" />
+      <StatCard icon={Clock} label="Menunggu TTD" value={String(summaryStats.menungguTtd)} accent="var(--c-warning)" />
+      <StatCard icon={ShieldCheck} label="Expired" value={String(summaryStats.expired)} accent="var(--c-danger)" />
     </div>
 
-    <div class="mb-6 flex flex-wrap items-center gap-3">
-      <select
-        bind:value={selectedType}
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
+    <!-- Sent contracts table (design Kontrak) -->
+    <Card pad={false} class="mb-6" style="overflow:hidden">
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+        style="border-bottom:1px solid var(--c-line)"
       >
-        {#each PACKAGE_TYPES as item}
-          <option value={item.value}>{item.label}</option>
-        {/each}
-      </select>
-      <select
-        bind:value={selectedStatus}
-        onchange={loadContracts}
-        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-100"
-      >
-        {#each CONTRACT_STATUSES as item}
-          <option value={item.value}>{item.label}</option>
-        {/each}
-      </select>
-      <div class="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-        <ShieldCheck class="h-4 w-4" />
-        Phase 3.1: generate + public signing
-      </div>
-    </div>
-
-    <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-    <section class="space-y-4">
-      <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center gap-2">
-          <FileText class="h-5 w-5 text-primary-600" />
-          <h2 class="text-lg font-bold text-slate-800">Template Kontrak</h2>
+        <div class="flex items-center gap-2">
+          <Link2 class="h-5 w-5" style="color:var(--c-primary)" />
+          <h2 class="text-[15px] font-extrabold" style="color:var(--c-ink)">Kontrak Terkirim</h2>
         </div>
+        <FilterTabs tabs={CONTRACT_STATUSES} value={selectedStatus} onChange={changeStatus} />
+      </div>
 
-        {#if isLoadingTemplates}
-          <div class="flex items-center justify-center gap-3 py-20 text-slate-500">
-            <Loader2 class="h-5 w-5 animate-spin" />
-            <span>Memuat template...</span>
-          </div>
-        {:else if filteredTemplates.length === 0}
-          <div class="flex flex-col items-center justify-center py-20 text-center text-slate-400">
-            <FileText class="mb-3 h-12 w-12 opacity-30" />
-            <p class="font-medium">Belum ada template kontrak</p>
-            <p class="mt-1 text-sm">Buat template untuk paket reguler, plus, atau haji khusus.</p>
-          </div>
-        {:else}
-          <div class="space-y-3">
-            {#each filteredTemplates as template}
-              <article class="rounded-2xl border border-slate-200 p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <h3 class="text-sm font-bold text-slate-800">{template.name}</h3>
-                      <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                        {typeLabel(template.package_type || '')}
-                      </span>
-                      <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold {template.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
-                        {template.is_active ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                    </div>
-                    <p class="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-500">
-                      {template.content}
-                    </p>
-                  </div>
-
-                  <div class="flex flex-wrap items-center gap-2">
+      {#if isLoadingContracts}
+        <div class="flex items-center justify-center gap-3 py-20" style="color:var(--c-muted)">
+          <Loader2 class="h-5 w-5 animate-spin" />
+          <span>Memuat kontrak...</span>
+        </div>
+      {:else if contracts.length === 0}
+        <EmptyState
+          icon={FileSignature}
+          title="Belum ada kontrak yang digenerate"
+          text="Generate kontrak dari template untuk mulai kirim link tanda tangan ke jamaah."
+        />
+      {:else}
+        <div class="overflow-x-auto">
+          <table class="w-full" style="border-collapse:collapse;font-size:13.5px">
+            <thead>
+              <tr>
+                <th class="contracts-th" style="text-align:left">No. Kontrak</th>
+                <th class="contracts-th" style="text-align:left">Jamaah</th>
+                <th class="contracts-th" style="text-align:left">Template</th>
+                <th class="contracts-th" style="text-align:center">Status</th>
+                <th class="contracts-th" style="text-align:left">Expired</th>
+                <th class="contracts-th" style="text-align:right">Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each contracts as contract}
+                <tr class="contracts-row">
+                  <td class="contracts-td">
+                    <div class="font-bold" style="color:var(--c-ink)">{contract.recipient_name}</div>
+                    {#if contract.recipient_phone}
+                      <div class="mt-0.5 text-xs" style="color:var(--c-faint)">{contract.recipient_phone}</div>
+                    {/if}
+                  </td>
+                  <td class="contracts-td">
+                    <span style="color:var(--c-ink-soft)">{contract.recipient_email || '-'}</span>
+                  </td>
+                  <td class="contracts-td">
+                    <span style="color:var(--c-muted)">{contract.template_name}</span>
+                  </td>
+                  <td class="contracts-td" style="text-align:center">
+                    <Badge status={badgeStatus(contract.status)} dot />
+                  </td>
+                  <td class="contracts-td">
+                    <div style="color:var(--c-ink-soft)">{formatDateTime(contract.expires_at)}</div>
+                    {#if contract.signed_at}
+                      <div class="mt-0.5 text-xs" style="color:var(--c-success)">Signed: {formatDateTime(contract.signed_at)}</div>
+                    {/if}
+                  </td>
+                  <td class="contracts-td" style="text-align:right">
                     <button
                       type="button"
-                      onclick={() => openPreview(template)}
-                      class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                      onclick={() => copySigningLink(contract)}
+                      class="inline-flex items-center gap-1.5 text-xs font-bold"
+                      style="color:var(--c-primary)"
                     >
-                      <Eye class="h-3.5 w-3.5" />
-                      Preview
+                      <Copy class="h-3.5 w-3.5" />
+                      Copy Link
+                      <ChevronRight class="h-3.5 w-3.5" />
                     </button>
-                    {#if canEditContracts}
-                      <button
-                        type="button"
-                        onclick={() => openGenerateDrawer(template)}
-                        class="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-                      >
-                        <FileSignature class="h-3.5 w-3.5" />
-                        Generate
-                      </button>
-                      <button
-                        type="button"
-                        onclick={() => openEditDrawer(template)}
-                        class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                      >
-                        <Pencil class="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onclick={() => deleteTemplate(template)}
-                        disabled={deletingId === template.id}
-                        class="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {#if deletingId === template.id}
-                          <Loader2 class="h-3.5 w-3.5 animate-spin" />
-                        {:else}
-                          <Trash2 class="h-3.5 w-3.5" />
-                        {/if}
-                        Hapus
-                      </button>
-                    {/if}
-                  </div>
-                </div>
-              </article>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </section>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </Card>
 
-    <aside class="space-y-4">
-      <div class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center gap-2">
-          <Link2 class="h-5 w-5 text-primary-600" />
-          <h2 class="text-lg font-bold text-slate-800">Kontrak Terkirim</h2>
+    <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <!-- Template management -->
+      <Card pad={false} style="overflow:hidden">
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+          style="border-bottom:1px solid var(--c-line)"
+        >
+          <div class="flex items-center gap-2">
+            <FileText class="h-5 w-5" style="color:var(--c-primary)" />
+            <h2 class="text-[15px] font-extrabold" style="color:var(--c-ink)">Template Kontrak</h2>
+          </div>
+          <select
+            bind:value={selectedType}
+            class="rounded-xl bg-white px-3 py-2 text-sm outline-none"
+            style="border:1px solid var(--c-line);color:var(--c-ink-soft)"
+          >
+            {#each PACKAGE_TYPES as item}
+              <option value={item.value}>{item.label}</option>
+            {/each}
+          </select>
         </div>
 
-        {#if isLoadingContracts}
-          <div class="flex items-center justify-center gap-3 py-20 text-slate-500">
-            <Loader2 class="h-5 w-5 animate-spin" />
-            <span>Memuat kontrak...</span>
-          </div>
-        {:else if contracts.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-center text-slate-400">
-            <FileSignature class="mb-3 h-12 w-12 opacity-30" />
-            <p class="font-medium">Belum ada kontrak yang digenerate</p>
-            <p class="mt-1 text-sm">Generate kontrak dari template untuk mulai kirim link ke jamaah.</p>
-          </div>
-        {:else}
-          <div class="space-y-3">
-            {#each contracts as contract}
-              <article class="rounded-2xl border border-slate-200 p-4">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <h3 class="text-sm font-bold text-slate-800">{contract.recipient_name}</h3>
-                      <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold {statusTone(contract.status)}">
-                        {statusLabel(contract.status)}
-                      </span>
+        <div class="p-5">
+          {#if isLoadingTemplates}
+            <div class="flex items-center justify-center gap-3 py-16" style="color:var(--c-muted)">
+              <Loader2 class="h-5 w-5 animate-spin" />
+              <span>Memuat template...</span>
+            </div>
+          {:else if filteredTemplates.length === 0}
+            <EmptyState
+              icon={FileText}
+              title="Belum ada template kontrak"
+              text="Buat template untuk paket reguler, plus, atau haji khusus."
+            />
+          {:else}
+            <div class="space-y-3">
+              {#each filteredTemplates as template}
+                <article
+                  class="rounded-2xl p-4"
+                  style="border:1px solid var(--c-line)"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h3 class="text-sm font-bold" style="color:var(--c-ink)">{template.name}</h3>
+                        <span
+                          class="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                          style="background:var(--c-bg-2);color:var(--c-muted)"
+                        >
+                          {typeLabel(template.package_type || '')}
+                        </span>
+                        <Badge status={template.is_active ? 'Aktif' : 'Nonaktif'} />
+                      </div>
+                      <p
+                        class="mt-2 line-clamp-3 text-sm leading-relaxed"
+                        style="color:var(--c-muted)"
+                      >
+                        {template.content}
+                      </p>
                     </div>
-                    <p class="mt-1 text-xs text-slate-500">{contract.template_name}</p>
-                    <p class="mt-2 text-xs text-slate-500">Expired: {formatDateTime(contract.expires_at)}</p>
-                    {#if contract.signed_at}
-                      <p class="mt-1 text-xs text-emerald-700">Signed: {formatDateTime(contract.signed_at)}</p>
-                    {/if}
-                  </div>
-                  <button
-                    type="button"
-                    onclick={() => copySigningLink(contract)}
-                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                  >
-                    <Copy class="h-3.5 w-3.5" />
-                    Copy Link
-                  </button>
-                </div>
-                <div class="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                  {publicLink(contract.public_token)}
-                </div>
-              </article>
-            {/each}
-          </div>
-        {/if}
-      </div>
 
-      <div class="rounded-2xl border border-amber-200 bg-[linear-gradient(180deg,#fff8eb_0%,#ffffff_100%)] p-5 shadow-sm">
-        <div class="mb-4 flex items-center gap-2">
-          <Sparkles class="h-5 w-5 text-amber-600" />
-          <h2 class="text-lg font-bold text-slate-800">Variabel Otomatis</h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <Button variant="ghost" size="sm" icon={Eye} onclick={() => openPreview(template)}>Preview</Button>
+                      {#if canEditContracts}
+                        <Button variant="soft" size="sm" icon={FileSignature} onclick={() => openGenerateDrawer(template)}>Generate</Button>
+                        <Button variant="ghost" size="sm" icon={Pencil} onclick={() => openEditDrawer(template)}>Edit</Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon={deletingId === template.id ? undefined : Trash2}
+                          disabled={deletingId === template.id}
+                          onclick={() => deleteTemplate(template)}
+                        >
+                          {#if deletingId === template.id}<Loader2 class="h-3.5 w-3.5 animate-spin" />{/if}
+                          Hapus
+                        </Button>
+                      {/if}
+                    </div>
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
         </div>
-        <p class="mb-4 text-sm leading-relaxed text-slate-500">
+      </Card>
+
+      <!-- Auto variables helper -->
+      <Card style="border-color:var(--c-accent-soft);background:linear-gradient(180deg,#fff8eb 0%,#ffffff 100%)">
+        <div class="mb-4 flex items-center gap-2">
+          <Sparkles class="h-5 w-5" style="color:var(--c-accent)" />
+          <h2 class="text-[15px] font-extrabold" style="color:var(--c-ink)">Variabel Otomatis</h2>
+        </div>
+        <p class="mb-4 text-sm leading-relaxed" style="color:var(--c-muted)">
           Klik variabel saat drawer template terbuka untuk menyisipkan placeholder sesuai PRD.
         </p>
         <div class="flex flex-wrap gap-2">
@@ -581,14 +584,14 @@
               onclick={() => {
                 if (canEditContracts && drawerOpen) insertVariable(variableName);
               }}
-              class="rounded-full border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+              class="rounded-full bg-white px-3 py-1.5 text-xs font-semibold"
+              style="border:1px solid var(--c-accent-soft);color:var(--c-accent)"
             >
               {'{{'}{variableName}{'}}'}
             </button>
           {/each}
         </div>
-      </div>
-    </aside>
+      </Card>
     </div>
   </div>
 </div>
@@ -601,79 +604,65 @@
 >
   <div class="space-y-6 p-6">
     {#if formError}
-      <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+      <div class="rounded-2xl px-4 py-3 text-sm" style="border:1px solid var(--c-danger-soft);background:var(--c-danger-soft);color:var(--c-danger)">
         {formError}
       </div>
     {/if}
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="contract-template-name" class="mb-1 block text-sm font-medium text-slate-700">Nama Template</label>
+        <label for="contract-template-name" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Nama Template</label>
         <input
           id="contract-template-name"
           type="text"
           bind:value={editor.name}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         />
       </div>
       <div>
-        <label for="contract-template-type" class="mb-1 block text-sm font-medium text-slate-700">Jenis Paket</label>
+        <label for="contract-template-type" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Jenis Paket</label>
         <select
           id="contract-template-type"
           bind:value={editor.package_type}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         >
           {#each PACKAGE_TYPES as item}
             <option value={item.value}>{item.label}</option>
           {/each}
         </select>
       </div>
-      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-        <input type="checkbox" bind:checked={editor.is_active} class="rounded border-slate-300" />
+      <label class="inline-flex items-center gap-2 text-sm font-medium" style="color:var(--c-ink-soft)">
+        <input type="checkbox" bind:checked={editor.is_active} class="rounded" style="border:1px solid var(--c-line)" />
         Template aktif
       </label>
     </div>
 
     <div>
-      <label for="contract-template-content" class="mb-1 block text-sm font-medium text-slate-700">Isi Template</label>
+      <label for="contract-template-content" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Isi Template</label>
       <textarea
         id="contract-template-content"
         rows="16"
         bind:value={editor.content}
-        class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+        class="w-full rounded-2xl bg-white px-4 py-3 text-sm leading-relaxed outline-none"
+        style="border:1px solid var(--c-line);color:var(--c-ink)"
       ></textarea>
     </div>
 
-    <div class="flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-4">
-      <button
-        type="button"
-        onclick={() => openPreview(editor)}
-        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-      >
-        <Eye class="h-4 w-4" />
-        Preview
-      </button>
+    <div class="flex flex-wrap justify-between gap-3 pt-4" style="border-top:1px solid var(--c-line-soft)">
+      <Button variant="ghost" icon={Eye} onclick={() => openPreview(editor)}>Preview</Button>
       <div class="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onclick={() => (drawerOpen = false)}
-          class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-        >
-          Batal
-        </button>
-        <button
-          type="button"
-          onclick={saveTemplate}
+        <Button variant="ghost" onclick={() => (drawerOpen = false)}>Batal</Button>
+        <Button
+          variant="primary"
+          icon={saving ? undefined : Save}
           disabled={saving}
-          class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          onclick={saveTemplate}
         >
-          {#if saving}
-            <Loader2 class="h-4 w-4 animate-spin" />
-          {:else}
-            <Save class="h-4 w-4" />
-          {/if}
+          {#if saving}<Loader2 class="h-4 w-4 animate-spin" />{/if}
           Simpan Template
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -687,18 +676,19 @@
 >
   <div class="space-y-6 p-6">
     {#if generateError}
-      <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+      <div class="rounded-2xl px-4 py-3 text-sm" style="border:1px solid var(--c-danger-soft);background:var(--c-danger-soft);color:var(--c-danger)">
         {generateError}
       </div>
     {/if}
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="contract-generator-template" class="mb-1 block text-sm font-medium text-slate-700">Template</label>
+        <label for="contract-generator-template" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Template</label>
         <select
           id="contract-generator-template"
           bind:value={generator.template_id}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         >
           <option value="">Pilih template</option>
           {#each templates.filter((tpl) => tpl.is_active) as template}
@@ -707,11 +697,12 @@
         </select>
       </div>
       <div>
-        <label for="contract-generator-type" class="mb-1 block text-sm font-medium text-slate-700">Jenis Paket</label>
+        <label for="contract-generator-type" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Jenis Paket</label>
         <select
           id="contract-generator-type"
           bind:value={generator.package_type}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         >
           {#each PACKAGE_TYPES as item}
             <option value={item.value}>{item.label}</option>
@@ -719,52 +710,57 @@
         </select>
       </div>
       <div>
-        <label for="contract-generator-name" class="mb-1 block text-sm font-medium text-slate-700">Nama Jamaah</label>
+        <label for="contract-generator-name" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Nama Jamaah</label>
         <input
           id="contract-generator-name"
           type="text"
           bind:value={generator.recipient_name}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         />
       </div>
       <div>
-        <label for="contract-generator-phone" class="mb-1 block text-sm font-medium text-slate-700">WhatsApp</label>
+        <label for="contract-generator-phone" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">WhatsApp</label>
         <input
           id="contract-generator-phone"
           type="text"
           bind:value={generator.recipient_phone}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         />
       </div>
       <div>
-        <label for="contract-generator-email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+        <label for="contract-generator-email" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Email</label>
         <input
           id="contract-generator-email"
           type="email"
           bind:value={generator.recipient_email}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         />
       </div>
       <div>
-        <label for="contract-generator-expiry" class="mb-1 block text-sm font-medium text-slate-700">Expiry (hari)</label>
+        <label for="contract-generator-expiry" class="mb-1 block text-sm font-medium" style="color:var(--c-ink-soft)">Expiry (hari)</label>
         <input
           id="contract-generator-expiry"
           type="number"
           min="1"
           max="30"
           bind:value={generator.expires_in_days}
-          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
         />
       </div>
     </div>
 
     <div>
       <div class="mb-2 flex items-center justify-between">
-        <p class="block text-sm font-medium text-slate-700">Variabel Kontrak</p>
+        <p class="block text-sm font-medium" style="color:var(--c-ink-soft)">Variabel Kontrak</p>
         <button
           type="button"
           onclick={() => (generator.variables = { ...SAMPLE_VALUES, nama_jamaah: generator.recipient_name || SAMPLE_VALUES.nama_jamaah })}
-          class="text-xs font-semibold text-primary-600"
+          class="text-xs font-semibold"
+          style="color:var(--c-primary)"
         >
           Reset Sample
         </button>
@@ -772,40 +768,31 @@
       <div class="grid gap-3 sm:grid-cols-2">
         {#each VARIABLES as variableName}
           <div>
-            <label for={`generator-${variableName}`} class="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">{'{{'}{variableName}{'}}'}</label>
+            <label for={`generator-${variableName}`} class="mb-1 block text-xs font-bold uppercase tracking-wide" style="color:var(--c-faint)">{'{{'}{variableName}{'}}'}</label>
             <input
               id={`generator-${variableName}`}
               type="text"
               value={generator.variables?.[variableName] || ''}
               oninput={(event) => fillGeneratorVariable(variableName, event.currentTarget.value)}
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              class="w-full rounded-xl bg-white px-3 py-2.5 text-sm outline-none"
+              style="border:1px solid var(--c-line);color:var(--c-ink)"
             />
           </div>
         {/each}
       </div>
     </div>
 
-    <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
-      <button
-        type="button"
-        onclick={() => (generateOpen = false)}
-        class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-      >
-        Batal
-      </button>
-      <button
-        type="button"
-        onclick={saveContractGeneration}
+    <div class="flex flex-wrap justify-end gap-3 pt-4" style="border-top:1px solid var(--c-line-soft)">
+      <Button variant="ghost" onclick={() => (generateOpen = false)}>Batal</Button>
+      <Button
+        variant="primary"
+        icon={generating ? undefined : Send}
         disabled={generating}
-        class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+        onclick={saveContractGeneration}
       >
-        {#if generating}
-          <Loader2 class="h-4 w-4 animate-spin" />
-        {:else}
-          <Send class="h-4 w-4" />
-        {/if}
+        {#if generating}<Loader2 class="h-4 w-4 animate-spin" />{/if}
         Generate Link
-      </button>
+      </Button>
     </div>
   </div>
 </SlideDrawer>
@@ -817,17 +804,58 @@
   onClose={() => (previewOpen = false)}
 >
   {#if previewLoading}
-    <div class="flex min-h-[320px] items-center justify-center gap-3 text-slate-500">
+    <div class="flex min-h-[320px] items-center justify-center gap-3" style="color:var(--c-muted)">
       <Loader2 class="h-5 w-5 animate-spin" />
       <span>Memuat preview kontrak...</span>
     </div>
   {:else}
     <div class="p-6">
-      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div class="text-sm leading-relaxed text-slate-700">
+      <div class="rounded-3xl bg-white p-6" style="border:1px solid var(--c-line);box-shadow:var(--shadow-sm)">
+        <div class="text-sm leading-relaxed" style="color:var(--c-ink-soft)">
           {@html previewHtml}
         </div>
       </div>
     </div>
   {/if}
 </SlideDrawer>
+
+<style>
+  .contracts-th {
+    padding: 0 16px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--c-line);
+  }
+  .contracts-th:first-child {
+    padding-left: 20px;
+  }
+  .contracts-th:last-child {
+    padding-right: 20px;
+  }
+  .contracts-td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--c-line-soft);
+    color: var(--c-ink-soft);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .contracts-td:first-child {
+    padding-left: 20px;
+  }
+  .contracts-td:last-child {
+    padding-right: 20px;
+  }
+  .contracts-row {
+    transition: background 0.12s;
+  }
+  .contracts-row:hover {
+    background: var(--c-primary-tint);
+  }
+  .contracts-row:last-child .contracts-td {
+    border-bottom: none;
+  }
+</style>

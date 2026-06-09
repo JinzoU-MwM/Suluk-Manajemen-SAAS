@@ -6,6 +6,9 @@
   import PageHeader from '../components/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import Card from '../components/ui/Card.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService } from '../services/api.js';
 
@@ -90,12 +93,12 @@
 </script>
 
 <div class="flex flex-col gap-6 p-4 lg:p-8">
-  <PageHeader kicker="Komisi Agen" title="Komisi Agen" subtitle="Kelola jaringan agen dan komisi referral.">
+  <PageHeader kicker="Komisi Agen" title="Agen &amp; Mitra" subtitle="Pantau performa agen penjualan dan komisi yang harus dibayarkan.">
     {#snippet actions()}
       {#if tab === 'agents'}
-        <button type="button" onclick={openNewAgent} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"><Plus class="h-4 w-4" /> Agen</button>
+        <Button variant="primary" icon={Plus} onclick={openNewAgent}>Tambah Agen</Button>
       {:else}
-        <button type="button" onclick={openNewCommission} class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"><Plus class="h-4 w-4" /> Komisi</button>
+        <Button variant="primary" icon={Plus} onclick={openNewCommission}>Catat Komisi</Button>
       {/if}
     {/snippet}
   </PageHeader>
@@ -105,119 +108,138 @@
   {:else}
     <!-- Summary cards (Suluk design) -->
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <StatCard icon={UserCheck} label="Agen Aktif" value={`${summaryStats.agentCount}`} accent="#1B7F5A" />
-      <StatCard icon={Users} label="Jamaah dari Agen" value={`${summaryStats.totalJamaah}`} accent="#2563a8" />
-      <StatCard icon={TrendingUp} label="Total Omzet Agen" value={formatIDR(summaryStats.totalOmzet)} accent="#C99A2E" />
-      <StatCard icon={Wallet} label="Komisi Terutang" value={formatIDR(summaryStats.outstanding)} accent="#c0392b" />
+      <StatCard icon={UserCheck} label="Agen Aktif" value={`${summaryStats.agentCount}`} accent="var(--c-primary)" />
+      <StatCard icon={Users} label="Jamaah dari Agen" value={`${summaryStats.totalJamaah}`} accent="var(--c-info)" />
+      <StatCard icon={TrendingUp} label="Total Omzet Agen" value={formatIDR(summaryStats.totalOmzet)} accent="var(--c-accent)" />
+      <StatCard icon={Wallet} label="Komisi Terutang" value={formatIDR(summaryStats.outstanding)} accent="var(--c-warning)" />
     </div>
 
-    <!-- Tabs -->
-    <div class="flex items-center justify-between">
-      <div class="flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
-        <button type="button" onclick={() => tab = 'agents'} class="rounded-lg px-4 py-2 text-xs font-semibold {tab === 'agents' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}">Agen ({agents.length})</button>
-        <button type="button" onclick={() => tab = 'commissions'} class="rounded-lg px-4 py-2 text-xs font-semibold {tab === 'commissions' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}">Komisi ({commissions.length})</button>
-      </div>
+    <!-- Tabs + filters -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <FilterTabs
+        tabs={[
+          { value: 'agents', label: 'Agen', count: agents.length },
+          { value: 'commissions', label: 'Komisi', count: commissions.length },
+        ]}
+        value={tab}
+        onChange={(v) => (tab = v)}
+      />
       {#if tab === 'agents'}
-        <div class="flex items-center gap-2">
-          <div class="relative"><Search class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input type="text" bind:value={searchQuery} oninput={loadData} placeholder="Cari..." class="w-40 rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100" /></div>
+        <div class="relative">
+          <Search class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style="color:var(--c-faint)" />
+          <input
+            type="text"
+            bind:value={searchQuery}
+            oninput={loadData}
+            placeholder="Cari agen..."
+            class="w-48 rounded-[var(--radius)] py-2 pl-9 pr-3 text-[13.5px] outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+            style="border:1px solid var(--c-line);color:var(--c-ink)"
+          />
         </div>
       {:else}
-        <div class="flex items-center gap-2">
-          <select bind:value={statusFilter} onchange={loadData} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium outline-none focus:border-primary-400">
-            <option value="all">Semua</option><option value="pending">Pending</option><option value="paid">Dibayar</option>
-          </select>
-        </div>
+        <select
+          bind:value={statusFilter}
+          onchange={loadData}
+          class="rounded-[var(--radius)] bg-white px-3 py-2 text-[13.5px] font-medium outline-none focus:border-primary-400"
+          style="border:1px solid var(--c-line);color:var(--c-ink)"
+        >
+          <option value="all">Semua</option><option value="pending">Pending</option><option value="paid">Dibayar</option>
+        </select>
       {/if}
     </div>
 
     <!-- Agents Tab -->
     {#if tab === 'agents'}
-      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+      <Card pad={false} style="padding:8px 4px">
         {#if agents.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><Users class="mb-2 h-10 w-10" /><p class="text-sm">Belum ada agen</p></div>
+          <div class="flex flex-col items-center justify-center py-16" style="color:var(--c-faint)"><Users class="mb-2 h-10 w-10" /><p class="text-sm">Belum ada agen</p></div>
         {:else}
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left">
-                <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Agen / Mitra</th>
-                <th class="px-4 py-3 text-center text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Komisi</th>
-                <th class="hidden px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 md:table-cell">Total Komisi</th>
-                <th class="hidden px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 lg:table-cell">Dibayar</th>
-                <th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Outstanding</th>
-                <th class="px-4 py-3 text-center text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jamaah</th>
-                <th class="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each agents as a}
-                <tr class="border-b border-slate-100 transition-colors last:border-0 hover:bg-primary-50/30">
-                  <td class="px-5 py-3.5">
-                    <div class="flex items-center gap-3">
-                      <Avatar name={a.name} size={40} />
-                      <div class="min-w-0">
-                        <p class="truncate text-sm font-bold text-[#10211c]">{a.name}</p>
-                        <p class="truncate text-xs text-slate-400">{a.phone || '-'}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3.5 text-center">
-                    <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-700">{a.commission_rate}%</span>
-                  </td>
-                  <td class="hidden px-4 py-3.5 text-right font-bold text-slate-800 md:table-cell" style="font-variant-numeric:tabular-nums">{formatIDR(a.total_commissions)}</td>
-                  <td class="hidden px-4 py-3.5 text-right font-bold text-emerald-600 lg:table-cell" style="font-variant-numeric:tabular-nums">{formatIDR(a.total_paid)}</td>
-                  <td class="px-4 py-3.5 text-right font-bold text-amber-600" style="font-variant-numeric:tabular-nums">{formatIDR(a.total_outstanding)}</td>
-                  <td class="px-4 py-3.5 text-center font-bold text-slate-800" style="font-variant-numeric:tabular-nums">{a.total_jamaah}</td>
-                  <td class="px-4 py-3.5 text-right">
-                    <div class="flex justify-end gap-2">
-                      <button type="button" onclick={() => editAgent(a)} class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Pencil class="h-3 w-3" />Edit</button>
-                      <button type="button" onclick={() => viewAgentCommissions(a)} class="rounded-lg bg-primary-50 px-2.5 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100">Komisi</button>
-                    </div>
-                  </td>
+          <div class="overflow-x-auto">
+            <table class="w-full" style="border-collapse:collapse;font-size:13.5px">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Agen / Mitra</th>
+                  <th style="text-align:center;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Komisi</th>
+                  <th class="hidden md:table-cell" style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Total Komisi</th>
+                  <th class="hidden lg:table-cell" style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Dibayar</th>
+                  <th style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Outstanding</th>
+                  <th style="text-align:center;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Jamaah</th>
+                  <th style="padding:0 16px 12px;border-bottom:1px solid var(--c-line)"></th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {#each agents as a}
+                  <tr class="suluk-row" style="transition:background .12s">
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;white-space:nowrap">
+                      <div class="flex items-center gap-3">
+                        <Avatar name={a.name} size={40} />
+                        <div class="min-w-0">
+                          <p class="truncate font-bold" style="color:var(--c-ink)">{a.name}</p>
+                          <p class="truncate" style="font-size:12px;color:var(--c-faint);margin-top:2px">{a.phone || '-'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:center;white-space:nowrap">
+                      <span style="font-weight:600;color:var(--c-ink-soft)">{a.commission_rate}%</span>
+                    </td>
+                    <td class="hidden md:table-cell" style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:right;font-weight:700;color:var(--c-ink);font-variant-numeric:tabular-nums;white-space:nowrap">{formatIDR(a.total_commissions)}</td>
+                    <td class="hidden lg:table-cell" style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:right;font-weight:800;color:var(--c-success);font-variant-numeric:tabular-nums;white-space:nowrap">{formatIDR(a.total_paid)}</td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:right;font-weight:700;color:var(--c-warning);font-variant-numeric:tabular-nums;white-space:nowrap">{formatIDR(a.total_outstanding)}</td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:center;font-weight:700;color:var(--c-ink);font-variant-numeric:tabular-nums;white-space:nowrap">{a.total_jamaah}</td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:right;white-space:nowrap">
+                      <div class="flex justify-end gap-2">
+                        <button type="button" onclick={() => editAgent(a)} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="border:1px solid var(--c-line);color:var(--c-ink-soft)"><Pencil class="h-3 w-3" />Edit</button>
+                        <button type="button" onclick={() => viewAgentCommissions(a)} class="rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="background:var(--c-primary-soft);color:var(--c-primary-deep)">Komisi</button>
+                      </div>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         {/if}
-      </div>
+      </Card>
     {/if}
 
     <!-- Commissions Tab -->
     {#if tab === 'commissions'}
-      <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+      <Card pad={false} style="padding:8px 4px">
         {#if commissions.length === 0}
-          <div class="flex flex-col items-center justify-center py-16 text-slate-400"><DollarSign class="mb-2 h-10 w-10" /><p class="text-sm">Belum ada komisi</p></div>
+          <div class="flex flex-col items-center justify-center py-16" style="color:var(--c-faint)"><DollarSign class="mb-2 h-10 w-10" /><p class="text-sm">Belum ada komisi</p></div>
         {:else}
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left">
-                <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Agen</th>
-                <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jamaah</th>
-                <th class="hidden px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 md:table-cell">Paket</th>
-                <th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jumlah</th>
-                <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                <th class="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each commissions as c}
-                <tr class="border-b border-slate-100 transition-colors last:border-0 hover:bg-primary-50/30">
-                  <td class="px-5 py-3.5">
-                    <div class="flex items-center gap-3">
-                      <Avatar name={c.agent_name} size={36} />
-                      <span class="text-sm font-bold text-[#10211c]">{c.agent_name}</span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3.5 text-slate-600">{c.jamaah_name || '-'}</td>
-                  <td class="hidden px-4 py-3.5 text-xs text-slate-500 md:table-cell">{c.package_name || '-'}</td>
-                  <td class="px-4 py-3.5 text-right font-bold text-slate-800" style="font-variant-numeric:tabular-nums">{formatIDR(c.commission_amount)}</td>
-                  <td class="px-4 py-3.5"><StatusBadge status={c.status} size="xs" /></td>
-                  <td class="px-4 py-3.5 text-right">{#if c.status === 'pending'}<button type="button" onclick={() => payCommission(c.id)} class="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"><CheckCheck class="h-3 w-3" />Bayar</button>{/if}</td>
+          <div class="overflow-x-auto">
+            <table class="w-full" style="border-collapse:collapse;font-size:13.5px">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Agen</th>
+                  <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Jamaah</th>
+                  <th class="hidden md:table-cell" style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Paket</th>
+                  <th style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Jumlah</th>
+                  <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Status</th>
+                  <th style="padding:0 16px 12px;border-bottom:1px solid var(--c-line)"></th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {#each commissions as c}
+                  <tr class="suluk-row" style="transition:background .12s">
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;white-space:nowrap">
+                      <div class="flex items-center gap-3">
+                        <Avatar name={c.agent_name} size={36} />
+                        <span class="font-bold" style="color:var(--c-ink)">{c.agent_name}</span>
+                      </div>
+                    </td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;color:var(--c-ink-soft);white-space:nowrap">{c.jamaah_name || '-'}</td>
+                    <td class="hidden md:table-cell" style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;font-size:12px;color:var(--c-muted);white-space:nowrap">{c.package_name || '-'}</td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:right;font-weight:700;color:var(--c-ink);font-variant-numeric:tabular-nums;white-space:nowrap">{formatIDR(c.commission_amount)}</td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;white-space:nowrap"><StatusBadge status={c.status} size="xs" /></td>
+                    <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;text-align:right;white-space:nowrap">{#if c.status === 'pending'}<button type="button" onclick={() => payCommission(c.id)} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="background:var(--c-success-soft);color:var(--c-success)"><CheckCheck class="h-3 w-3" />Bayar</button>{/if}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         {/if}
-      </div>
+      </Card>
     {/if}
   {/if}
 </div>
@@ -287,3 +309,7 @@
     {/if}
   </div>
 </SlideDrawer>
+
+<style>
+  .suluk-row:hover { background: var(--c-bg); }
+</style>

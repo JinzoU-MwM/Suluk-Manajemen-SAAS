@@ -1,8 +1,7 @@
-﻿<!--
-  RoomingPage.svelte — Professional Room Allocation Dashboard
-  
-  Design: Compact card-based layout, efficient use of space
-  Tone: Clean, data-dense, professional travel agency tool
+<!--
+  RoomingPage.svelte — Suluk design Rooming List
+  Drag jamaah between rooms. Real data wiring preserved (fetch, auto-rooming,
+  reset, drag/drop, add/delete room, remove member, PDF, WhatsApp blast).
 -->
 <script>
   import {
@@ -20,11 +19,14 @@
     Plus,
     FileDown,
     MessageCircle,
+    GripVertical,
   } from "lucide-svelte";
   import { ApiService } from "../services/api.js";
   import PageHeader from "../components/PageHeader.svelte";
   import StatCard from "../components/StatCard.svelte";
   import Avatar from "../components/Avatar.svelte";
+  import ProgressBar from "../components/ui/ProgressBar.svelte";
+  import Button from "../components/ui/Button.svelte";
   import WhatsAppBlast from "../components/WhatsAppBlast.svelte";
 
   let { isOpen = false, onClose, groups = [], isPro = false } = $props();
@@ -41,6 +43,7 @@
   // Drag state
   let draggedMember = $state(null);
   let dragSourceRoomId = $state(null);
+  let dragOverRoomId = $state(null);
 
   // Add room state
   let showAddRoom = $state(false);
@@ -56,6 +59,17 @@
       : null,
   );
 
+  function genderLabel(g) {
+    return g === "male" ? "Laki-laki" : g === "female" ? "Perempuan" : "Keluarga";
+  }
+  function genderToken(g) {
+    return g === "male"
+      ? "var(--c-info)"
+      : g === "female"
+        ? "#c2298a"
+        : "var(--c-accent)";
+  }
+
   function exportRoomingPDF() {
     const groupName =
       groups.find((g) => g.id == selectedGroupId)?.name || "Rooming List";
@@ -68,18 +82,13 @@
     let tableRows = "";
     rooms.forEach((room) => {
       const members = room.members || [];
-      const genderLabel =
-        room.gender_type === "male"
-          ? "Laki-laki"
-          : room.gender_type === "female"
-            ? "Perempuan"
-            : "Keluarga";
+      const gLabel = genderLabel(room.gender_type);
       if (members.length === 0) {
-        tableRows += `<tr><td>${room.room_number}</td><td>${genderLabel}</td><td>${room.capacity || 4}</td><td>-</td><td>-</td></tr>`;
+        tableRows += `<tr><td>${room.room_number}</td><td>${gLabel}</td><td>${room.capacity || 4}</td><td>-</td><td>-</td></tr>`;
       } else {
         members.forEach((m, idx) => {
           tableRows += `<tr>
-            ${idx === 0 ? `<td rowspan="${members.length}">${room.room_number}</td><td rowspan="${members.length}">${genderLabel}</td><td rowspan="${members.length}">${members.length}/${room.capacity || 4}</td>` : ""}
+            ${idx === 0 ? `<td rowspan="${members.length}">${room.room_number}</td><td rowspan="${members.length}">${gLabel}</td><td rowspan="${members.length}">${members.length}/${room.capacity || 4}</td>` : ""}
             <td>${m.nama || "-"}</td>
             <td>${m.no_paspor || "-"}</td>
           </tr>`;
@@ -200,12 +209,19 @@
     }
   }
 
+  function handleDragEnd() {
+    draggedMember = null;
+    dragSourceRoomId = null;
+    dragOverRoomId = null;
+  }
+
   function handleDragOver(e) {
     // Allow drop only from same room type
     e.preventDefault();
   }
 
   async function handleDrop(targetRoomId) {
+    dragOverRoomId = null;
     if (!draggedMember || dragSourceRoomId === targetRoomId) {
       draggedMember = null;
       dragSourceRoomId = null;
@@ -392,368 +408,329 @@
 </script>
 
 {#if isOpen}
-  <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+  <div class="page-enter" style="min-height:100vh;background:var(--c-bg);padding:24px">
     <PageHeader
       kicker="Operasional"
-      title="Auto-Rooming"
-      subtitle="Alokasi kamar hotel otomatis, tetap bisa disesuaikan manual."
+      title="Rooming List"
+      subtitle="Alokasi kamar hotel otomatis — seret jamaah antar kamar untuk mengatur penempatan."
     >
       {#snippet actions()}
+        <select
+          bind:value={selectedGroupId}
+          onchange={loadData}
+          aria-label="Grup Keberangkatan"
+          style="padding:9px 14px;font-size:13.5px;font-weight:600;color:var(--c-ink-soft);background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);outline:none;min-width:200px;max-width:280px"
+        >
+          <option value="">Pilih Grup</option>
+          {#each groups as group}
+            <option value={group.id}>{group.name} ({group.member_count})</option>
+          {/each}
+        </select>
+
         {#if selectedGroupId}
-          <button
-            type="button"
-            onclick={loadData}
-            disabled={isLoading}
-            class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-            title="Muat ulang"
-          >
-            <RefreshCw class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" />
-          </button>
+          <Button variant="ghost" icon={RefreshCw} onclick={loadData} disabled={isLoading}>
+            Muat Ulang
+          </Button>
         {/if}
-        <button
-          type="button"
+
+        <Button
+          variant="primary"
+          icon={isAutoRooming ? Loader2 : Sparkles}
           onclick={runAutoRooming}
           disabled={isAutoRooming || unassignedCount === 0}
-          class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition hover:bg-primary-700 disabled:opacity-50"
         >
-          {#if isAutoRooming}<Loader2
-              class="w-4 h-4 animate-spin"
-            />{:else}<Sparkles class="w-4 h-4" />{/if}
           Auto-Generate
-        </button>
+        </Button>
+
         {#if summary?.total_rooms > 0}
-          <button
-            type="button"
-            onclick={exportRoomingPDF}
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
-          >
-            <FileDown class="w-4 h-4" />
-            PDF
-          </button>
-          <button
-            type="button"
-            onclick={() => (waBlastOpen = true)}
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-600 shadow-sm transition hover:bg-emerald-50"
-          >
-            <MessageCircle class="w-4 h-4" />
+          <Button variant="ghost" icon={FileDown} onclick={exportRoomingPDF}>PDF</Button>
+          <Button variant="soft" icon={MessageCircle} onclick={() => (waBlastOpen = true)}>
             WA
-          </button>
-          <button
-            type="button"
-            onclick={clearRooms}
-            disabled={isLoading}
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50 disabled:opacity-50"
-          >
-            <Trash2 class="w-4 h-4" />
+          </Button>
+          <Button variant="danger" icon={Trash2} onclick={clearRooms} disabled={isLoading}>
             Reset
-          </button>
+          </Button>
         {/if}
       {/snippet}
     </PageHeader>
 
-    <!-- Group selector -->
-    <div class="mb-5 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
-      <label
-        for="room-group-select"
-        class="mb-2 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400"
-        >Grup Keberangkatan</label
-      >
-      <select
-        id="room-group-select"
-        bind:value={selectedGroupId}
-        onchange={loadData}
-        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100 lg:max-w-sm"
-      >
-        <option value="">Pilih Grup</option>
-        {#each groups as group}
-          <option value={group.id}>{group.name} ({group.member_count})</option>
-        {/each}
-      </select>
-    </div>
-
     <!-- Messages -->
     {#if error}
       <div
-        class="mb-3 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm"
+        style="margin-bottom:14px;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--radius);background:var(--c-danger-soft);color:var(--c-danger);font-size:13.5px"
       >
-        <AlertTriangle class="w-4 h-4 text-red-500" />
-        <span class="text-red-700 flex-1">{error}</span>
-        <button
-          type="button"
-          onclick={() => (error = null)}
-          class="text-red-500"><X class="w-4 h-4" /></button
-        >
+        <AlertTriangle size={17} />
+        <span style="flex:1">{error}</span>
+        <button type="button" onclick={() => (error = null)} style="color:var(--c-danger);display:inline-flex">
+          <X size={16} />
+        </button>
       </div>
     {/if}
 
     {#if success}
       <div
-        class="mb-3 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm"
+        style="margin-bottom:14px;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--radius);background:var(--c-success-soft);color:var(--c-success);font-size:13.5px"
       >
-        <CheckCircle class="w-4 h-4 text-emerald-500" />
-        <span class="text-emerald-700 flex-1">{success}</span>
-        <button
-          type="button"
-          onclick={() => (success = null)}
-          class="text-emerald-500"><X class="w-4 h-4" /></button
-        >
+        <CheckCircle size={17} />
+        <span style="flex:1">{success}</span>
+        <button type="button" onclick={() => (success = null)} style="color:var(--c-success);display:inline-flex">
+          <X size={16} />
+        </button>
       </div>
     {/if}
 
     <!-- Content -->
     {#if isLoading}
       <div
-        class="flex items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-16 shadow-sm"
+        style="display:flex;align-items:center;justify-content:center;padding:64px 0;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)"
       >
-        <Loader2 class="w-6 h-6 animate-spin text-primary-600" />
+        <Loader2 size={26} class="animate-spin" style="color:var(--c-primary)" />
       </div>
     {:else if !selectedGroupId}
       <div
-        class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-16 text-slate-400 shadow-sm"
+        style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 0;color:var(--c-faint);background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)"
       >
-        <Hotel class="w-10 h-10 mb-2" />
-        <p class="text-sm">Pilih grup untuk memulai</p>
+        <Hotel size={40} style="margin-bottom:10px" />
+        <p style="font-size:13.5px">Pilih grup untuk memulai</p>
       </div>
     {:else if summary}
       <!-- Stats -->
-      <div class="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div
+        style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--gap);margin-bottom:var(--gap)"
+      >
         <StatCard
           icon={Users}
           label="Total Jamaah"
-          value={String(summary.total_members)}
-          accent="#1B7F5A"
+          value={String(summary.total_members ?? "—")}
+          accent="var(--c-primary)"
         />
         <StatCard
           icon={CheckCircle}
           label="Sudah Ditempatkan"
-          value={String(summary.assigned_count)}
-          accent="#1B7F5A"
+          value={String(summary.assigned_count ?? 0)}
+          accent="var(--c-success)"
         />
         <StatCard
           icon={Users}
           label="Belum Ditempatkan"
           value={String(unassignedCount)}
-          accent="#C99A2E"
+          accent="var(--c-warning)"
         />
         <StatCard
           icon={TrendingUp}
           label="Okupansi"
           value={`${occupancyPct}%`}
-          accent="#2563a8"
-          sub={`${summary.total_rooms} kamar`}
+          accent="var(--c-accent)"
+          sub={`${summary.total_rooms ?? rooms.length} kamar`}
         />
       </div>
 
-      <div
-        class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm"
-      >
-        <!-- Unassigned Notice -->
-        {#if unassignedCount > 0}
-          <div
-            class="m-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
-          >
-            <Users class="w-4 h-4 text-amber-600" />
-            <span class="text-amber-700">
-              <strong>{unassignedCount}</strong> jamaah belum ditempatkan
-            </span>
-          </div>
-        {/if}
+      <!-- Unassigned notice -->
+      {#if unassignedCount > 0}
+        <div
+          style="margin-bottom:14px;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:var(--radius);background:var(--c-warning-soft);color:var(--c-warning);font-size:13.5px"
+        >
+          <Users size={17} />
+          <span><strong>{unassignedCount}</strong> jamaah belum ditempatkan — seret ke kamar.</span>
+        </div>
+      {/if}
 
-        <!-- Rooms Grid -->
-        {#if rooms.length > 0}
-          <div
-            class="grid grid-cols-1 gap-3.5 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-          >
-            {#each rooms as room}
-              <article
-                class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm transition hover:shadow-md"
-                ondragover={handleDragOver}
-                ondrop={(e) => {
-                  e.preventDefault();
-                  handleDrop(room.id);
-                }}
-                role="region"
-                aria-label="Kamar {room.room_number}"
-              >
-                <!-- Room Header -->
-                <div class="mb-3 flex items-center justify-between">
-                  <div class="flex items-center gap-2.5">
-                    <div
-                      class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-700"
-                    >
-                      <Bed class="h-4 w-4" />
+      <!-- Rooms grid -->
+      {#if rooms.length > 0}
+        <div
+          style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px"
+        >
+          {#each rooms as room}
+            {@const isOver = dragOverRoomId === room.id}
+            <div
+              role="region"
+              aria-label="Kamar {room.room_number}"
+              ondragover={(e) => {
+                handleDragOver(e);
+                dragOverRoomId = room.id;
+              }}
+              ondragleave={() => {
+                if (dragOverRoomId === room.id) dragOverRoomId = null;
+              }}
+              ondrop={(e) => {
+                e.preventDefault();
+                handleDrop(room.id);
+              }}
+              style="background:var(--c-surface);border:1px solid {isOver
+                ? 'var(--c-primary)'
+                : 'var(--c-line)'};border-radius:var(--radius-lg);padding:14px;box-shadow:{isOver
+                ? 'var(--shadow)'
+                : 'var(--shadow-sm)'};transition:all .15s"
+            >
+              <!-- Room header -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div style="display:flex;align-items:center;gap:9px;min-width:0">
+                  <div
+                    style="width:34px;height:34px;flex-shrink:0;border-radius:var(--radius-sm);background:var(--c-primary-soft);color:var(--c-primary-deep);display:flex;align-items:center;justify-content:center"
+                  >
+                    <Bed size={17} />
+                  </div>
+                  <div style="min-width:0">
+                    <div style="font-size:14px;font-weight:800;color:var(--c-ink)">
+                      {room.room_number}
                     </div>
-                    <div>
-                      <p class="text-sm font-bold text-[#10211c]">
-                        {room.room_number}
-                      </p>
-                      <span
-                        class="text-[11.5px] font-medium {room.gender_type ===
-                        'male'
-                          ? 'text-blue-600'
-                          : room.gender_type === 'female'
-                            ? 'text-pink-600'
-                            : 'text-purple-600'}"
-                      >
-                        {room.gender_type === "male"
-                          ? "Laki-laki"
-                          : room.gender_type === "female"
-                            ? "Perempuan"
-                            : "Keluarga"}
-                      </span>
+                    <div style="font-size:11.5px;font-weight:600;color:{genderToken(room.gender_type)}">
+                      {genderLabel(room.gender_type)}
                     </div>
                   </div>
-                  <div class="flex items-center gap-1.5">
-                    {#if room.is_auto_assigned}
-                      <span
-                        class="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-bold text-primary-700"
-                        >Auto</span
-                      >
-                    {/if}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                  {#if room.is_auto_assigned}
                     <span
-                      class="rounded-full px-2.5 py-0.5 text-[11.5px] font-bold {room.is_full
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'bg-slate-100 text-slate-500'}"
+                      style="font-size:10px;font-weight:800;color:var(--c-primary);background:var(--c-primary-soft);padding:2px 7px;border-radius:999px"
+                      >Auto</span
                     >
-                      {room.occupied}/{room.capacity}
-                    </span>
+                  {/if}
+                  <span
+                    style="font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;color:{room.is_full
+                      ? 'var(--c-success)'
+                      : 'var(--c-muted)'};background:{room.is_full
+                      ? 'var(--c-success-soft)'
+                      : 'var(--c-bg-2)'}"
+                  >
+                    {room.occupied}/{room.capacity}
+                  </span>
+                  <button
+                    type="button"
+                    onclick={() => deleteRoom(room.id)}
+                    title="Hapus kamar"
+                    style="color:var(--c-faint);display:inline-flex;padding:2px"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <!-- Capacity bar -->
+              <div style="margin-bottom:12px">
+                <ProgressBar
+                  value={room.occupied}
+                  max={room.capacity}
+                  color={room.is_full ? "var(--c-success)" : "var(--c-accent)"}
+                  height={6}
+                />
+              </div>
+
+              <!-- Members + empty slots -->
+              <div style="display:flex;flex-direction:column;gap:8px;min-height:{room.capacity * 46}px">
+                {#each room.members as member}
+                  {@const dragging =
+                    draggedMember &&
+                    draggedMember.id === member.id &&
+                    dragSourceRoomId === room.id}
+                  <div
+                    role="listitem"
+                    draggable="true"
+                    ondragstart={(e) => handleDragStart(e, { id: member.id }, room.id)}
+                    ondragend={handleDragEnd}
+                    style="display:flex;align-items:center;gap:9px;padding:8px 10px;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);cursor:grab;box-shadow:var(--shadow-sm);opacity:{dragging
+                      ? 0.4
+                      : 1};transition:opacity .15s"
+                  >
+                    <Avatar name={member.nama || "Tanpa Nama"} size={28} />
+                    <span
+                      style="font-size:12.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--c-ink)"
+                      >{member.nama || "Tanpa Nama"}</span
+                    >
                     <button
                       type="button"
-                      onclick={() => deleteRoom(room.id)}
-                      class="p-1 text-slate-300 transition-colors hover:text-red-500"
-                      title="Hapus kamar"
+                      onclick={() => removeFromRoom(member.id)}
+                      title="Keluarkan dari kamar"
+                      style="color:var(--c-faint);display:inline-flex"
                     >
-                      <Trash2 class="h-3.5 w-3.5" />
+                      <X size={14} />
                     </button>
+                    <GripVertical size={15} style="color:var(--c-faint);flex-shrink:0" />
                   </div>
-                </div>
+                {/each}
 
-                <!-- Capacity Bar -->
-                <div class="mb-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                {#each Array(Math.max(0, room.capacity - room.occupied)) as _, i}
                   <div
-                    class="h-full rounded-full transition-all {room.is_full
-                      ? 'bg-primary-600'
-                      : 'bg-gold-500'}"
-                    style="width: {(room.occupied / room.capacity) * 100}%"
-                  ></div>
-                </div>
-
-                <!-- Members -->
-                <div class="flex flex-col gap-2">
-                  {#each room.members as member}
-                    <div
-                      class="flex cursor-move items-center gap-2.5 rounded-xl border border-slate-200/70 bg-white px-2.5 py-2 shadow-sm"
-                      draggable="true"
-                      role="listitem"
-                      ondragstart={(e) =>
-                        handleDragStart(e, { id: member.id }, room.id)}
-                    >
-                      <Avatar name={member.nama || "Tanpa Nama"} size={28} />
-                      <span
-                        class="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[#10211c]"
-                        >{member.nama || "Tanpa Nama"}</span
-                      >
-                      <button
-                        type="button"
-                        onclick={() => removeFromRoom(member.id)}
-                        class="text-slate-300 transition-colors hover:text-red-500"
-                      >
-                        <X class="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  {/each}
-
-                  <!-- Empty Slots -->
-                  {#each Array(Math.max(0, room.capacity - room.occupied)) as _, i}
-                    <div
-                      class="flex h-11 items-center justify-center rounded-xl border border-dashed border-slate-200 text-[11.5px] text-slate-400"
-                    >
-                      Kosong
-                    </div>
-                  {/each}
-                </div>
-              </article>
-            {/each}
-
-            <!-- Add Room Card -->
-            {#if showAddRoom}
-              <article
-                class="rounded-2xl border border-dashed border-primary-300 bg-primary-50/50 p-4"
-              >
-                <div class="mb-3 flex items-center justify-between">
-                  <span class="text-sm font-bold text-primary-700">Kamar Baru</span>
-                  <button
-                    type="button"
-                    onclick={() => {
-                      showAddRoom = false;
-                    }}
-                    class="text-slate-400 hover:text-red-500"
+                    style="border:1.5px dashed var(--c-line);border-radius:var(--radius);height:44px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--c-faint)"
                   >
-                    <X class="h-4 w-4" />
-                  </button>
-                </div>
-                <div class="space-y-2">
-                  <input
-                    type="text"
-                    bind:value={newRoomNumber}
-                    placeholder="No. kamar (cth: 301)"
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-                  />
-                  <select
-                    bind:value={newRoomGender}
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-                  >
-                    <option value="male">Laki-laki</option>
-                    <option value="female">Perempuan</option>
-                    <option value="family">Keluarga</option>
-                  </select>
-                  <button
-                    type="button"
-                    onclick={addRoom}
-                    disabled={isAddingRoom || !newRoomNumber.trim()}
-                    class="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
-                  >
-                    {#if isAddingRoom}<Loader2
-                        class="h-4 w-4 animate-spin"
-                      />{:else}<Plus class="h-4 w-4" />{/if}
-                    Buat Kamar
-                  </button>
-                </div>
-              </article>
-            {:else}
-              <button
-                type="button"
-                onclick={() => {
-                  showAddRoom = true;
-                }}
-                class="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 text-slate-400 transition-colors hover:border-primary-400 hover:bg-primary-50/30 hover:text-primary-600"
-              >
-                <Plus class="h-6 w-6" />
-                <span class="text-sm font-semibold">Tambah Kamar</span>
-              </button>
-            {/if}
-          </div>
-        {:else}
-          <div class="py-12 text-center text-sm text-slate-400">
-            <Hotel class="mx-auto mb-3 h-10 w-10" />
-            <p class="font-medium text-slate-500">Belum ada kamar</p>
-            <p class="mt-1 text-xs">Klik "Auto-Generate" atau tambah manual</p>
+                    Kosong
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/each}
+
+          <!-- Add room card -->
+          {#if showAddRoom}
+            <div
+              style="background:var(--c-primary-tint);border:1.5px dashed var(--c-primary);border-radius:var(--radius-lg);padding:14px"
+            >
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <span style="font-size:14px;font-weight:800;color:var(--c-primary-deep)">Kamar Baru</span>
+                <button
+                  type="button"
+                  onclick={() => (showAddRoom = false)}
+                  style="color:var(--c-faint);display:inline-flex"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <input
+                  type="text"
+                  bind:value={newRoomNumber}
+                  placeholder="No. kamar (cth: 301)"
+                  style="width:100%;padding:9px 12px;font-size:13px;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);outline:none"
+                />
+                <select
+                  bind:value={newRoomGender}
+                  style="width:100%;padding:9px 12px;font-size:13px;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);outline:none"
+                >
+                  <option value="male">Laki-laki</option>
+                  <option value="female">Perempuan</option>
+                  <option value="family">Keluarga</option>
+                </select>
+                <Button
+                  variant="primary"
+                  icon={isAddingRoom ? Loader2 : Plus}
+                  full
+                  onclick={addRoom}
+                  disabled={isAddingRoom || !newRoomNumber.trim()}
+                >
+                  Buat Kamar
+                </Button>
+              </div>
+            </div>
+          {:else}
             <button
               type="button"
-              onclick={() => {
-                showAddRoom = true;
-              }}
-              class="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-dashed border-primary-300 px-4 py-2 text-sm font-semibold text-primary-600 transition-colors hover:bg-primary-50"
+              onclick={() => (showAddRoom = true)}
+              style="min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1.5px dashed var(--c-line);border-radius:var(--radius-lg);color:var(--c-faint);background:transparent;cursor:pointer;transition:all .15s"
             >
-              <Plus class="h-4 w-4" />
-              Tambah Kamar Manual
+              <Plus size={24} />
+              <span style="font-size:13.5px;font-weight:700">Tambah Kamar</span>
             </button>
+          {/if}
+        </div>
+      {:else}
+        <div
+          style="padding:48px 0;text-align:center;background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)"
+        >
+          <Hotel size={40} style="margin:0 auto 12px;color:var(--c-faint)" />
+          <p style="font-weight:600;color:var(--c-muted)">Belum ada kamar</p>
+          <p style="margin-top:4px;font-size:12.5px;color:var(--c-faint)">
+            Klik "Auto-Generate" atau tambah manual
+          </p>
+          <div style="margin-top:16px;display:inline-flex">
+            <Button variant="soft" icon={Plus} onclick={() => (showAddRoom = true)}>
+              Tambah Kamar Manual
+            </Button>
           </div>
-        {/if}
-      </div>
+        </div>
+      {/if}
     {:else}
       <div
-        class="rounded-2xl border border-slate-200/70 bg-white py-12 text-center text-sm text-slate-400 shadow-sm"
+        style="padding:48px 0;text-align:center;font-size:13.5px;color:var(--c-faint);background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)"
       >
         Tidak ada data
       </div>

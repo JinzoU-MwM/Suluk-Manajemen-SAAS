@@ -3,13 +3,18 @@
   import {
     Plus, Search, LayoutGrid, List,
     Phone, ChevronRight, UserCircle, Loader2,
-    Users, CheckCircle, CreditCard, Clock,
+    Users, CheckCircle, CreditCard, Clock, Package as PackageIcon,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import EmptyState from '../components/EmptyState.svelte';
   import Pager from '../components/Pager.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
+  import ProgressBar from '../components/ui/ProgressBar.svelte';
   import { showToast, mapError } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR } from '../utils/formatting.js';
   import { ApiService } from '../services/api.js';
@@ -22,10 +27,15 @@
   let error = $state('');
   let searchQuery = $state('');
   let filterStatus = $state('all');
-  let viewMode = $state('table'); // 'table' | 'kanban'
+  let viewMode = $state('kanban'); // 'table' | 'kanban'
   let drawerOpen = $state(false);
   let selectedJamaah = $state(null);
   let activeTab = $state('profil');
+
+  // Kanban drag-and-drop (local/optimistic — no server persistence endpoint yet)
+  let dragId = $state(null);
+  let dragFrom = $state(null);
+  let overCol = $state(null);
 
   // Pagination (server-side via /jamaah/crm meta)
   const PAGE_SIZE = 25;
@@ -41,16 +51,19 @@
   let form = $state({ ...emptyForm });
 
   const PIPELINE_STATUSES = [
-    { id: 'all',       label: 'Semua' },
-    { id: 'prospek',   label: 'Prospek' },
-    { id: 'survey',    label: 'Survey' },
-    { id: 'booking',   label: 'Booking' },
-    { id: 'dp',        label: 'DP' },
-    { id: 'cicilan',   label: 'Cicilan' },
-    { id: 'lunas',     label: 'Lunas' },
-    { id: 'berangkat', label: 'Berangkat' },
-    { id: 'batal',     label: 'Batal' },
+    { id: 'all',       label: 'Semua',     color: 'var(--c-muted)' },
+    { id: 'prospek',   label: 'Prospek',   color: '#2563c9' },
+    { id: 'survey',    label: 'Survey',    color: 'var(--c-accent)' },
+    { id: 'booking',   label: 'Booking',   color: '#7a5ae0' },
+    { id: 'dp',        label: 'DP',        color: 'var(--c-warning)' },
+    { id: 'cicilan',   label: 'Cicilan',   color: 'var(--c-info)' },
+    { id: 'lunas',     label: 'Lunas',     color: 'var(--c-success)' },
+    { id: 'berangkat', label: 'Berangkat', color: '#0f7a5a' },
+    { id: 'batal',     label: 'Batal',     color: 'var(--c-danger)' },
   ];
+
+  // Kanban columns = pipeline stages excluding the "all" filter pseudo-stage.
+  let kanbanCols = $derived(PIPELINE_STATUSES.filter(s => s.id !== 'all'));
 
   const DRAWER_TABS = [
     { id: 'profil',   label: 'Profil' },
@@ -160,211 +173,272 @@
     const number = clean.startsWith('0') ? '62' + clean.slice(1) : clean;
     window.open(`https://wa.me/${number}`, '_blank');
   }
+
+  function cardsFor(colId) {
+    return jamaah.filter(j => j.pipeline_status === colId);
+  }
+
+  // ── Kanban drag-and-drop (local move; updates stage optimistically) ──
+  function onDragStart(j) {
+    dragId = j.id;
+    dragFrom = j.pipeline_status;
+  }
+
+  function onDragEnd() {
+    dragId = null;
+    dragFrom = null;
+    overCol = null;
+  }
+
+  function onDrop(toCol) {
+    if (!dragId || dragFrom === toCol) { onDragEnd(); return; }
+    const idx = jamaah.findIndex(j => j.id === dragId);
+    if (idx !== -1) {
+      jamaah[idx] = { ...jamaah[idx], pipeline_status: toCol };
+      const label = PIPELINE_STATUSES.find(s => s.id === toCol)?.label || toCol;
+      showToast(`Lead dipindahkan ke ${label}`, 'success');
+    }
+    onDragEnd();
+  }
 </script>
 
-{#snippet statTile(t)}
-  {@const TIcon = t.icon}
-  <div class="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
-    <div class="mb-2 flex h-10 w-10 items-center justify-center rounded-xl" style="background:{t.accent}18;color:{t.accent}">
-      <TIcon class="h-5 w-5" />
-    </div>
-    <p class="tabular text-2xl font-extrabold tracking-tight text-[#10211c]" style="font-variant-numeric:tabular-nums">{t.value}</p>
-    <p class="mt-0.5 text-[13px] font-medium text-slate-500">{t.label}</p>
-  </div>
-{/snippet}
-
-<div class="flex h-screen flex-col">
-  <!-- Header -->
-  <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="font-serif text-xl font-bold text-slate-800">CRM & Jamaah</h1>
-        <p class="mt-0.5 text-sm text-slate-500">{total} jamaah</p>
-      </div>
-      <div class="flex items-center gap-2">
+<div class="flex h-full min-h-0 flex-col" style="background:var(--c-bg)">
+  <div class="flex-shrink-0 px-6 pt-6">
+    <PageHeader
+      title="CRM — Pipeline Penjualan"
+      subtitle="Seret kartu jamaah antar tahap untuk memperbarui status. Pantau progres pembayaran tiap lead."
+    >
+      {#snippet actions()}
         <!-- View toggle -->
-        <div class="flex rounded-xl border border-slate-200 p-0.5">
-          <button
-            type="button"
-            onclick={() => (viewMode = 'table')}
-            class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors {viewMode === 'table' ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-slate-600'}"
-            title="Tampilan tabel"
-          >
-            <List class="h-4 w-4" />
-          </button>
+        <div style="display:inline-flex;gap:4px;background:var(--c-bg-2);padding:4px;border-radius:var(--radius)">
           <button
             type="button"
             onclick={() => (viewMode = 'kanban')}
-            class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors {viewMode === 'kanban' ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-slate-600'}"
+            class="crm-toggle"
+            class:crm-toggle-on={viewMode === 'kanban'}
             title="Tampilan kanban"
           >
             <LayoutGrid class="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            onclick={() => (viewMode = 'table')}
+            class="crm-toggle"
+            class:crm-toggle-on={viewMode === 'table'}
+            title="Tampilan tabel"
+          >
+            <List class="h-4 w-4" />
+          </button>
         </div>
-        <button
-          type="button"
-          onclick={openCreate}
-          class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
-        >
-          <Plus class="h-4 w-4" />
-          Tambah Jamaah
-        </button>
-      </div>
+        <Button variant="primary" icon={Plus} onclick={openCreate}>Tambah Jamaah</Button>
+      {/snippet}
+    </PageHeader>
+
+    <!-- Stat tiles -->
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {#each statTiles as t}
+        <StatCard icon={t.icon} label={t.label} value={String(t.value)} accent={t.accent} />
+      {/each}
     </div>
 
-    <!-- Search + filter -->
-    <div class="mt-4 flex gap-3">
-      <div class="relative flex-1">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+    <!-- Search + stage filter -->
+    <div class="mt-5 flex flex-wrap items-center gap-3">
+      <div class="relative min-w-[220px] flex-1">
+        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style="color:var(--c-faint)" />
         <input
           type="text"
           bind:value={searchQuery}
           oninput={onSearchInput}
           placeholder="Cari nama, HP, NIK, paspor..."
-          class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="crm-search"
         />
       </div>
-      <div class="flex gap-1 overflow-x-auto">
-        {#each PIPELINE_STATUSES as s}
-          <button
-            type="button"
-            onclick={() => (filterStatus = s.id)}
-            class="flex-shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-all
-              {filterStatus === s.id ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
-          >
-            {s.label}
-          </button>
-        {/each}
+      <div class="overflow-x-auto">
+        <FilterTabs
+          tabs={PIPELINE_STATUSES.map(s => ({ value: s.id, label: s.label }))}
+          value={filterStatus}
+          onChange={(v) => (filterStatus = v)}
+        />
       </div>
     </div>
   </div>
 
-  <!-- Table view -->
-  {#if viewMode === 'table'}
-    <div class="flex-1 overflow-auto">
-      <div class="grid grid-cols-2 gap-4 p-6 pb-0 sm:grid-cols-4">
-        {#each statTiles as t}{@render statTile(t)}{/each}
+  <!-- Body -->
+  {#if isLoading}
+    <div class="flex-1 overflow-auto p-6">
+      <div class="space-y-3">
+        {#each [1,2,3,4] as _}
+          <div class="h-14 animate-pulse rounded-2xl" style="background:var(--c-bg-2)"></div>
+        {/each}
       </div>
-      {#if isLoading}
-        <div class="space-y-3 p-6">
-          {#each [1,2,3,4] as _}
-            <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
-          {/each}
-        </div>
-      {:else if error}
-        <div class="m-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{mapError(error)}</div>
-      {:else if filtered.length === 0}
+    </div>
+  {:else if error}
+    <div class="m-6 rounded-2xl p-4 text-sm" style="border:1px solid var(--c-danger);background:var(--c-danger-soft);color:var(--c-danger)">{mapError(error)}</div>
+
+  <!-- Kanban view -->
+  {:else if viewMode === 'kanban'}
+    <div class="min-h-0 flex-1 overflow-x-auto px-6 py-5">
+      <div class="flex h-full items-start gap-3.5">
+        {#each kanbanCols as col}
+          {@const colItems = cardsFor(col.id)}
+          <div
+            role="list"
+            class="flex h-full min-h-[120px] w-[260px] flex-shrink-0 flex-col rounded-2xl p-2.5 transition-colors"
+            style="background:{overCol === col.id ? col.color + '10' : 'var(--c-bg-2)'};border:2px solid {overCol === col.id ? col.color : 'transparent'}"
+            ondragover={(e) => { e.preventDefault(); overCol = col.id; }}
+            ondragleave={() => { if (overCol === col.id) overCol = null; }}
+            ondrop={() => onDrop(col.id)}
+          >
+            <!-- Column header -->
+            <div class="flex items-center gap-2 px-1.5 pb-3 pt-1.5">
+              <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" style="background:{col.color}"></span>
+              <span class="text-[13.5px] font-extrabold" style="color:var(--c-ink)">{col.label}</span>
+              <span class="rounded-full px-2 py-0.5 text-[11px] font-bold" style="background:var(--c-surface);color:var(--c-faint)">{colItems.length}</span>
+            </div>
+
+            <!-- Cards -->
+            <div class="flex min-h-[60px] flex-1 flex-col gap-2.5 overflow-y-auto">
+              {#each colItems as j (j.id)}
+                <div
+                  role="button"
+                  tabindex="0"
+                  draggable="true"
+                  ondragstart={() => onDragStart(j)}
+                  ondragend={onDragEnd}
+                  onclick={() => openDetail(j)}
+                  onkeydown={(e) => { if (e.key === 'Enter') openDetail(j); }}
+                  class="cursor-grab rounded-xl p-3 text-left transition-shadow active:cursor-grabbing"
+                  style="background:var(--c-surface);border:1px solid var(--c-line);border-left:3px solid {col.color};box-shadow:var(--shadow-sm);opacity:{dragId === j.id ? 0.4 : 1}"
+                >
+                  <div class="mb-2 flex items-center gap-2.5">
+                    <Avatar name={j.name} size={30} />
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-[13px] font-bold" style="color:var(--c-ink)">{j.name}</p>
+                      <p class="truncate text-[11px]" style="color:var(--c-faint)">{j.nik || j.phone || '—'}</p>
+                    </div>
+                  </div>
+
+                  {#if j.package_name}
+                    <div class="mb-2 flex items-center gap-1.5 text-[12px]" style="color:var(--c-muted)">
+                      <PackageIcon class="h-3 w-3 flex-shrink-0" />
+                      <span class="truncate">{j.package_name}</span>
+                    </div>
+                  {/if}
+
+                  {#if j.total_invoice > 0}
+                    <div class="mb-1 flex items-center justify-between text-[11px]">
+                      <span class="tabular font-bold" style="font-variant-numeric:tabular-nums;color:var(--c-ink)">{formatIDR(j.paid)}</span>
+                      <span class="tabular" style="font-variant-numeric:tabular-nums;color:var(--c-faint)">{formatIDR(j.total_invoice)}</span>
+                    </div>
+                    <ProgressBar
+                      value={j.paid}
+                      max={j.total_invoice}
+                      height={6}
+                      color={j.sisa_tagihan <= 0 ? 'var(--c-success)' : 'var(--c-accent)'}
+                    />
+                    {#if j.sisa_tagihan > 0}
+                      <p class="mt-2 text-[11px] font-semibold" style="color:var(--c-danger)">Sisa {formatIDR(j.sisa_tagihan)}</p>
+                    {:else}
+                      <p class="mt-2 text-[11px] font-semibold" style="color:var(--c-success)">Lunas</p>
+                    {/if}
+                  {/if}
+                </div>
+              {/each}
+              {#if colItems.length === 0}
+                <p class="px-1 py-2 text-[11px]" style="color:var(--c-faint)">Belum ada</p>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+
+  <!-- Table view -->
+  {:else}
+    <div class="min-h-0 flex-1 overflow-auto px-6 py-5">
+      {#if filtered.length === 0}
         <EmptyState
           icon={UserCircle}
           title={searchQuery || filterStatus !== 'all' ? 'Tidak ada jamaah yang cocok' : 'Belum ada jamaah'}
           text={searchQuery || filterStatus !== 'all' ? 'Coba ubah kata kunci atau filter.' : 'Klik “Tambah Jamaah” untuk menambah data, atau import dari AI Scanner.'}
         />
       {:else}
-        <table class="w-full">
-          <thead class="sticky top-0 bg-slate-50">
-            <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <th class="px-6 py-3">Jamaah</th>
-              <th class="hidden px-4 py-3 md:table-cell">Paket</th>
-              <th class="hidden px-4 py-3 lg:table-cell">Pembayaran</th>
-              <th class="px-4 py-3">Status</th>
-              <th class="px-4 py-3 text-right">Sisa Tagihan</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            {#each filtered as j}
-              <tr class="group bg-white transition-colors hover:bg-primary-50/30">
-                <td class="px-6 py-3.5">
-                  <div class="flex items-center gap-3">
-                    <Avatar name={j.name} size={38} />
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-bold text-[#10211c]">{j.name}</p>
-                      <p class="truncate text-xs text-slate-400">{j.nik || j.phone || '—'}</p>
-                    </div>
-                  </div>
-                </td>
-                <td class="hidden px-4 py-3.5 md:table-cell">
-                  <p class="text-sm font-medium text-slate-600">{j.package_name || '—'}</p>
-                  {#if j.room_type}<p class="text-xs text-slate-400">{j.room_type}</p>{/if}
-                </td>
-                <td class="hidden px-4 py-3.5 lg:table-cell">
-                  {#if j.total_invoice > 0}
-                    <div class="min-w-[140px]">
-                      <div class="mb-1 flex justify-between text-xs">
-                        <span class="tabular font-bold text-[#10211c]" style="font-variant-numeric:tabular-nums">{formatIDR(j.paid)}</span>
-                        <span class="tabular text-slate-400" style="font-variant-numeric:tabular-nums">{formatIDR(j.total_invoice)}</span>
-                      </div>
-                      <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div class="h-full rounded-full {j.sisa_tagihan <= 0 ? 'bg-primary-600' : 'bg-gold-500'}" style:width={`${Math.min(100, Math.round((j.paid / j.total_invoice) * 100))}%`}></div>
-                      </div>
-                    </div>
-                  {:else}
-                    <span class="text-xs text-slate-400">—</span>
-                  {/if}
-                </td>
-                <td class="px-4 py-3.5">
-                  <StatusBadge status={j.pipeline_status} size="xs" />
-                </td>
-                <td class="px-4 py-3.5 text-right">
-                  {#if j.sisa_tagihan > 0}
-                    <span class="text-sm font-semibold text-red-600">{formatIDR(j.sisa_tagihan)}</span>
-                  {:else if j.total_invoice > 0}
-                    <span class="text-sm font-semibold text-primary-600">Lunas</span>
-                  {:else}
-                    <span class="text-sm text-slate-400">—</span>
-                  {/if}
-                </td>
-                <td class="px-4 py-3.5 text-right">
-                  <button
-                    type="button"
-                    onclick={() => openDetail(j)}
-                    class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
-                  >
-                    Detail
-                    <ChevronRight class="h-3 w-3" />
-                  </button>
-                </td>
+        <div class="overflow-hidden rounded-2xl" style="background:var(--c-surface);border:1px solid var(--c-line);box-shadow:var(--shadow-sm)">
+          <table class="w-full">
+            <thead style="background:var(--c-bg-2)">
+              <tr class="text-left text-xs font-semibold uppercase tracking-wider" style="color:var(--c-faint)">
+                <th class="px-6 py-3">Jamaah</th>
+                <th class="hidden px-4 py-3 md:table-cell">Paket</th>
+                <th class="hidden px-4 py-3 lg:table-cell">Pembayaran</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Sisa Tagihan</th>
+                <th class="px-4 py-3"></th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
-        <div class="px-6">
-          <Pager {page} pageSize={PAGE_SIZE} {total} onchange={gotoPage} />
-        </div>
-      {/if}
-    </div>
-
-  <!-- Kanban view -->
-  {:else}
-    <div class="flex-1 overflow-x-auto">
-      <div class="flex h-full gap-3 p-4">
-        {#each PIPELINE_STATUSES.filter(s => s.id !== 'all') as col}
-          {@const colItems = jamaah.filter(j => j.pipeline_status === col.id)}
-          <div class="flex h-full w-64 flex-shrink-0 flex-col rounded-2xl bg-slate-100 p-3">
-            <div class="mb-3 flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-500">{col.label}</span>
-              <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500">{colItems.length}</span>
-            </div>
-            <div class="flex-1 space-y-2 overflow-y-auto">
-              {#each colItems as j}
-                <button
-                  type="button"
-                  onclick={() => openDetail(j)}
-                  class="w-full rounded-xl bg-white p-3 text-left shadow-sm transition-all hover:shadow-md"
-                >
-                  <p class="text-sm font-semibold text-slate-800">{j.name}</p>
-                  {#if j.package_name}
-                    <p class="mt-0.5 text-[11px] text-slate-500">{j.package_name}</p>
-                  {/if}
-                  {#if j.sisa_tagihan > 0}
-                    <p class="mt-2 text-[11px] font-semibold text-red-500">Sisa {formatIDR(j.sisa_tagihan)}</p>
-                  {/if}
-                </button>
+            </thead>
+            <tbody style="--tw-divide-opacity:1">
+              {#each filtered as j (j.id)}
+                <tr class="group transition-colors" style="border-top:1px solid var(--c-line-soft)">
+                  <td class="px-6 py-3.5">
+                    <div class="flex items-center gap-3">
+                      <Avatar name={j.name} size={38} />
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-bold" style="color:var(--c-ink)">{j.name}</p>
+                        <p class="truncate text-xs" style="color:var(--c-faint)">{j.nik || j.phone || '—'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="hidden px-4 py-3.5 md:table-cell">
+                    <p class="text-sm font-medium" style="color:var(--c-ink-soft)">{j.package_name || '—'}</p>
+                    {#if j.room_type}<p class="text-xs" style="color:var(--c-faint)">{j.room_type}</p>{/if}
+                  </td>
+                  <td class="hidden px-4 py-3.5 lg:table-cell">
+                    {#if j.total_invoice > 0}
+                      <div class="min-w-[140px]">
+                        <div class="mb-1 flex justify-between text-xs">
+                          <span class="tabular font-bold" style="font-variant-numeric:tabular-nums;color:var(--c-ink)">{formatIDR(j.paid)}</span>
+                          <span class="tabular" style="font-variant-numeric:tabular-nums;color:var(--c-faint)">{formatIDR(j.total_invoice)}</span>
+                        </div>
+                        <ProgressBar
+                          value={j.paid}
+                          max={j.total_invoice}
+                          height={6}
+                          color={j.sisa_tagihan <= 0 ? 'var(--c-success)' : 'var(--c-accent)'}
+                        />
+                      </div>
+                    {:else}
+                      <span class="text-xs" style="color:var(--c-faint)">—</span>
+                    {/if}
+                  </td>
+                  <td class="px-4 py-3.5">
+                    <StatusBadge status={j.pipeline_status} size="xs" />
+                  </td>
+                  <td class="px-4 py-3.5 text-right">
+                    {#if j.sisa_tagihan > 0}
+                      <span class="text-sm font-semibold" style="color:var(--c-danger)">{formatIDR(j.sisa_tagihan)}</span>
+                    {:else if j.total_invoice > 0}
+                      <span class="text-sm font-semibold" style="color:var(--c-success)">Lunas</span>
+                    {:else}
+                      <span class="text-sm" style="color:var(--c-faint)">—</span>
+                    {/if}
+                  </td>
+                  <td class="px-4 py-3.5 text-right">
+                    <button
+                      type="button"
+                      onclick={() => openDetail(j)}
+                      class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                      style="color:var(--c-primary)"
+                    >
+                      Detail
+                      <ChevronRight class="h-3 w-3" />
+                    </button>
+                  </td>
+                </tr>
               {/each}
-            </div>
-          </div>
-        {/each}
-      </div>
+            </tbody>
+          </table>
+        </div>
+        <Pager {page} pageSize={PAGE_SIZE} {total} onchange={gotoPage} />
+      {/if}
     </div>
   {/if}
 </div>
@@ -531,3 +605,39 @@
     <span class="text-right font-medium text-slate-700">{value}</span>
   </div>
 {/snippet}
+
+<style>
+  .crm-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    color: var(--c-muted);
+    transition: all 0.15s;
+  }
+  .crm-toggle:hover { color: var(--c-ink); }
+  .crm-toggle-on {
+    background: var(--c-surface);
+    color: var(--c-primary);
+    box-shadow: var(--shadow-sm);
+  }
+  .crm-search {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    font-size: 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+    color: var(--c-ink);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .crm-search::placeholder { color: var(--c-faint); }
+  .crm-search:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+  tbody tr.group:hover { background: var(--c-primary-tint); }
+</style>

@@ -85,3 +85,4 @@ htmlcov/
 # Local data & generated artifacts
 # =============================================================================
 certs/*.pem
+.design-ref/

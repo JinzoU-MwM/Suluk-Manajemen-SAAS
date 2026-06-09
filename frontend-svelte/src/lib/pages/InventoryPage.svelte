@@ -1,8 +1,10 @@
 <!--
   InventoryPage.svelte — Suluk design (Inventaris)
 
-  Header (kicker + title + actions) · StatCard summary row · brand inventory table.
-  Presentation only — all data fetching, state, handlers, and labels preserved.
+  PageHeader (kicker + title + group selector/actions) · StatCard forecast row ·
+  bulk-action toolbar · member equipment table (design th/td styling, Avatar in the
+  member cell, status Badge for Diterima/Menunggu).
+  Presentation only — all data fetching, $props, $state/$derived, handlers, and labels preserved.
 -->
 <script>
   import {
@@ -19,6 +21,11 @@
   import PageHeader from "../components/PageHeader.svelte";
   import StatCard from "../components/StatCard.svelte";
   import Avatar from "../components/Avatar.svelte";
+  import EmptyState from "../components/EmptyState.svelte";
+  import Card from "../components/ui/Card.svelte";
+  import Badge from "../components/ui/Badge.svelte";
+  import Button from "../components/ui/Button.svelte";
+  import ProgressBar from "../components/ui/ProgressBar.svelte";
   import { ApiService } from "../services/api.js";
 
   let { isOpen = false, onClose, groups = [], isPro = false } = $props();
@@ -35,6 +42,9 @@
   // Derived values
   let selectedGroup = $derived(groups.find((g) => g.id === selectedGroupId));
   let canMarkSelected = $derived(selectedMembers.size > 0 && !isMarking);
+  let receivedCount = $derived(fulfillment?.received_count || 0);
+  let pendingCount = $derived(fulfillment?.pending_count || 0);
+  let totalFulfillment = $derived(receivedCount + pendingCount);
 
   // Size options
   const sizes = ["", "S", "M", "L", "XL", "XXL"];
@@ -151,18 +161,18 @@
 </script>
 
 {#if isOpen}
-  <div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+  <div class="inv-page">
     <PageHeader
       kicker="Logistik"
-      title="Inventory"
-      subtitle="Kelola stok koper, ihram, mukena, dan distribusi perlengkapan jamaah."
+      title="Inventaris"
+      subtitle="Pantau stok perlengkapan jamaah — koper, seragam, kain ihram, dan distribusi ke jamaah."
     >
       {#snippet actions()}
         <select
           id="inv-group-select"
           bind:value={selectedGroupId}
           onchange={loadGroupData}
-          class="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:w-auto sm:min-w-[14rem]"
+          class="inv-select"
         >
           <option value="">Pilih Grup</option>
           {#each groups as group}
@@ -175,7 +185,7 @@
             type="button"
             onclick={loadGroupData}
             disabled={isLoading}
-            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
+            class="inv-icon-btn"
             title="Muat ulang"
           >
             <RefreshCw class="h-4 w-4 {isLoading ? 'animate-spin' : ''}" />
@@ -184,150 +194,135 @@
       {/snippet}
     </PageHeader>
 
-    <!-- Summary cards (Suluk design) -->
+    <!-- Summary / forecast cards -->
     {#if forecast}
-      <div class="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div class="inv-stats">
         <StatCard
           icon={Boxes}
-          label="Total"
+          label="Total Jamaah"
           value={String(forecast.total_members)}
-          accent="#1B7F5A"
+          accent="var(--c-primary)"
         />
         <StatCard
           icon={Package}
           label="Koper"
           value={String(forecast.requirements?.koper || 0)}
-          accent="#2563a8"
+          accent="var(--c-info)"
         />
         <StatCard
           icon={CheckCircle}
           label="Ihram"
           value={String(forecast.requirements?.ihram || 0)}
-          accent="#1B7F5A"
+          accent="var(--c-success)"
         />
         <StatCard
           icon={Shirt}
           label="Mukena"
           value={String(forecast.requirements?.mukena || 0)}
-          accent="#C99A2E"
+          accent="var(--c-accent)"
         />
       </div>
     {/if}
 
     <!-- Bulk actions toolbar -->
     {#if fulfillment && fulfillment.pending?.length > 0}
-      <div class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 shadow-sm">
-        <span class="text-xs font-medium text-slate-500"
-          >{selectedMembers.size} dipilih</span
-        >
-        <button
-          type="button"
-          onclick={selectAllPending}
-          class="text-xs font-semibold text-primary-600 hover:underline"
-          >Semua</button
-        >
-        <button
-          type="button"
-          onclick={clearSelection}
-          class="text-xs font-medium text-slate-500 hover:underline">Batal</button
-        >
-        <button
-          type="button"
-          onclick={markSelectedAsReceived}
-          disabled={!canMarkSelected}
-          class="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-primary-600/30 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {#if isMarking}<Loader2
-              class="h-3.5 w-3.5 animate-spin"
-            />{:else}<CheckCircle class="h-3.5 w-3.5" />{/if}
-          Tandai Terima
-        </button>
-      </div>
+      <Card pad={false} class="inv-toolbar-card" style="margin-bottom:var(--gap)">
+        <div class="inv-toolbar">
+          <span class="inv-toolbar-count">{selectedMembers.size} dipilih</span>
+          <button type="button" onclick={selectAllPending} class="inv-link inv-link-primary"
+            >Semua</button
+          >
+          <button type="button" onclick={clearSelection} class="inv-link"
+            >Batal</button
+          >
+          <div class="inv-toolbar-spacer"></div>
+          <Button
+            variant="primary"
+            size="sm"
+            onclick={markSelectedAsReceived}
+            disabled={!canMarkSelected}
+          >
+            {#if isMarking}<Loader2 class="h-3.5 w-3.5 animate-spin" />{:else}<CheckCircle
+                class="h-3.5 w-3.5"
+              />{/if}
+            Tandai Terima
+          </Button>
+        </div>
+      </Card>
     {/if}
 
     <!-- Error -->
     {#if error}
-      <div
-        class="mb-5 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm"
-      >
-        <AlertTriangle class="h-4 w-4 text-red-500" />
-        <span class="flex-1 text-red-700">{error}</span>
-        <button
-          type="button"
-          onclick={() => (error = null)}
-          class="text-red-500 hover:text-red-700"
-        >
+      <div class="inv-error" role="alert">
+        <AlertTriangle class="h-4 w-4" style="color:var(--c-danger);flex-shrink:0" />
+        <span class="inv-error-text">{error}</span>
+        <button type="button" onclick={() => (error = null)} class="inv-error-close">
           <X class="h-4 w-4" />
         </button>
       </div>
     {/if}
 
     <!-- Content -->
-    <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+    <Card pad={false}>
       {#if isLoading}
-        <div class="flex items-center justify-center py-16">
-          <Loader2 class="h-6 w-6 animate-spin text-primary-500" />
+        <div class="inv-center">
+          <Loader2 class="h-6 w-6 animate-spin" style="color:var(--c-primary)" />
         </div>
       {:else if !selectedGroupId}
-        <div
-          class="flex flex-col items-center justify-center py-16 text-slate-400"
-        >
-          <Package class="mb-2 h-10 w-10" />
-          <p class="text-sm">Pilih grup untuk memulai</p>
-        </div>
+        <EmptyState
+          icon={Package}
+          title="Pilih grup untuk memulai"
+          text="Pilih sebuah grup keberangkatan di atas untuk melihat kebutuhan perlengkapan dan status distribusi jamaah."
+        />
       {:else if forecast}
         <!-- Size & Status summary row -->
-        <div class="flex flex-wrap gap-3 border-b border-slate-100 p-4">
+        <div class="inv-meta-row">
           <!-- Sizes -->
-          <div class="min-w-[220px] flex-1 rounded-xl border border-slate-200/70 bg-slate-50/60 p-3">
-            <div class="mb-2 flex items-center gap-1.5">
-              <Shirt class="h-3.5 w-3.5 text-slate-500" />
-              <span class="text-xs font-semibold text-slate-600">Ukuran Baju</span
-              >
+          <div class="inv-meta-box inv-meta-grow">
+            <div class="inv-meta-head">
+              <Shirt class="h-3.5 w-3.5" style="color:var(--c-faint)" />
+              <span>Ukuran Baju</span>
             </div>
-            <div class="flex flex-wrap gap-1.5">
+            <div class="inv-chips">
               {#each Object.entries(forecast.size_breakdown || {}) as [size, count]}
-                <span
-                  class="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
-                >
-                  {size || "N/A"}: {count}
-                </span>
+                <span class="inv-chip">{size || "N/A"}: {count}</span>
               {/each}
             </div>
           </div>
           <!-- Status -->
           {#if fulfillment}
-            <div
-              class="min-w-[160px] rounded-xl border border-slate-200/70 bg-slate-50/60 p-3"
-            >
-              <div class="mb-2 flex items-center gap-1.5">
-                <Clock class="h-3.5 w-3.5 text-slate-500" />
-                <span class="text-xs font-semibold text-slate-600">Status</span>
+            <div class="inv-meta-box">
+              <div class="inv-meta-head">
+                <Clock class="h-3.5 w-3.5" style="color:var(--c-faint)" />
+                <span>Status Distribusi</span>
               </div>
-              <div class="flex items-center gap-4 text-xs">
-                <span class="flex items-center gap-1">
-                  <CheckCircle class="h-3.5 w-3.5 text-primary-500" />
-                  <span class="font-semibold text-primary-700"
-                    >{fulfillment.received_count || 0}</span
-                  >
+              <div class="inv-status-figures">
+                <span class="inv-status-fig" style="color:var(--c-success)">
+                  <CheckCircle class="h-3.5 w-3.5" />
+                  <strong>{receivedCount}</strong> diterima
                 </span>
-                <span class="flex items-center gap-1">
-                  <Package class="h-3.5 w-3.5 text-gold-500" />
-                  <span class="font-semibold text-amber-600"
-                    >{fulfillment.pending_count || 0}</span
-                  >
+                <span class="inv-status-fig" style="color:var(--c-warning)">
+                  <Package class="h-3.5 w-3.5" />
+                  <strong>{pendingCount}</strong> menunggu
                 </span>
+              </div>
+              <div class="inv-progress">
+                <ProgressBar
+                  value={receivedCount}
+                  max={Math.max(totalFulfillment, 1)}
+                  color="var(--c-success)"
+                />
               </div>
             </div>
           {/if}
         </div>
 
         <!-- Member Table -->
-        <div class="overflow-x-auto">
-          <table class="w-full">
+        <div class="inv-table-wrap">
+          <table class="inv-table">
             <thead>
-              <tr class="text-left">
-                <th class="w-10 px-4 py-3">
+              <tr>
+                <th class="inv-th inv-th-check">
                   <input
                     type="checkbox"
                     checked={fulfillment?.pending?.length > 0 &&
@@ -337,70 +332,45 @@
                         clearSelection();
                       else selectAllPending();
                     }}
-                    class="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    class="inv-checkbox"
                   />
                 </th>
-                <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"
-                  >Nama</th
-                >
-                <th
-                  class="w-16 px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"
-                  >Gender</th
-                >
-                <th
-                  class="w-24 px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"
-                  >Baju</th
-                >
-                <th
-                  class="w-24 px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"
-                  >Family</th
-                >
-                <th
-                  class="w-24 px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400"
-                  >Status</th
-                >
+                <th class="inv-th">Nama</th>
+                <th class="inv-th inv-th-center">Gender</th>
+                <th class="inv-th">Baju</th>
+                <th class="inv-th">Family</th>
+                <th class="inv-th inv-th-center">Status</th>
               </tr>
             </thead>
             <tbody>
               {#each forecast.details || [] as member}
                 {@const isReceived = member.is_equipment_received}
-                <tr
-                  class="transition-colors hover:bg-primary-50/30 {isReceived
-                    ? 'bg-primary-50/20'
-                    : ''}"
-                >
-                  <td class="border-b border-slate-100 px-4 py-3.5">
+                <tr class="inv-row {isReceived ? 'inv-row-received' : ''}">
+                  <td class="inv-td">
                     {#if !isReceived}
                       <input
                         type="checkbox"
                         checked={selectedMembers.has(member.member_id)}
                         onchange={() => toggleMember(member.member_id)}
-                        class="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        class="inv-checkbox"
                       />
                     {:else}
-                      <CheckCircle class="h-4 w-4 text-primary-500" />
+                      <CheckCircle class="h-4 w-4" style="color:var(--c-success)" />
                     {/if}
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
-                    <div class="flex items-center gap-2.5">
-                      <Avatar name={member.nama} size={32} />
-                      <span
-                        class="max-w-[180px] truncate text-sm font-semibold text-[#10211c]"
-                        >{member.nama}</span
-                      >
+                  <td class="inv-td">
+                    <div class="inv-member">
+                      <Avatar name={member.nama} size={34} />
+                      <span class="inv-member-name">{member.nama}</span>
                     </div>
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
-                    <span
-                      class="rounded-md px-2 py-0.5 text-[10px] font-semibold {member.gender ===
-                      'male'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-pink-100 text-pink-700'}"
-                    >
-                      {member.gender === "male" ? "L" : "P"}
-                    </span>
+                  <td class="inv-td inv-td-center">
+                    <Badge
+                      label={member.gender === "male" ? "L" : "P"}
+                      tone={member.gender === "male" ? "info" : "danger"}
+                    />
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
+                  <td class="inv-td">
                     <select
                       value={member.baju_size || ""}
                       onchange={(e) =>
@@ -408,13 +378,13 @@
                           member.member_id,
                           /** @type {HTMLSelectElement} */ (e.target).value,
                         )}
-                      class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-primary-400"
+                      class="inv-field"
                     >
                       {#each sizes as s}<option value={s}>{s || "-"}</option
                         >{/each}
                     </select>
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
+                  <td class="inv-td">
                     <input
                       type="text"
                       value={member.family_id || ""}
@@ -424,22 +394,14 @@
                           /** @type {HTMLInputElement} */ (e.target).value,
                         )}
                       placeholder="F00"
-                      class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-primary-400"
+                      class="inv-field"
                     />
                   </td>
-                  <td class="border-b border-slate-100 px-4 py-3.5">
+                  <td class="inv-td inv-td-center">
                     {#if isReceived}
-                      <span
-                        class="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-0.5 text-[11px] font-semibold text-primary-700"
-                      >
-                        <CheckCircle class="h-3 w-3" /> Diterima
-                      </span>
+                      <Badge status="Selesai" label="Diterima" dot />
                     {:else}
-                      <span
-                        class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700"
-                      >
-                        Menunggu
-                      </span>
+                      <Badge tone="warning" label="Menunggu" dot />
                     {/if}
                   </td>
                 </tr>
@@ -448,10 +410,290 @@
           </table>
         </div>
       {:else}
-        <div class="py-8 text-center text-sm text-slate-400">
-          Tidak ada data
-        </div>
+        <EmptyState icon={Package} title="Tidak ada data" />
       {/if}
-    </div>
+    </Card>
   </div>
 {/if}
+
+<style>
+  .inv-page {
+    min-height: 100vh;
+    background: var(--c-bg);
+    padding: 16px;
+  }
+  @media (min-width: 1024px) {
+    .inv-page {
+      padding: 32px;
+    }
+  }
+
+  /* Header actions */
+  .inv-select {
+    width: 100%;
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+    border-radius: var(--radius);
+    padding: 9px 14px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--c-ink-soft);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .inv-select:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+  @media (min-width: 640px) {
+    .inv-select {
+      width: auto;
+      min-width: 14rem;
+    }
+  }
+  .inv-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius);
+    color: var(--c-muted);
+    background: var(--c-surface);
+    transition: background 0.15s;
+  }
+  .inv-icon-btn:hover {
+    background: var(--c-bg-2);
+  }
+  .inv-icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Stat row */
+  .inv-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--gap);
+    margin-bottom: var(--gap);
+  }
+  @media (min-width: 1024px) {
+    .inv-stats {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  /* Toolbar */
+  .inv-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+  }
+  .inv-toolbar-count {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--c-muted);
+  }
+  .inv-toolbar-spacer {
+    margin-left: auto;
+  }
+  .inv-link {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--c-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .inv-link:hover {
+    text-decoration: underline;
+  }
+  .inv-link-primary {
+    color: var(--c-primary);
+    font-weight: 700;
+  }
+
+  /* Error */
+  .inv-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: var(--gap);
+    border: 1px solid var(--c-danger);
+    background: var(--c-danger-soft);
+    border-radius: var(--radius-lg);
+    padding: 12px 16px;
+    font-size: 13.5px;
+  }
+  .inv-error-text {
+    flex: 1;
+    color: var(--c-danger);
+    font-weight: 600;
+  }
+  .inv-error-close {
+    color: var(--c-danger);
+    background: none;
+    border: none;
+    cursor: pointer;
+    line-height: 0;
+  }
+
+  .inv-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 0;
+  }
+
+  /* Meta row (sizes + status) */
+  .inv-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 16px;
+    border-bottom: 1px solid var(--c-line);
+  }
+  .inv-meta-box {
+    min-width: 180px;
+    border: 1px solid var(--c-line);
+    background: var(--c-primary-tint);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .inv-meta-grow {
+    flex: 1;
+    min-width: 220px;
+  }
+  .inv-meta-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+  }
+  .inv-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .inv-chip {
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius-sm);
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-ink-soft);
+  }
+  .inv-status-figures {
+    display: flex;
+    gap: 16px;
+    font-size: 12.5px;
+  }
+  .inv-status-fig {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+  }
+  .inv-status-fig strong {
+    font-weight: 800;
+  }
+  .inv-progress {
+    margin-top: 10px;
+  }
+
+  /* Table (matches design Table th/td styling) */
+  .inv-table-wrap {
+    overflow-x: auto;
+  }
+  .inv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .inv-th {
+    text-align: left;
+    padding: 14px 16px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--c-line);
+  }
+  .inv-th-center {
+    text-align: center;
+  }
+  .inv-th-check {
+    width: 44px;
+  }
+  .inv-td {
+    padding: calc(var(--row-h, 56px) / 4.2) 16px;
+    border-bottom: 1px solid var(--c-line-soft);
+    color: var(--c-ink-soft);
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .inv-td-center {
+    text-align: center;
+  }
+  .inv-row {
+    transition: background 0.12s;
+  }
+  .inv-row:hover {
+    background: var(--c-primary-tint);
+  }
+  .inv-row-received {
+    background: var(--c-success-soft);
+  }
+  .inv-row-received:hover {
+    background: var(--c-success-soft);
+  }
+  .inv-member {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .inv-member-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--c-ink);
+  }
+  .inv-checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--c-line);
+    accent-color: var(--c-primary);
+    cursor: pointer;
+  }
+  .inv-field {
+    width: 100%;
+    min-width: 72px;
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    font-size: 12.5px;
+    color: var(--c-ink);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .inv-field:focus {
+    border-color: var(--c-primary);
+  }
+</style>

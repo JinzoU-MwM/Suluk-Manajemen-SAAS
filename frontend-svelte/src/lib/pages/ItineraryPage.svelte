@@ -1,9 +1,10 @@
 <!--
   ItineraryPage.svelte - Trip schedule/itinerary manager.
-  Timeline view grouped by date with color-coded categories.
+  Suluk design: PageHeader + group selector + day-by-day vertical timeline
+  (green circle day markers + connector line, gold date labels, category-coloured
+  activity items with time/location/notes). All data wiring preserved.
 -->
 <script>
-    import { onMount } from "svelte";
     import {
         CalendarDays,
         Plane,
@@ -22,6 +23,9 @@
     } from "lucide-svelte";
     import { ApiService } from "../services/api";
     import PageHeader from "../components/PageHeader.svelte";
+    import EmptyState from "../components/EmptyState.svelte";
+    import Card from "../components/ui/Card.svelte";
+    import Button from "../components/ui/Button.svelte";
 
     let { groups = [], isPro = false } = $props();
 
@@ -57,27 +61,32 @@
         flight: {
             icon: Plane,
             label: "Penerbangan",
-            color: "bg-blue-50 text-blue-600 border-blue-200",
+            fg: "--c-info",
+            bg: "--c-info-soft",
         },
         hotel: {
             icon: Hotel,
             label: "Hotel",
-            color: "bg-purple-50 text-purple-600 border-purple-200",
+            fg: "--c-primary",
+            bg: "--c-primary-soft",
         },
         transport: {
             icon: Bus,
             label: "Transportasi",
-            color: "bg-amber-50 text-amber-600 border-amber-200",
+            fg: "--c-accent",
+            bg: "--c-accent-soft",
         },
         activity: {
             icon: MapPin,
             label: "Aktivitas",
-            color: "bg-emerald-50 text-emerald-600 border-emerald-200",
+            fg: "--c-success",
+            bg: "--c-success-soft",
         },
         other: {
             icon: MoreHorizontal,
             label: "Lainnya",
-            color: "bg-slate-50 text-slate-600 border-slate-200",
+            fg: "--c-muted",
+            bg: "--c-bg-2",
         },
     };
 
@@ -175,51 +184,46 @@
     }
 </script>
 
-<div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+<div class="itinerary-page">
     <!-- Header -->
     <PageHeader
         kicker="Operasional"
-        title="Itinerary"
+        title="Itinerary Perjalanan"
         subtitle="Kelola jadwal perjalanan per grup keberangkatan."
     >
         {#snippet actions()}
             {#if selectedGroupId}
-                <button
-                    type="button"
-                    onclick={openAddForm}
-                    class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition hover:bg-primary-700"
-                >
-                    <Plus class="w-4 h-4" /> Tambah
-                </button>
+                <Button variant="primary" icon={Plus} onclick={openAddForm}>
+                    Tambah
+                </Button>
             {/if}
         {/snippet}
     </PageHeader>
 
     <!-- Error -->
     {#if error}
-        <div
-            class="mb-5 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
-        >
-            <AlertCircle class="w-4 h-4 flex-shrink-0" />
-            {error}
-            <button onclick={() => (error = "")} class="ml-auto"
-                ><X class="w-4 h-4" /></button
+        <div class="itinerary-alert">
+            <AlertCircle size={16} style="flex-shrink:0" />
+            <span>{error}</span>
+            <button
+                type="button"
+                onclick={() => (error = "")}
+                class="itinerary-alert-close"
+                aria-label="Tutup"
             >
+                <X size={16} />
+            </button>
         </div>
     {/if}
 
     <!-- Group Selector -->
-    <div
-        class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm"
-    >
-        <label
-            for="itinerary-group"
-            class="mb-2 block text-xs font-bold uppercase tracking-[0.08em] text-primary-600"
-            >Pilih Grup</label
-        >
+    <Card style="margin-bottom:var(--gap)">
+        <label for="itinerary-group" class="itinerary-field-label">
+            Pilih Grup
+        </label>
         <select
             id="itinerary-group"
-            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100"
+            class="itinerary-select"
             onchange={(e) => {
                 selectedGroupId = parseInt(
                     /** @type {HTMLSelectElement} */ (e.target).value,
@@ -232,144 +236,108 @@
                 <option value={g.id}>{g.name}</option>
             {/each}
         </select>
-    </div>
+    </Card>
 
     {#if !selectedGroupId}
-        <div
-            class="rounded-2xl border border-slate-200/70 bg-white py-16 text-center text-slate-400 shadow-sm"
-        >
-            <CalendarDays class="w-12 h-12 mx-auto mb-3 text-slate-300" />
-            <p class="text-sm">
-                Pilih grup terlebih dahulu untuk melihat jadwal
-            </p>
-        </div>
+        <Card>
+            <EmptyState
+                icon={CalendarDays}
+                title="Pilih grup keberangkatan"
+                text="Pilih grup terlebih dahulu untuk melihat jadwal perjalanan."
+            />
+        </Card>
     {:else if isLoading}
-        <div
-            class="flex items-center justify-center rounded-2xl border border-slate-200/70 bg-white py-16 text-slate-400 shadow-sm"
-        >
-            <Loader2 class="w-6 h-6 animate-spin mr-2" /> Memuat jadwal...
-        </div>
+        <Card>
+            <div class="itinerary-loading">
+                <Loader2 size={22} class="spin" />
+                <span>Memuat jadwal...</span>
+            </div>
+        </Card>
     {:else if items.length === 0}
-        <div
-            class="rounded-2xl border border-slate-200/70 bg-white py-16 text-center text-slate-400 shadow-sm"
-        >
-            <CalendarDays class="w-12 h-12 mx-auto mb-3 text-slate-300" />
-            <p class="font-medium text-slate-500">Belum ada jadwal</p>
-            <p class="text-sm mt-1">
-                Klik "Tambah" untuk menambahkan item jadwal pertama
-            </p>
-        </div>
+        <Card>
+            <EmptyState
+                icon={CalendarDays}
+                title="Belum ada jadwal"
+                text={'Klik "Tambah" untuk menambahkan item jadwal pertama.'}
+            />
+        </Card>
     {:else}
         <!-- Timeline -->
-        <div
-            class="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm lg:p-6"
-        >
-            <div class="relative pl-1">
+        <Card>
+            <div class="timeline">
                 {#each groupedItems() as [date, dateItems], dayIdx}
-                    <div
-                        class="relative flex gap-4 sm:gap-5 {dayIdx <
-                        groupedItems().length - 1
-                            ? 'pb-7'
-                            : ''}"
-                    >
+                    {@const isLast = dayIdx === groupedItems().length - 1}
+                    <div class="timeline-day" class:is-last={isLast}>
                         <!-- Connector line -->
-                        {#if dayIdx < groupedItems().length - 1}
-                            <div
-                                class="absolute left-[21px] top-12 bottom-0 w-0.5 bg-slate-200"
-                            ></div>
+                        {#if !isLast}
+                            <div class="timeline-connector"></div>
                         {/if}
 
                         <!-- Day marker -->
-                        <div
-                            class="z-10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-[3px] border-white bg-primary-50 text-primary-800 shadow-sm"
-                        >
-                            <CalendarDays class="h-5 w-5" />
+                        <div class="timeline-marker">
+                            <CalendarDays size={20} />
                         </div>
 
                         <!-- Day content -->
-                        <div class="min-w-0 flex-1 pt-1">
-                            <p
-                                class="text-[11.5px] font-bold uppercase tracking-[0.05em] text-[#C99A2E]"
-                            >
-                                {formatDate(date)}
-                            </p>
+                        <div class="timeline-content">
+                            <p class="timeline-date">{formatDate(date)}</p>
 
                             <!-- Items -->
-                            <div class="mt-3 space-y-2.5">
+                            <div class="timeline-items">
                                 {#each dateItems as item}
                                     {@const cat =
                                         categoryConfig[item.category] ||
                                         categoryConfig.other}
-                                    <div
-                                        class="group rounded-xl border border-slate-200/70 bg-white p-3.5 transition-shadow hover:shadow-sm"
-                                    >
+                                    <div class="timeline-item">
                                         <div
-                                            class="flex items-start justify-between"
+                                            class="timeline-item-icon"
+                                            style="background:var({cat.bg});color:var({cat.fg})"
                                         >
-                                            <div
-                                                class="flex min-w-0 flex-1 items-start gap-3"
+                                            <cat.icon size={16} />
+                                        </div>
+                                        <div class="timeline-item-body">
+                                            <p class="timeline-item-title">
+                                                {item.activity}
+                                            </p>
+                                            {#if item.location}
+                                                <p class="timeline-item-meta">
+                                                    <MapPin size={12} />
+                                                    {item.location}
+                                                </p>
+                                            {/if}
+                                            {#if item.time_start}
+                                                <p class="timeline-item-meta">
+                                                    <Clock size={12} />
+                                                    {item.time_start}{item.time_end
+                                                        ? ` - ${item.time_end}`
+                                                        : ""}
+                                                </p>
+                                            {/if}
+                                            {#if item.notes}
+                                                <p class="timeline-item-notes">
+                                                    {item.notes}
+                                                </p>
+                                            {/if}
+                                        </div>
+                                        <div class="timeline-item-actions">
+                                            <button
+                                                type="button"
+                                                onclick={() =>
+                                                    openEditForm(item)}
+                                                class="timeline-action edit"
+                                                aria-label="Edit jadwal"
                                             >
-                                                <div
-                                                    class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border {cat.color}"
-                                                >
-                                                    <cat.icon class="w-4 h-4" />
-                                                </div>
-                                                <div class="min-w-0 flex-1">
-                                                    <p
-                                                        class="text-sm font-semibold text-slate-800"
-                                                    >
-                                                        {item.activity}
-                                                    </p>
-                                                    {#if item.location}
-                                                        <p
-                                                            class="mt-0.5 text-xs text-slate-500"
-                                                        >
-                                                            ?? {item.location}
-                                                        </p>
-                                                    {/if}
-                                                    {#if item.time_start}
-                                                        <p
-                                                            class="mt-0.5 flex items-center gap-1 text-xs text-slate-400"
-                                                        >
-                                                            <Clock
-                                                                class="w-3 h-3"
-                                                            />
-                                                            {item.time_start}{item.time_end
-                                                                ? ` - ${item.time_end}`
-                                                                : ""}
-                                                        </p>
-                                                    {/if}
-                                                    {#if item.notes}
-                                                        <p
-                                                            class="mt-1 text-xs italic text-slate-400"
-                                                        >
-                                                            {item.notes}
-                                                        </p>
-                                                    {/if}
-                                                </div>
-                                            </div>
-                                            <div
-                                                class="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+                                                <Edit3 size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick={() =>
+                                                    deleteItem(item.id)}
+                                                class="timeline-action delete"
+                                                aria-label="Hapus jadwal"
                                             >
-                                                <button
-                                                    type="button"
-                                                    onclick={() =>
-                                                        openEditForm(item)}
-                                                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-primary-50 hover:text-primary-600"
-                                                >
-                                                    <Edit3 class="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onclick={() =>
-                                                        deleteItem(item.id)}
-                                                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                                                >
-                                                    <Trash2
-                                                        class="w-3.5 h-3.5"
-                                                    />
-                                                </button>
-                                            </div>
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     </div>
                                 {/each}
@@ -378,169 +346,440 @@
                     </div>
                 {/each}
             </div>
-        </div>
+        </Card>
     {/if}
 </div>
 
 <!-- Add/Edit Modal -->
 {#if showForm}
-    <div
-        class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        role="dialog"
-    >
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-slate-800">
+    <div class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-panel">
+            <div class="modal-head">
+                <h3 class="modal-title">
                     {editingItem ? "Edit Jadwal" : "Tambah Jadwal"}
                 </h3>
                 <button
                     type="button"
                     onclick={() => (showForm = false)}
-                    class="p-1.5 hover:bg-slate-100 rounded-lg"
+                    class="modal-close"
+                    aria-label="Tutup"
                 >
-                    <X class="w-4 h-4" />
+                    <X size={16} />
                 </button>
             </div>
 
-            <div class="space-y-3">
+            <div class="modal-body">
                 <!-- Category -->
                 <div>
-                    <label
-                        for="itinerary-category"
-                        class="block text-xs font-medium text-slate-600 mb-1"
-                        >Kategori</label
-                    >
+                    <label for="itinerary-category" class="modal-label">
+                        Kategori
+                    </label>
                     <select
                         id="itinerary-category"
                         bind:value={formCategory}
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        class="modal-input"
                     >
-                        <option value="flight">?? Penerbangan</option>
-                        <option value="hotel">?? Hotel</option>
-                        <option value="transport">?? Transportasi</option>
-                        <option value="activity">?? Aktivitas</option>
-                        <option value="other">?? Lainnya</option>
+                        <option value="flight">Penerbangan</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="transport">Transportasi</option>
+                        <option value="activity">Aktivitas</option>
+                        <option value="other">Lainnya</option>
                     </select>
                 </div>
 
                 <!-- Date -->
                 <div>
-                    <label
-                        for="itinerary-date"
-                        class="block text-xs font-medium text-slate-600 mb-1"
-                        >Tanggal *</label
-                    >
+                    <label for="itinerary-date" class="modal-label">
+                        Tanggal *
+                    </label>
                     <input
                         id="itinerary-date"
                         type="date"
                         bind:value={formDate}
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        class="modal-input"
                     />
                 </div>
 
                 <!-- Time -->
-                <div class="grid grid-cols-2 gap-3">
+                <div class="modal-grid-2">
                     <div>
                         <label
                             for="itinerary-time-start"
-                            class="block text-xs font-medium text-slate-600 mb-1"
-                            >Jam Mulai</label
+                            class="modal-label"
                         >
+                            Jam Mulai
+                        </label>
                         <input
                             id="itinerary-time-start"
                             type="time"
                             bind:value={formTimeStart}
-                            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                            class="modal-input"
                         />
                     </div>
                     <div>
-                        <label
-                            for="itinerary-time-end"
-                            class="block text-xs font-medium text-slate-600 mb-1"
-                            >Jam Selesai</label
-                        >
+                        <label for="itinerary-time-end" class="modal-label">
+                            Jam Selesai
+                        </label>
                         <input
                             id="itinerary-time-end"
                             type="time"
                             bind:value={formTimeEnd}
-                            class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                            class="modal-input"
                         />
                     </div>
                 </div>
 
                 <!-- Activity -->
                 <div>
-                    <label
-                        for="itinerary-activity"
-                        class="block text-xs font-medium text-slate-600 mb-1"
-                        >Aktivitas *</label
-                    >
+                    <label for="itinerary-activity" class="modal-label">
+                        Aktivitas *
+                    </label>
                     <input
                         id="itinerary-activity"
                         type="text"
                         bind:value={formActivity}
                         placeholder="e.g. Check-in Hotel Al Safwah"
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        class="modal-input"
                     />
                 </div>
 
                 <!-- Location -->
                 <div>
-                    <label
-                        for="itinerary-location"
-                        class="block text-xs font-medium text-slate-600 mb-1"
-                        >Lokasi</label
-                    >
+                    <label for="itinerary-location" class="modal-label">
+                        Lokasi
+                    </label>
                     <input
                         id="itinerary-location"
                         type="text"
                         bind:value={formLocation}
                         placeholder="e.g. Makkah"
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        class="modal-input"
                     />
                 </div>
 
                 <!-- Notes -->
                 <div>
-                    <label
-                        for="itinerary-notes"
-                        class="block text-xs font-medium text-slate-600 mb-1"
-                        >Catatan</label
-                    >
+                    <label for="itinerary-notes" class="modal-label">
+                        Catatan
+                    </label>
                     <textarea
                         id="itinerary-notes"
                         bind:value={formNotes}
                         rows="2"
                         placeholder="Catatan tambahan..."
-                        class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                        class="modal-input modal-textarea"
                     ></textarea>
                 </div>
             </div>
 
-            <div class="flex gap-2 mt-4">
-                <button
-                    type="button"
+            <div class="modal-actions">
+                <Button
+                    variant="ghost"
+                    full
                     onclick={() => (showForm = false)}
-                    class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
                 >
                     Batal
-                </button>
-                <button
-                    type="button"
-                    onclick={handleSubmit}
+                </Button>
+                <Button
+                    variant="primary"
+                    full
+                    icon={isSaving ? Loader2 : Save}
                     disabled={isSaving ||
                         !formActivity.trim() ||
                         !formDate.trim()}
-                    class="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    onclick={handleSubmit}
                 >
-                    {#if isSaving}
-                        <Loader2 class="w-4 h-4 animate-spin" />
-                    {:else}
-                        <Save class="w-4 h-4" />
-                    {/if}
                     {editingItem ? "Simpan" : "Tambah"}
-                </button>
+                </Button>
             </div>
         </div>
     </div>
 {/if}
+
+<style>
+    .itinerary-page {
+        min-height: 100vh;
+        background: var(--c-bg, #f6f8f7);
+        padding: 16px;
+    }
+    @media (min-width: 1024px) {
+        .itinerary-page {
+            padding: 32px;
+        }
+    }
+
+    /* Error alert */
+    .itinerary-alert {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: var(--gap);
+        padding: 12px 16px;
+        border: 1px solid var(--c-danger);
+        background: var(--c-danger-soft);
+        color: var(--c-danger);
+        border-radius: var(--radius-lg);
+        font-size: 14px;
+    }
+    .itinerary-alert-close {
+        margin-left: auto;
+        display: inline-flex;
+        color: inherit;
+    }
+
+    /* Group selector */
+    .itinerary-field-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--c-primary);
+    }
+    .itinerary-select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--c-line);
+        background: var(--c-bg-2, #f2f6f4);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--c-ink-soft);
+        outline: none;
+        transition: border-color 0.15s, background 0.15s;
+    }
+    .itinerary-select:focus {
+        border-color: var(--c-primary);
+        background: var(--c-surface);
+    }
+
+    /* Loading */
+    .itinerary-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 40px 0;
+        color: var(--c-faint);
+        font-size: 14px;
+    }
+    :global(.itinerary-loading .spin) {
+        animation: itinerary-spin 1s linear infinite;
+    }
+    @keyframes itinerary-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Timeline */
+    .timeline {
+        position: relative;
+        padding-left: 8px;
+    }
+    .timeline-day {
+        position: relative;
+        display: flex;
+        gap: 18px;
+        padding-bottom: 24px;
+    }
+    .timeline-day.is-last {
+        padding-bottom: 0;
+    }
+    .timeline-connector {
+        position: absolute;
+        left: 21px;
+        top: 44px;
+        bottom: 0;
+        width: 2px;
+        background: var(--c-line);
+    }
+    .timeline-marker {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--c-primary-soft);
+        color: var(--c-primary-deep);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        z-index: 1;
+        border: 3px solid var(--c-surface);
+    }
+    .timeline-content {
+        flex: 1;
+        min-width: 0;
+        padding-top: 2px;
+    }
+    .timeline-date {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--c-accent);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .timeline-items {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .timeline-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--c-line);
+        border-radius: var(--radius-md);
+        background: var(--c-surface);
+        transition: box-shadow 0.15s;
+    }
+    .timeline-item:hover {
+        box-shadow: var(--shadow-sm);
+    }
+    .timeline-item:hover .timeline-item-actions {
+        opacity: 1;
+    }
+    .timeline-item-icon {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-md);
+    }
+    .timeline-item-body {
+        min-width: 0;
+        flex: 1;
+    }
+    .timeline-item-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--c-ink);
+    }
+    .timeline-item-meta {
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--c-muted);
+    }
+    .timeline-item-notes {
+        margin-top: 4px;
+        font-size: 12px;
+        font-style: italic;
+        color: var(--c-faint);
+    }
+    .timeline-item-actions {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.15s;
+    }
+    .timeline-action {
+        display: inline-flex;
+        padding: 6px;
+        border-radius: var(--radius-sm);
+        color: var(--c-faint);
+        transition: background 0.15s, color 0.15s;
+    }
+    .timeline-action.edit:hover {
+        background: var(--c-primary-soft);
+        color: var(--c-primary);
+    }
+    .timeline-action.delete:hover {
+        background: var(--c-danger-soft);
+        color: var(--c-danger);
+    }
+    @media (max-width: 640px) {
+        .timeline-item-actions {
+            opacity: 1;
+        }
+    }
+
+    /* Modal */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+    }
+    .modal-panel {
+        width: 100%;
+        max-width: 28rem;
+        background: var(--c-surface);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg, 0 20px 50px rgba(0, 0, 0, 0.25));
+        padding: 20px;
+    }
+    .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .modal-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--c-ink);
+    }
+    .modal-close {
+        display: inline-flex;
+        padding: 6px;
+        border-radius: var(--radius-sm);
+        color: var(--c-muted);
+    }
+    .modal-close:hover {
+        background: var(--c-bg-2, #f2f6f4);
+    }
+    .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .modal-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .modal-label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--c-ink-soft);
+    }
+    .modal-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--c-line);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        color: var(--c-ink);
+        background: var(--c-surface);
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .modal-input:focus {
+        border-color: var(--c-primary);
+        box-shadow: 0 0 0 2px var(--c-primary-soft);
+    }
+    .modal-textarea {
+        resize: none;
+    }
+    .modal-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+    }
+</style>

@@ -12,6 +12,9 @@
   } from "lucide-svelte";
   import PageHeader from "../components/PageHeader.svelte";
   import StatCard from "../components/StatCard.svelte";
+  import EmptyState from "../components/EmptyState.svelte";
+  import Card from "../components/ui/Card.svelte";
+  import Button from "../components/ui/Button.svelte";
   import { ApiService } from "../services/api.js";
 
   let { onNavigate = () => {} } = $props();
@@ -75,135 +78,276 @@
   }
 </script>
 
-<div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+<div class="grup-page">
   <PageHeader
     kicker="Manajemen"
     title="Grup & Hotel"
     subtitle="Atur grup keberangkatan sebelum masuk ke rooming hotel."
   >
     {#snippet actions()}
-      <button
-        type="button"
-        onclick={() => (showCreate = !showCreate)}
-        class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
-      >
-        <Plus class="h-4 w-4" />
+      <Button variant="primary" icon={Plus} onclick={() => (showCreate = !showCreate)}>
         Buat Grup Baru
-      </button>
+      </Button>
     {/snippet}
   </PageHeader>
 
   <!-- Summary cards (Suluk design) -->
-  <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-    <StatCard icon={Layers} label="Total Grup" value={`${summaryStats.totalGroups}`} accent="#1B7F5A" />
-    <StatCard icon={UsersRound} label="Total Jamaah" value={`${summaryStats.totalJamaah}`} accent="#C99A2E" />
+  <div class="stat-grid">
+    <StatCard icon={Layers} label="Total Grup" value={`${summaryStats.totalGroups}`} accent="var(--c-primary)" />
+    <StatCard icon={UsersRound} label="Total Jamaah" value={`${summaryStats.totalJamaah}`} accent="var(--c-accent)" />
   </div>
 
   {#if error}
-    <div class="mb-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-      <AlertCircle class="mt-0.5 h-5 w-5 flex-shrink-0" />
+    <div class="alert">
+      <AlertCircle size={20} style="flex-shrink:0;margin-top:1px" />
       <span>{error}</span>
     </div>
   {/if}
 
   {#if showCreate}
-    <div class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-sm">
-      <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+    <Card style="margin-bottom:var(--gap)">
+      <div class="create-form">
         <input
           bind:value={newGroupName}
-          class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="field"
           placeholder="Nama grup, mis. Umrah Maret 2026"
         />
         <input
           bind:value={newGroupDescription}
-          class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          class="field"
           placeholder="Catatan singkat"
         />
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onclick={() => createGroup()}
           disabled={isCreating || !newGroupName.trim()}
-          class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+          icon={isCreating ? Loader2 : null}
         >
-          {#if isCreating}
-            <Loader2 class="h-4 w-4 animate-spin" />
-          {/if}
           Simpan
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   {/if}
 
   {#if isLoading}
-    <div class="flex items-center justify-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-12 text-sm text-slate-500 shadow-sm">
-      <Loader2 class="h-5 w-5 animate-spin text-primary-500" />
-      Memuat grup...
-    </div>
-  {:else if groups.length === 0}
-    <div class="rounded-2xl border border-slate-200/70 bg-white p-12 text-center shadow-sm">
-      <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50">
-        <Building2 class="h-7 w-7 text-primary-600" />
+    <Card>
+      <div class="loading">
+        <Loader2 size={20} class="spin" style="color:var(--c-primary)" />
+        Memuat grup...
       </div>
-      <h3 class="text-sm font-bold text-[#10211c]">Belum ada grup keberangkatan</h3>
-      <p class="mt-1 text-sm text-slate-500">Buat grup untuk menampung data jamaah, hotel, rooming, dan manifest.</p>
-    </div>
+    </Card>
+  {:else if groups.length === 0}
+    <Card pad={false}>
+      <EmptyState
+        icon={Building2}
+        title="Belum ada grup keberangkatan"
+        text="Buat grup untuk menampung data jamaah, hotel, rooming, dan manifest."
+      />
+    </Card>
   {:else}
-    <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    <div class="group-grid">
       {#each groups as group, i}
         {@const stripe = STRIPE_COLORS[i % STRIPE_COLORS.length]}
-        <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
-          <div class="h-[5px]" style="background:{stripe}"></div>
-          <div class="p-5">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <h2 class="truncate font-serif text-[16.5px] font-extrabold text-[#10211c]">{group.name}</h2>
-                <p class="mt-0.5 truncate text-[13px] text-slate-500">{group.description || "Tanpa catatan"}</p>
+        <Card hover pad={false} style="overflow:hidden">
+          <div style="height:5px;background:{stripe}"></div>
+          <div style="padding:var(--pad)">
+            <div class="card-head">
+              <div style="flex:1;min-width:0">
+                <h2 class="group-name">{group.name}</h2>
+                <p class="group-desc">{group.description || "Tanpa catatan"}</p>
               </div>
-              <div
-                class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl"
-                style="background:{stripe}18;color:{stripe}"
-              >
-                <Building2 class="h-5 w-5" />
+              <div class="group-icon" style="background:{stripe}18;color:{stripe}">
+                <Building2 size={21} />
               </div>
             </div>
 
-            <div class="mt-5 flex gap-6">
+            <div class="stats-row">
               <div>
-                <p class="text-[22px] font-extrabold leading-none text-[#10211c]" style="font-variant-numeric:tabular-nums">{group.member_count || 0}</p>
-                <p class="mt-1.5 flex items-center gap-1 text-xs text-slate-400">
-                  <UsersRound class="h-3.5 w-3.5" />
-                  jamaah
-                </p>
+                <p class="stat-value tabular">{group.member_count || 0}</p>
+                <p class="stat-label"><UsersRound size={13} /> jamaah</p>
               </div>
               <div>
-                <p class="text-sm font-bold text-[#10211c]">{formatDate(group.updated_at || group.created_at)}</p>
-                <p class="mt-1.5 flex items-center gap-1 text-xs text-slate-400">
-                  <CalendarDays class="h-3.5 w-3.5" />
-                  update
-                </p>
+                <p class="stat-date">{formatDate(group.updated_at || group.created_at)}</p>
+                <p class="stat-label"><CalendarDays size={13} /> update</p>
               </div>
             </div>
 
-            <div class="mt-5 flex gap-2 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onclick={() => onNavigate("jamaah")}
-                class="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
+            <div class="card-actions">
+              <Button variant="ghost" full onclick={() => onNavigate("jamaah")}>
                 Lihat Jamaah
-              </button>
-              <button
-                type="button"
-                onclick={() => onNavigate("rooming")}
-                class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700"
-              >
-                <Hotel class="h-4 w-4" />
+              </Button>
+              <Button variant="primary" full icon={Hotel} onclick={() => onNavigate("rooming")}>
                 Rooming
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Card>
       {/each}
     </div>
   {/if}
 </div>
+
+<style>
+  .grup-page {
+    min-height: 100vh;
+    background: var(--c-bg);
+    padding: 16px;
+  }
+  @media (min-width: 1024px) {
+    .grup-page {
+      padding: 32px;
+    }
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--gap);
+    margin-bottom: var(--gap);
+  }
+
+  .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: var(--gap);
+    padding: 16px;
+    border: 1px solid var(--c-danger-soft);
+    background: var(--c-danger-soft);
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    color: var(--c-danger);
+  }
+
+  .create-form {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 768px) {
+    .create-form {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    }
+  }
+
+  .field {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--c-ink);
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    font-size: 14px;
+    color: var(--c-muted);
+  }
+
+  .group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--gap);
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .group-name {
+    margin: 0;
+    font-family: var(--font-display, "Playfair Display", serif);
+    font-size: 16.5px;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--c-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .group-desc {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--c-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .group-icon {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 24px;
+    margin-top: 18px;
+  }
+
+  .stat-value {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--c-ink);
+  }
+
+  .stat-date {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--c-ink);
+  }
+
+  .stat-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--c-faint);
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--c-line-soft);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :global(.spin) {
+    animation: grup-spin 1s linear infinite;
+  }
+  @keyframes grup-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+</style>

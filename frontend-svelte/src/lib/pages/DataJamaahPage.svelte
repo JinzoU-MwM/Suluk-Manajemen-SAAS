@@ -4,12 +4,15 @@
     AlertCircle,
     BadgeCheck,
     BookUser,
+    CheckCircle2,
+    Clock,
     FileText,
     Loader2,
     Plane,
     Search,
     UserPlus,
     UsersRound,
+    X,
   } from "lucide-svelte";
   import { ApiService } from "../services/api.js";
   import { mapError } from "../services/toast.svelte.js";
@@ -18,6 +21,11 @@
   import PageHeader from "../components/PageHeader.svelte";
   import StatCard from "../components/StatCard.svelte";
   import Avatar from "../components/Avatar.svelte";
+  import Card from "../components/ui/Card.svelte";
+  import Badge from "../components/ui/Badge.svelte";
+  import Button from "../components/ui/Button.svelte";
+  import FilterTabs from "../components/ui/FilterTabs.svelte";
+  import ProgressBar from "../components/ui/ProgressBar.svelte";
 
   let { onNavigate = () => {} } = $props();
 
@@ -28,12 +36,33 @@
   let isLoadingMembers = $state(false);
   let error = $state("");
   let search = $state("");
+  let tab = $state("Semua");
+  let selected = $state(null);
 
   let selectedGroup = $derived(
     groups.find((group) => String(group.id) === String(selectedGroupId)) || null,
   );
 
-  let filteredMembers = $derived(
+  // Documents a member can hold (drives checklist + completeness filter).
+  function docList(member) {
+    return [
+      { label: "Identitas", ok: !!member.no_identitas },
+      { label: "Paspor", ok: !!member.no_paspor },
+      { label: "Visa", ok: !!member.no_visa },
+      { label: "Asuransi", ok: !!(member.asuransi || member.no_polis) },
+    ];
+  }
+  function docsDone(member) {
+    return docList(member).filter((d) => d.ok).length;
+  }
+  function docCount() {
+    return 4;
+  }
+  function isComplete(member) {
+    return docsDone(member) === docCount();
+  }
+
+  let searchedMembers = $derived(
     members.filter((member) => {
       const needle = search.trim().toLowerCase();
       if (!needle) return true;
@@ -49,12 +78,27 @@
     }),
   );
 
+  let filteredMembers = $derived(
+    searchedMembers.filter((member) => {
+      if (tab === "Lengkap") return isComplete(member);
+      if (tab === "Belum Lengkap") return !isComplete(member);
+      return true;
+    }),
+  );
+
+  // Filter tabs with live counts (Suluk design).
+  let tabs = $derived([
+    { value: "Semua", label: "Semua", count: searchedMembers.length },
+    { value: "Lengkap", label: "Lengkap", count: searchedMembers.filter(isComplete).length },
+    { value: "Belum Lengkap", label: "Belum Lengkap", count: searchedMembers.filter((m) => !isComplete(m)).length },
+  ]);
+
   // Summary tiles (Suluk design). Counts are over the loaded group's members.
   let statTiles = $derived([
-    { label: "Total di Grup", value: String(members.length), icon: UsersRound, accent: "#1B7F5A" },
-    { label: "Punya Paspor", value: String(members.filter((m) => m.no_paspor).length), icon: BookUser, accent: "#2563a8" },
-    { label: "Punya Identitas", value: String(members.filter((m) => m.no_identitas).length), icon: BadgeCheck, accent: "#C99A2E" },
-    { label: "Punya Visa", value: String(members.filter((m) => m.no_visa).length), icon: Plane, accent: "#1B7F5A" },
+    { label: "Total di Grup", value: String(members.length), icon: UsersRound, accent: "var(--c-primary)" },
+    { label: "Punya Paspor", value: String(members.filter((m) => m.no_paspor).length), icon: BookUser, accent: "var(--c-info)" },
+    { label: "Punya Identitas", value: String(members.filter((m) => m.no_identitas).length), icon: BadgeCheck, accent: "var(--c-accent)" },
+    { label: "Punya Visa", value: String(members.filter((m) => m.no_visa).length), icon: Plane, accent: "var(--c-success)" },
   ]);
 
   // Pagination (client-side over the filtered members)
@@ -62,7 +106,7 @@
   let page = $state(1);
   let pagedMembers = $derived(filteredMembers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE));
   $effect(() => {
-    search; selectedGroupId;
+    search; selectedGroupId; tab;
     page = 1;
   });
 
@@ -101,23 +145,40 @@
   function displayName(member) {
     return member.nama || member.nama_paspor || "Tanpa nama";
   }
+
+  function genderLabel(member) {
+    const g = String(member.jenis_kelamin || "").toUpperCase();
+    if (g === "L" || g === "LAKI-LAKI") return "Laki-laki";
+    if (g === "P" || g === "PEREMPUAN") return "Perempuan";
+    return "—";
+  }
+
+  // KeyValue items for the drawer (binds to real scanned fields).
+  function keyValues(member) {
+    return [
+      { k: "Title", v: member.title || "—" },
+      { k: "Jenis Kelamin", v: genderLabel(member) },
+      { k: "Tempat Lahir", v: member.tempat_lahir || "—" },
+      { k: "Tanggal Lahir", v: member.tanggal_lahir || "—" },
+      { k: "No. Identitas", v: member.no_identitas || "—" },
+      { k: "No. Paspor", v: member.no_paspor || "—" },
+      { k: "No. Visa", v: member.no_visa || "—" },
+      { k: "No. HP", v: member.no_hp || member.no_telepon || "—" },
+      { k: "Alamat", v: member.alamat || "—", full: true },
+    ];
+  }
 </script>
 
-<div class="min-h-screen bg-slate-50/70 p-4 lg:p-8">
+<div style="background:var(--c-bg)" class="min-h-screen p-4 lg:p-8">
   <PageHeader
     kicker="CRM & Jamaah"
     title="Data Jamaah"
     subtitle="Kelola seluruh data calon jamaah dari setiap grup keberangkatan."
   >
     {#snippet actions()}
-      <button
-        type="button"
-        onclick={() => onNavigate("scanner")}
-        class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-colors hover:bg-primary-700"
-      >
-        <UserPlus class="h-4 w-4" />
+      <Button variant="primary" icon={UserPlus} onclick={() => onNavigate("scanner")}>
         Tambah via Scanner
-      </button>
+      </Button>
     {/snippet}
   </PageHeader>
 
@@ -136,13 +197,13 @@
   </div>
 
   <!-- Group selector -->
-  <div class="mb-6 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-sm">
-    <label for="jamaah-group-select" class="mb-2 block text-[11.5px] font-semibold uppercase tracking-wide text-slate-400">Grup Keberangkatan</label>
+  <Card style="margin-bottom:var(--gap)">
+    <label for="jamaah-group-select" style="display:block;margin-bottom:8px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint)">Grup Keberangkatan</label>
     <select
       id="jamaah-group-select"
       bind:value={selectedGroupId}
       onchange={loadMembers}
-      class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-primary-400 focus:bg-white"
+      style="width:100%;padding:12px 14px;font-size:13.5px;font-weight:500;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none"
     >
       {#if isLoadingGroups}
         <option>Memuat grup...</option>
@@ -154,69 +215,86 @@
         {/each}
       {/if}
     </select>
-  </div>
+  </Card>
 
   <!-- Jamaah list -->
-  <div class="rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-    <div class="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 class="text-sm font-bold text-[#10211c]">{selectedGroup?.name || "Daftar Jamaah"}</h2>
-        <p class="text-xs text-slate-500">Data operasional yang tersimpan dari hasil scan dan input grup.</p>
+  <Card pad={false}>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;gap:16px;flex-wrap:wrap">
+      <div class="min-w-0">
+        <div style="font-size:15px;font-weight:800;color:var(--c-ink)">{selectedGroup?.name || "Daftar Jamaah"}</div>
+        <div style="font-size:12.5px;color:var(--c-muted);margin-top:2px">Data operasional yang tersimpan dari hasil scan dan input grup.</div>
       </div>
-      <div class="relative w-full sm:w-72">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          bind:value={search}
-          class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-primary-400 focus:bg-white"
-          placeholder="Cari nama, paspor, NIK..."
-        />
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <FilterTabs {tabs} value={tab} onChange={(v) => (tab = v)} />
+        <div style="position:relative;width:260px;max-width:100%">
+          <Search style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--c-faint);pointer-events:none" size={17} />
+          <input
+            bind:value={search}
+            placeholder="Cari nama, paspor, NIK…"
+            style="width:100%;padding:10px 14px 10px 38px;font-size:13.5px;color:var(--c-ink);background:var(--c-surface);border:1px solid var(--c-line);border-radius:var(--radius);outline:none"
+          />
+        </div>
       </div>
     </div>
 
     {#if isLoadingMembers}
-      <div class="flex items-center justify-center gap-3 p-12 text-sm text-slate-500">
-        <Loader2 class="h-5 w-5 animate-spin text-primary-500" />
+      <div style="color:var(--c-muted)" class="flex items-center justify-center gap-3 p-12 text-sm">
+        <Loader2 class="h-5 w-5 animate-spin" style="color:var(--c-primary)" />
         Memuat data jamaah...
       </div>
     {:else if filteredMembers.length === 0}
       <EmptyState
         icon={UsersRound}
-        title={search ? "Tidak ada jamaah yang cocok" : "Belum ada data jamaah"}
-        text={search ? "Coba kata kunci lain." : "Pilih grup lain atau tambah data dari AI Scanner."}
+        title={search || tab !== "Semua" ? "Tidak ada jamaah yang cocok" : "Belum ada data jamaah"}
+        text={search || tab !== "Semua" ? "Coba ubah filter atau kata kunci pencarian." : "Pilih grup lain atau tambah data dari AI Scanner."}
       />
     {:else}
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+      <div style="padding:0 4px 8px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13.5px">
           <thead>
             <tr>
-              <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Nama</th>
-              <th class="hidden px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 md:table-cell">Paspor</th>
-              <th class="hidden px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 lg:table-cell">Identitas</th>
-              <th class="hidden px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 lg:table-cell">Visa</th>
-              <th class="px-5 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Dokumen</th>
+              <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Jamaah</th>
+              <th class="hidden md:table-cell" style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Paspor</th>
+              <th class="hidden lg:table-cell" style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Identitas</th>
+              <th class="hidden lg:table-cell" style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Visa</th>
+              <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Dokumen</th>
+              <th style="text-align:center;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Status</th>
             </tr>
           </thead>
           <tbody>
             {#each pagedMembers as member}
-              <tr class="transition-colors hover:bg-primary-50/30">
-                <td class="border-b border-slate-100 px-5 py-3.5">
-                  <div class="flex items-center gap-3">
+              <tr
+                class="suluk-row"
+                style="cursor:pointer;transition:background .12s"
+                onclick={() => (selected = member)}
+              >
+                <td style="padding:13px 16px;border-bottom:1px solid var(--c-line-soft);color:var(--c-ink-soft);vertical-align:middle">
+                  <div style="display:flex;gap:12px;align-items:center">
                     <Avatar name={displayName(member)} size={38} />
                     <div class="min-w-0">
-                      <p class="truncate font-bold text-[#10211c]">{displayName(member)}</p>
-                      <p class="truncate text-xs text-slate-400 md:hidden">{member.no_paspor || member.no_identitas || "-"}</p>
-                      <p class="hidden truncate text-xs text-slate-400 md:block">{member.title || "-"} {member.tanggal_lahir || ""}</p>
+                      <div style="font-weight:700;color:var(--c-ink)" class="truncate">{displayName(member)}</div>
+                      <div style="font-size:12px;color:var(--c-faint);margin-top:2px" class="truncate">
+                        {member.title || ""}{member.title && member.tanggal_lahir ? " · " : ""}{member.tanggal_lahir || (member.title ? "" : "—")}
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td class="hidden border-b border-slate-100 px-5 py-3.5 text-slate-600 md:table-cell">{member.no_paspor || "-"}</td>
-                <td class="hidden border-b border-slate-100 px-5 py-3.5 text-slate-600 lg:table-cell">{member.no_identitas || "-"}</td>
-                <td class="hidden border-b border-slate-100 px-5 py-3.5 text-slate-600 lg:table-cell">{member.no_visa || "-"}</td>
-                <td class="border-b border-slate-100 px-5 py-3.5">
-                  <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                    <FileText class="h-3.5 w-3.5" />
-                    Tersimpan
-                  </span>
+                <td class="hidden md:table-cell" style="padding:13px 16px;border-bottom:1px solid var(--c-line-soft);color:var(--c-ink-soft);vertical-align:middle;white-space:nowrap">{member.no_paspor || "—"}</td>
+                <td class="hidden lg:table-cell" style="padding:13px 16px;border-bottom:1px solid var(--c-line-soft);color:var(--c-ink-soft);vertical-align:middle;white-space:nowrap">{member.no_identitas || "—"}</td>
+                <td class="hidden lg:table-cell" style="padding:13px 16px;border-bottom:1px solid var(--c-line-soft);color:var(--c-ink-soft);vertical-align:middle;white-space:nowrap">{member.no_visa || "—"}</td>
+                <td style="padding:13px 16px;border-bottom:1px solid var(--c-line-soft);color:var(--c-ink-soft);vertical-align:middle;min-width:150px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+                    <span style="font-weight:700;color:var(--c-ink)" class="tabular">{docsDone(member)}/{docCount()}</span>
+                    <span style="color:var(--c-faint)">dokumen</span>
+                  </div>
+                  <ProgressBar
+                    value={docsDone(member)}
+                    max={docCount()}
+                    color={isComplete(member) ? "var(--c-success)" : "var(--c-accent)"}
+                  />
+                </td>
+                <td style="padding:13px 16px;border-bottom:1px solid var(--c-line-soft);text-align:center;vertical-align:middle">
+                  <Badge status={isComplete(member) ? "Lengkap" : "Sebagian"} tone={isComplete(member) ? "success" : "info"} dot />
                 </td>
               </tr>
             {/each}
@@ -227,5 +305,113 @@
         </div>
       </div>
     {/if}
-  </div>
+  </Card>
 </div>
+
+<!-- Detail Drawer (Suluk design) -->
+{#if selected}
+  <button
+    type="button"
+    onclick={() => (selected = null)}
+    aria-label="Tutup"
+    style="position:fixed;inset:0;z-index:90;background:rgba(16,33,28,0.34);backdrop-filter:blur(2px);border:none;cursor:default"
+  ></button>
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label={displayName(selected)}
+    style="position:fixed;top:0;right:0;bottom:0;z-index:91;width:460px;max-width:94vw;background:var(--c-surface);box-shadow:var(--shadow-lg);display:flex;flex-direction:column"
+  >
+    <!-- Header -->
+    <div style="padding:20px 24px;border-bottom:1px solid var(--c-line);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div class="min-w-0">
+        <div style="font-size:17px;font-weight:800;color:var(--c-ink)" class="truncate">{displayName(selected)}</div>
+        <div style="font-size:13px;color:var(--c-muted);margin-top:3px" class="truncate">{selectedGroup?.name || "Jamaah"}</div>
+      </div>
+      <button
+        type="button"
+        onclick={() => (selected = null)}
+        aria-label="Tutup"
+        style="width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--c-muted);background:transparent;flex-shrink:0"
+      >
+        <X size={18} />
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div style="flex:1;overflow-y:auto;padding:24px">
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <!-- Identity -->
+        <div style="display:flex;gap:16px;align-items:center">
+          <Avatar name={displayName(selected)} size={64} />
+          <div class="min-w-0">
+            <div style="font-size:18px;font-weight:800;color:var(--c-ink)" class="truncate">{displayName(selected)}</div>
+            <div style="font-size:13px;color:var(--c-muted);margin-top:4px">
+              {genderLabel(selected)}{selected.tanggal_lahir ? " · " + selected.tanggal_lahir : ""}
+            </div>
+            <div style="margin-top:8px">
+              <Badge status={isComplete(selected) ? "Lengkap" : "Sebagian"} tone={isComplete(selected) ? "success" : "info"} dot />
+            </div>
+          </div>
+        </div>
+
+        <!-- Document completeness summary -->
+        <div style="background:var(--c-primary-tint);border-radius:var(--radius);padding:18px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+            <div style="font-size:12.5px;font-weight:700;color:var(--c-primary-deep)">KELENGKAPAN DOKUMEN</div>
+            <div style="font-size:13px;color:var(--c-muted)" class="tabular">{Math.round((docsDone(selected) / docCount()) * 100)}% lengkap</div>
+          </div>
+          <div style="font-size:22px;font-weight:800;margin-bottom:4px;color:var(--c-ink)" class="tabular">{docsDone(selected)} / {docCount()}</div>
+          <div style="font-size:13px;color:var(--c-muted);margin-bottom:12px">dokumen tersimpan</div>
+          <ProgressBar
+            value={docsDone(selected)}
+            max={docCount()}
+            color={isComplete(selected) ? "var(--c-success)" : "var(--c-accent)"}
+            height={9}
+          />
+        </div>
+
+        <!-- KeyValue grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px 20px">
+          {#each keyValues(selected) as it}
+            <div style={it.full ? "grid-column:1 / -1" : ""}>
+              <div style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint);margin-bottom:5px">{it.k}</div>
+              <div style="font-size:14.5px;font-weight:600;color:var(--c-ink)">{it.v}</div>
+            </div>
+          {/each}
+        </div>
+
+        <!-- Document checklist -->
+        <div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--c-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Dokumen</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            {#each docList(selected) as d}
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--c-bg);border-radius:var(--radius-sm)">
+                <div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:{d.ok ? 'var(--c-success-soft)' : 'var(--c-bg-2)'};color:{d.ok ? 'var(--c-success)' : 'var(--c-faint)'}">
+                  {#if d.ok}<CheckCircle2 size={15} />{:else}<Clock size={15} />{/if}
+                </div>
+                <span style="flex:1;font-size:13.5px;font-weight:600;color:var(--c-ink)">{d.label}</span>
+                <span style="font-size:12px;font-weight:600;color:{d.ok ? 'var(--c-success)' : 'var(--c-faint)'}">{d.ok ? "Lengkap" : "Menunggu"}</span>
+              </div>
+            {/each}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 24px;border-top:1px solid var(--c-line);display:flex;gap:10px;background:var(--c-bg)">
+      <Button variant="ghost" icon={FileText} full onclick={() => onNavigate("documents")}>Dokumen</Button>
+      <Button variant="primary" icon={UserPlus} full onclick={() => onNavigate("scanner")}>Tambah Data</Button>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .suluk-row:hover {
+    background: var(--c-primary-tint);
+  }
+</style>

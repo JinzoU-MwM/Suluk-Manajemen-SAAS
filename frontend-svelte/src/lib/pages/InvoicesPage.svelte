@@ -1,15 +1,20 @@
 <script>
   import { onMount } from 'svelte';
   import {
-    Plus, Search, Receipt, AlertCircle, CheckCircle,
-    Clock, ChevronRight, Upload, Download, Loader2,
+    Plus, Receipt, AlertCircle, CheckCircle, Clock,
+    Download, Printer, Wallet, Check, X, Loader2, Search,
   } from 'lucide-svelte';
-  import StatusBadge from '../components/StatusBadge.svelte';
+  import PageHeader from '../components/PageHeader.svelte';
+  import StatCard from '../components/StatCard.svelte';
+  import Avatar from '../components/Avatar.svelte';
+  import EmptyState from '../components/EmptyState.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import IDRInput from '../components/IDRInput.svelte';
-  import EmptyState from '../components/EmptyState.svelte';
   import Pager from '../components/Pager.svelte';
-  import StatCard from '../components/StatCard.svelte';
+  import StatusBadge from '../components/StatusBadge.svelte';
+  import Card from '../components/ui/Card.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
   import { showToast, mapError } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR, formatDate } from '../utils/formatting.js';
   import { invoiceApi } from '../services/apiDomains/invoiceApi.js';
@@ -118,11 +123,12 @@
     }
   }
 
+  // FilterTabs values use the real invoice status keys (plus "all").
   const INVOICE_STATUSES = [
-    { id: 'all',          label: 'Semua' },
-    { id: 'belum bayar',  label: 'Belum Bayar' },
-    { id: 'sebagian',     label: 'Sebagian' },
-    { id: 'lunas',        label: 'Lunas' },
+    { value: 'all',          label: 'Semua' },
+    { value: 'belum bayar',  label: 'Belum Bayar' },
+    { value: 'sebagian',     label: 'Sebagian' },
+    { value: 'lunas',        label: 'Lunas' },
   ];
 
   const PAY_METHODS = [
@@ -202,6 +208,15 @@
     showPaymentModal = false;
   }
 
+  function openPayment() {
+    payAmount = selectedInvoice?.remaining || 0;
+    payRef = '';
+    payNote = '';
+    payMethod = 'transfer';
+    payDate = new Date().toISOString().slice(0, 10);
+    showPaymentModal = true;
+  }
+
   async function submitPayment() {
     if (!payAmount || payAmount <= 0) {
       showToast('Masukkan nominal pembayaran', 'warning');
@@ -253,66 +268,51 @@
       showToast('Gagal mengunduh: ' + e.message, 'error');
     }
   }
+
+  function pct(inv) {
+    if (!inv || !inv.total) return 0;
+    return Math.round((inv.paid / inv.total) * 100);
+  }
 </script>
 
-<div class="flex h-screen flex-col">
-  <!-- Header -->
-  <div class="flex-shrink-0 border-b border-slate-100 bg-white px-6 py-5">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="font-serif text-xl font-bold text-slate-800">Invoice & Pembayaran</h1>
-        <p class="mt-0.5 text-sm text-slate-500">{filtered.length} invoice</p>
-      </div>
-      <button
-        type="button"
-        onclick={openCreate}
-        class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700"
-      >
-        <Plus class="h-4 w-4" />
-        Buat Invoice
-      </button>
-    </div>
+<div class="suluk-page">
+  <PageHeader
+    kicker="Penjualan"
+    title="Invoice & Pembayaran"
+    subtitle="Buat tagihan, catat pembayaran, dan pantau tunggakan jamaah."
+  >
+    {#snippet actions()}
+      <Button variant="ghost" icon={Download} onclick={() => selectedInvoice ? downloadInvoicePDF(selectedInvoice) : showToast('Pilih invoice untuk diunduh', 'warning')}>Ekspor</Button>
+      <Button variant="primary" icon={Plus} onclick={openCreate}>Buat Invoice</Button>
+    {/snippet}
+  </PageHeader>
 
-    <!-- Summary cards (Suluk design) -->
-    <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard icon={Receipt} label="Total Tagihan" value={formatIDR(summaryStats.totalTagih)} accent="#1B7F5A" />
-      <StatCard icon={CheckCircle} label="Sudah Diterima" value={formatIDR(summaryStats.totalBayar)} accent="#1B7F5A" />
-      <StatCard icon={Clock} label="Outstanding" value={formatIDR(summaryStats.outstanding)} accent="#C99A2E" />
-      <StatCard icon={AlertCircle} label="Jatuh Tempo" value={`${summaryStats.overdueCount}`} accent="#c0392b" sub="perlu ditindaklanjuti" />
-    </div>
+  <!-- Summary cards -->
+  <div class="suluk-stat-grid">
+    <StatCard icon={Receipt} label="Total Tagihan" value={formatIDR(summaryStats.totalTagih)} accent="var(--c-primary)" />
+    <StatCard icon={CheckCircle} label="Sudah Diterima" value={formatIDR(summaryStats.totalBayar)} accent="var(--c-success)" />
+    <StatCard icon={Clock} label="Outstanding" value={formatIDR(summaryStats.outstanding)} accent="var(--c-warning)" />
+    <StatCard icon={AlertCircle} label="Jatuh Tempo" value={`${summaryStats.overdueCount}`} accent="var(--c-danger)" sub="perlu ditindaklanjuti" />
+  </div>
 
-    <!-- Search + filter -->
-    <div class="mt-4 flex gap-3">
-      <div class="relative flex-1 min-w-0">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+  <!-- Table card -->
+  <Card pad={false}>
+    <div class="suluk-toolbar">
+      <FilterTabs tabs={INVOICE_STATUSES} value={filterStatus} onChange={(v) => (filterStatus = v)} />
+      <div class="suluk-search">
+        <Search size={17} class="suluk-search-icon" />
         <input
           type="text"
           bind:value={searchQuery}
-          placeholder="Cari nama atau nomor invoice..."
-          class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          placeholder="Cari invoice…"
         />
       </div>
-      <div class="flex gap-1">
-        {#each INVOICE_STATUSES as s}
-          <button
-            type="button"
-            onclick={() => (filterStatus = s.id)}
-            class="flex-shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-all
-              {filterStatus === s.id ? 'bg-primary-600 text-white' : 'text-slate-500 hover:bg-slate-100'}"
-          >
-            {s.label}
-          </button>
-        {/each}
-      </div>
     </div>
-  </div>
 
-  <!-- Invoice table -->
-  <div class="flex-1 overflow-auto">
     {#if isLoading}
-      <div class="space-y-3 p-6">
-        {#each [1,2,3,4] as _}
-          <div class="h-16 animate-pulse rounded-xl bg-slate-100"></div>
+      <div class="suluk-skeletons">
+        {#each [1, 2, 3, 4, 5] as _}
+          <div class="suluk-skeleton-row"></div>
         {/each}
       </div>
     {:else if filtered.length === 0}
@@ -322,233 +322,190 @@
         text={searchQuery || filterStatus !== 'all' ? 'Coba ubah kata kunci atau filter status.' : 'Invoice akan muncul di sini setelah dibuat dari paket jamaah.'}
       />
     {:else}
-      <table class="w-full">
-        <thead class="sticky top-0 bg-slate-50">
-          <tr class="text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-            <th class="hidden px-6 py-3 md:table-cell">No. Invoice</th>
-            <th class="px-4 py-3 sm:px-6">Jamaah</th>
-            <th class="hidden px-4 py-3 text-right lg:table-cell">Total</th>
-            <th class="hidden px-4 py-3 text-right lg:table-cell">Terbayar</th>
-            <th class="px-4 py-3 text-right">Sisa</th>
-            <th class="px-4 py-3">Status</th>
-            <th class="hidden px-4 py-3 md:table-cell">Jatuh Tempo</th>
-            <th class="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-50">
-          {#each paged as inv}
-            <tr class="group bg-white transition-colors hover:bg-primary-50/30 {inv.is_overdue ? 'bg-red-50/30' : ''}">
-              <td class="hidden px-6 py-3.5 md:table-cell">
-                <div class="flex items-center gap-2">
-                  {#if inv.is_overdue}
-                    <AlertCircle class="h-4 w-4 flex-shrink-0 text-red-500" />
-                  {/if}
-                  <span class="text-sm font-mono font-semibold text-slate-700">{inv.invoice_no}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3.5 sm:px-6">
-                <div class="flex items-center gap-2">
-                  {#if inv.is_overdue}
-                    <AlertCircle class="h-4 w-4 flex-shrink-0 text-red-500 md:hidden" />
-                  {/if}
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-slate-800">{inv.jamaah_name}</p>
-                    <p class="truncate text-xs text-slate-400">{inv.package_name} · {inv.room_type}</p>
-                  </div>
-                </div>
-              </td>
-              <td class="hidden px-4 py-3.5 text-right text-sm font-medium text-slate-600 lg:table-cell">{formatIDR(inv.total)}</td>
-              <td class="hidden px-4 py-3.5 text-right text-sm font-medium text-emerald-600 lg:table-cell">{formatIDR(inv.paid)}</td>
-              <td class="px-4 py-3.5 text-right text-sm font-bold {inv.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}">
-                {inv.remaining > 0 ? formatIDR(inv.remaining) : 'Lunas'}
-              </td>
-              <td class="px-4 py-3.5">
-                <StatusBadge status={inv.status} size="xs" />
-              </td>
-              <td class="hidden px-4 py-3.5 md:table-cell">
-                <span class="text-xs {inv.is_overdue ? 'font-semibold text-red-600' : 'text-slate-500'}">
-                  {formatDate(inv.due_date)}
-                </span>
-              </td>
-              <td class="px-4 py-3.5 text-right">
-                <button
-                  type="button"
-                  onclick={() => openDetail(inv)}
-                  class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-primary-600 transition-colors hover:bg-primary-50"
-                >
-                  Detail <ChevronRight class="h-3 w-3" />
-                </button>
-              </td>
+      <div class="suluk-table-wrap">
+        <table class="suluk-table">
+          <thead>
+            <tr>
+              <th>Invoice#</th>
+              <th>Jamaah</th>
+              <th class="num">Jumlah</th>
+              <th class="num">Dibayar</th>
+              <th>Jatuh Tempo</th>
+              <th class="center">Status</th>
             </tr>
-          {/each}
-        </tbody>
-      </table>
-      <div class="px-6">
+          </thead>
+          <tbody>
+            {#each paged as inv}
+              <tr class="suluk-row" onclick={() => openDetail(inv)}>
+                <td>
+                  <div class="cell-stack">
+                    <span class="inv-id">{inv.invoice_no}</span>
+                    <span class="inv-sub">{formatDate(inv.created_at || inv.issue_date)}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="cell-jamaah">
+                    <Avatar name={inv.jamaah_name} size={34} />
+                    <div class="cell-stack min-w-0">
+                      <span class="jamaah-name">{inv.jamaah_name}</span>
+                      <span class="inv-sub">{inv.package_name} · {inv.room_type}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="num">
+                  <span class="amount">{formatIDR(inv.total)}</span>
+                </td>
+                <td class="num">
+                  <span class="amount" style={inv.paid > 0 ? 'color:var(--c-success)' : 'color:var(--c-faint)'}>{formatIDR(inv.paid)}</span>
+                </td>
+                <td>
+                  <span class="due {inv.is_overdue ? 'overdue' : ''}">
+                    {#if inv.is_overdue}<AlertCircle size={13} />{/if}
+                    {formatDate(inv.due_date)}
+                  </span>
+                </td>
+                <td class="center">
+                  <StatusBadge status={inv.status} />
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4">
         <Pager {page} pageSize={PAGE_SIZE} total={filtered.length} onchange={(p) => (page = p)} />
       </div>
     {/if}
-  </div>
+  </Card>
 </div>
 
 <!-- Invoice Detail Drawer -->
 <SlideDrawer
   open={drawerOpen}
   title="Invoice {selectedInvoice?.invoice_no || ''}"
-  width="580px"
+  width="480px"
   onClose={() => (drawerOpen = false)}
 >
   {#if selectedInvoice}
-    <div class="p-6 space-y-5">
-      <!-- Header info -->
-      <div class="rounded-xl bg-slate-50 p-4 space-y-2">
-        <div class="flex items-center justify-between">
-          <StatusBadge status={selectedInvoice.status} />
-          {#if selectedInvoice.is_overdue}
-            <span class="flex items-center gap-1 text-xs font-semibold text-red-600">
-              <AlertCircle class="h-3.5 w-3.5" /> Overdue
-            </span>
-          {/if}
+    <div class="drawer-body">
+      <!-- Status + issue date -->
+      <div class="drawer-status-row">
+        <StatusBadge status={selectedInvoice.status} />
+        <span class="issue-date">Terbit {formatDate(selectedInvoice.created_at || selectedInvoice.issue_date)}</span>
+      </div>
+
+      <!-- Jamaah -->
+      <div class="drawer-jamaah">
+        <Avatar name={selectedInvoice.jamaah_name} size={42} />
+        <div class="min-w-0">
+          <p class="dj-name">{selectedInvoice.jamaah_name}</p>
+          <p class="dj-sub">{selectedInvoice.package_name} · {selectedInvoice.room_type}</p>
         </div>
-        <p class="text-base font-bold text-slate-800">{selectedInvoice.jamaah_name}</p>
-        <p class="text-sm text-slate-500">{selectedInvoice.package_name} · {selectedInvoice.room_type}</p>
       </div>
 
       <!-- Billing summary -->
-      <div class="rounded-xl border border-slate-100 p-4 space-y-3">
-        <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ringkasan Tagihan</h4>
-        <div class="space-y-2 text-sm">
-          <div class="flex justify-between">
-            <span class="text-slate-500">Total Tagihan</span>
-            <span class="font-semibold text-slate-800">{formatIDR(selectedInvoice.total)}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-500">Sudah Dibayar</span>
-            <span class="font-semibold text-emerald-600">{formatIDR(selectedInvoice.paid)}</span>
-          </div>
-          <div class="border-t border-slate-100 pt-2 flex justify-between">
-            <span class="font-semibold text-slate-700">Sisa Tagihan</span>
-            <span class="font-bold {selectedInvoice.remaining > 0 ? 'text-red-600' : 'text-emerald-600'}">
-              {selectedInvoice.remaining > 0 ? formatIDR(selectedInvoice.remaining) : 'LUNAS'}
-            </span>
-          </div>
+      <div class="summary-box">
+        <div class="summary-line">
+          <span>Total tagihan</span>
+          <span class="amount">{formatIDR(selectedInvoice.total)}</span>
         </div>
-        <!-- Progress bar -->
-        <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-          <div
-            class="h-full rounded-full bg-emerald-400"
-            style="width: {Math.round((selectedInvoice.paid / selectedInvoice.total) * 100)}%"
-          ></div>
+        <div class="summary-line">
+          <span>Sudah dibayar</span>
+          <span class="amount" style="color:var(--c-success)">{formatIDR(selectedInvoice.paid)}</span>
         </div>
-        <p class="text-center text-[11px] text-slate-400">
-          {Math.round((selectedInvoice.paid / selectedInvoice.total) * 100)}% lunas
-        </p>
+        <div class="summary-line total">
+          <span>Sisa</span>
+          <span class="amount" style={selectedInvoice.remaining > 0 ? 'color:var(--c-danger)' : 'color:var(--c-success)'}>
+            {selectedInvoice.remaining > 0 ? formatIDR(selectedInvoice.remaining) : 'LUNAS'}
+          </span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:{pct(selectedInvoice)}%"></div>
+        </div>
+        <p class="progress-label">{pct(selectedInvoice)}% lunas</p>
       </div>
 
       <!-- Payment history -->
-      <div class="rounded-xl border border-slate-100 p-4">
-        <h4 class="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Riwayat Pembayaran</h4>
-        {#if selectedInvoice.payments.length === 0}
-          <p class="text-sm text-slate-400">Belum ada pembayaran.</p>
+      <div>
+        <h4 class="section-label">Riwayat Pembayaran</h4>
+        {#if (selectedInvoice.payments?.length ?? 0) === 0}
+          <p class="empty-line">Belum ada pembayaran tercatat.</p>
         {:else}
-          <div class="space-y-2">
+          <div class="pay-list">
             {#each selectedInvoice.payments as pay}
-              <div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5">
-                <div>
-                  <p class="text-xs font-semibold text-slate-700">{formatDate(pay.date)}</p>
-                  <p class="text-[11px] text-slate-400">{pay.method} {pay.ref ? '· ' + pay.ref : ''}</p>
+              <div class="pay-item">
+                <div class="pay-icon"><Check size={16} /></div>
+                <div class="min-w-0 flex-1">
+                  <p class="pay-amount">{formatIDR(pay.amount)}</p>
+                  <p class="pay-meta">{pay.method}{pay.ref ? ' · ' + pay.ref : ''} · {formatDate(pay.date)}</p>
                 </div>
-                <span class="text-sm font-bold text-emerald-600">{formatIDR(pay.amount)}</span>
               </div>
             {/each}
           </div>
         {/if}
       </div>
 
-      <!-- Actions -->
-      {#if !showPaymentModal}
-        <div class="flex gap-3">
-          <button
-            type="button"
-            onclick={() => downloadInvoicePDF(selectedInvoice)}
-            class="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <Download class="h-4 w-4" />
-            PDF Invoice
-          </button>
-          {#if selectedInvoice.remaining > 0}
-            <button
-              type="button"
-              onclick={() => (showPaymentModal = true)}
-              class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700"
-            >
-              <Plus class="h-4 w-4" />
-              Rekam Pembayaran
-            </button>
-          {/if}
-        </div>
-
-      <!-- Record payment form -->
-      {:else}
-        <div class="rounded-xl border border-primary-200 bg-primary-50 p-4 space-y-3">
-          <h4 class="text-sm font-bold text-primary-800">Rekam Pembayaran Baru</h4>
-
-          <IDRInput label="Nominal" bind:value={payAmount} required />
-
-          <div class="flex flex-col gap-1">
-            <label for="pay-method" class="text-sm font-medium text-slate-700">Metode</label>
-            <select
-              id="pay-method"
-              bind:value={payMethod}
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
-            >
-              {#each PAY_METHODS as m}
-                <option value={m.id}>{m.label}</option>
-              {/each}
-            </select>
-          </div>
-
-          <div class="flex flex-col gap-1">
-            <label for="pay-date" class="text-sm font-medium text-slate-700">Tanggal</label>
-            <input
-              id="pay-date"
-              type="date"
-              bind:value={payDate}
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
-            />
-          </div>
-
-          <div class="flex flex-col gap-1">
-            <label for="pay-ref" class="text-sm font-medium text-slate-700">No. Referensi (opsional)</label>
-            <input
-              id="pay-ref"
-              type="text"
-              bind:value={payRef}
-              placeholder="Nomor bukti transfer..."
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400"
-            />
-          </div>
-
-          <div class="flex gap-2">
-            <button
-              type="button"
-              onclick={() => (showPaymentModal = false)}
-              class="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              onclick={submitPayment}
-              class="flex-1 rounded-xl bg-primary-600 py-2 text-sm font-semibold text-white hover:bg-primary-700"
-            >
-              Simpan
-            </button>
-          </div>
-        </div>
-      {/if}
+      <!-- Footer actions -->
+      <div class="drawer-footer">
+        <Button variant="ghost" icon={Printer} full onclick={() => downloadInvoicePDF(selectedInvoice)}>Cetak</Button>
+        {#if selectedInvoice.remaining > 0}
+          <Button variant="primary" icon={Wallet} full onclick={openPayment}>Catat Pembayaran</Button>
+        {/if}
+      </div>
     </div>
   {/if}
 </SlideDrawer>
+
+<!-- Record Payment Modal -->
+{#if showPaymentModal && selectedInvoice}
+  <button type="button" class="modal-backdrop" aria-label="Tutup" onclick={() => (showPaymentModal = false)}></button>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Catat Pembayaran">
+    <div class="modal-head">
+      <h3 class="modal-title">Catat Pembayaran</h3>
+      <button type="button" class="modal-close" onclick={() => (showPaymentModal = false)} aria-label="Tutup">
+        <X size={18} />
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <p class="modal-hint">
+        Untuk <strong>{selectedInvoice.jamaah_name}</strong> · sisa
+        <strong>{formatIDR(selectedInvoice.remaining)}</strong>
+      </p>
+
+      <IDRInput label="Jumlah Pembayaran" bind:value={payAmount} required />
+
+      <div class="field">
+        <label for="pay-date">Tanggal</label>
+        <input id="pay-date" type="date" bind:value={payDate} />
+      </div>
+
+      <div class="field">
+        <label for="pay-method">Metode</label>
+        <select id="pay-method" bind:value={payMethod}>
+          {#each PAY_METHODS as m}
+            <option value={m.id}>{m.label}</option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="pay-ref">No. Referensi (opsional)</label>
+        <input id="pay-ref" type="text" bind:value={payRef} placeholder="Nomor bukti transfer…" />
+      </div>
+
+      <div class="field">
+        <label for="pay-note">Catatan (opsional)</label>
+        <input id="pay-note" type="text" bind:value={payNote} placeholder="Catatan pembayaran…" />
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <Button variant="ghost" onclick={() => (showPaymentModal = false)}>Batal</Button>
+      <Button variant="primary" icon={Check} onclick={submitPayment}>Simpan</Button>
+    </div>
+  </div>
+{/if}
 
 <!-- Buat Invoice Drawer -->
 <SlideDrawer open={showCreate} title="Buat Invoice" width="520px" onClose={() => (showCreate = false)}>
@@ -633,3 +590,236 @@
     </div>
   </div>
 </SlideDrawer>
+
+<style>
+  .suluk-page {
+    padding: var(--space-6);
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .suluk-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+
+  /* Toolbar (FilterTabs + SearchBar) */
+  .suluk-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+  }
+  .suluk-search {
+    position: relative;
+    width: 280px;
+    max-width: 100%;
+  }
+  :global(.suluk-search .suluk-search-icon) {
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--c-faint);
+    pointer-events: none;
+  }
+  .suluk-search input {
+    width: 100%;
+    padding: 10px 14px 10px 38px;
+    font-size: 13.5px;
+    color: var(--c-ink);
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .suluk-search input:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+
+  /* Table */
+  .suluk-table-wrap {
+    overflow-x: auto;
+    padding: 0 4px 4px;
+  }
+  .suluk-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  .suluk-table th {
+    text-align: left;
+    padding: 0 16px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--c-faint);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--c-line);
+  }
+  .suluk-table th.num { text-align: right; }
+  .suluk-table th.center { text-align: center; }
+  .suluk-table td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--c-line-soft);
+    color: var(--c-ink-soft);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .suluk-table td.num { text-align: right; }
+  .suluk-table td.center { text-align: center; }
+  .suluk-row { cursor: pointer; transition: background .12s; }
+  .suluk-row:hover { background: var(--c-bg); }
+  .suluk-table tbody tr:last-child td { border-bottom: none; }
+
+  .cell-stack { display: flex; flex-direction: column; gap: 2px; }
+  .cell-jamaah { display: flex; align-items: center; gap: 11px; }
+  .inv-id { font-weight: 800; color: var(--c-ink); }
+  .inv-sub { font-size: 12px; color: var(--c-faint); overflow: hidden; text-overflow: ellipsis; }
+  .jamaah-name { font-weight: 600; color: var(--c-ink); overflow: hidden; text-overflow: ellipsis; }
+  .amount { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--c-ink); }
+  .due {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-weight: 600; color: var(--c-ink-soft);
+  }
+  .due.overdue { color: var(--c-danger); }
+  .min-w-0 { min-width: 0; }
+
+  /* Skeletons */
+  .suluk-skeletons { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; }
+  .suluk-skeleton-row {
+    height: 52px;
+    border-radius: var(--radius);
+    background: var(--c-bg-2);
+    animation: suluk-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes suluk-pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+
+  /* Drawer body */
+  .drawer-body { display: flex; flex-direction: column; gap: 20px; padding: 24px; }
+  .drawer-status-row { display: flex; justify-content: space-between; align-items: center; }
+  .issue-date { font-size: 13px; color: var(--c-muted); }
+  .drawer-jamaah { display: flex; align-items: center; gap: 12px; }
+  .dj-name { font-size: 16px; font-weight: 800; color: var(--c-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-sub { font-size: 13px; color: var(--c-muted); margin-top: 2px; }
+
+  .summary-box {
+    background: var(--c-bg);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .summary-line {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; font-size: 13.5px; color: var(--c-muted);
+  }
+  .summary-line.total {
+    margin-top: 6px; padding-top: 12px;
+    border-top: 1px solid var(--c-line);
+    font-size: 15px; color: var(--c-ink);
+  }
+  .summary-line.total span:first-child { font-weight: 700; }
+  .summary-line.total .amount { font-weight: 800; }
+  .progress-track {
+    height: 7px; background: var(--c-bg-2); border-radius: 999px;
+    overflow: hidden; margin-top: 14px;
+  }
+  .progress-fill {
+    height: 100%; background: var(--c-success); border-radius: 999px;
+    transition: width .6s cubic-bezier(.2,.7,.3,1);
+  }
+  .progress-label { text-align: center; font-size: 11.5px; color: var(--c-faint); margin-top: 8px; }
+
+  .section-label {
+    font-size: 12.5px; font-weight: 700; color: var(--c-faint);
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px;
+  }
+  .empty-line { font-size: 13px; color: var(--c-faint); padding: 8px 0; }
+  .pay-list { display: flex; flex-direction: column; gap: 8px; }
+  .pay-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; background: var(--c-success-soft);
+    border-radius: var(--radius-sm);
+  }
+  .pay-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--c-success); color: #fff;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .pay-amount { font-size: 13.5px; font-weight: 700; color: var(--c-ink); }
+  .pay-meta { font-size: 12px; color: var(--c-muted); margin-top: 2px; }
+
+  .drawer-footer { display: flex; gap: 10px; padding-top: 4px; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 95;
+    background: rgba(16,33,28,.4);
+    backdrop-filter: blur(2px);
+    border: none; cursor: pointer;
+    animation: suluk-fade .2s ease;
+  }
+  .modal-panel {
+    position: fixed; z-index: 96;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 460px; max-width: 94vw;
+    background: var(--c-surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: suluk-scale .25s cubic-bezier(.2,.7,.3,1) both;
+  }
+  @keyframes suluk-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes suluk-scale {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(.96); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .modal-head {
+    padding: 22px 26px 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .modal-title { font-size: 18px; font-weight: 800; color: var(--c-ink); }
+  .modal-close {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px;
+    color: var(--c-faint); transition: background .15s, color .15s;
+  }
+  .modal-close:hover { background: var(--c-bg-2); color: var(--c-ink); }
+  .modal-body {
+    padding: 14px 26px 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .modal-hint { font-size: 13.5px; color: var(--c-muted); }
+  .modal-hint strong { color: var(--c-ink); font-variant-numeric: tabular-nums; }
+  .modal-foot {
+    padding: 16px 26px;
+    border-top: 1px solid var(--c-line);
+    display: flex; gap: 10px; justify-content: flex-end;
+    background: var(--c-bg);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12.5px; font-weight: 700; color: var(--c-ink-soft); }
+  .field input,
+  .field select {
+    width: 100%; padding: 11px 13px; font-size: 13.5px;
+    color: var(--c-ink); background: var(--c-surface);
+    border: 1px solid var(--c-line); border-radius: var(--radius);
+    outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus,
+  .field select:focus {
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+
+  @media (max-width: 640px) {
+    .suluk-page { padding: var(--space-4); }
+    .suluk-toolbar { gap: 12px; }
+    .suluk-search { width: 100%; }
+  }
+</style>

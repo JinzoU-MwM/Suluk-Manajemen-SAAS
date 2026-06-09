@@ -54,6 +54,13 @@
   --c-info: #2563a8;
   --c-info-soft: #e6eef8;
 
+  /* Suluk design layout tokens (used by Card/Button primitives + design-matched pages) */
+  --gap: 20px;
+  --pad: 20px;
+  --row-h: 56px;
+  --radius: 0.625rem;
+  --shadow: 0 4px 14px rgba(16, 33, 28, 0.07);
+
   /* Neutrals */
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;

@@ -1,29 +1,36 @@
-﻿<script>
-    import { onMount, onDestroy } from "svelte";
+<script>
+    import { onMount } from "svelte";
     import {
         User,
+        UserCheck,
         Crown,
         Shield,
         Lock,
-        Save,
+        Eye,
+        Check,
         CheckCircle,
         AlertCircle,
         Clock,
         Zap,
-        Copy,
-        ChevronRight,
         Trash2,
         Activity,
         Bell,
         Moon,
         Sun,
-        MessageCircle,
         FolderOpen,
         BarChart3,
+        ChevronRight,
+        Sparkles,
         Loader2,
     } from "lucide-svelte";
     import { ApiService } from "../services/api";
-    import { planMeta, limitLabel, isProOrHigher } from '../config/pricing.js';
+    import { planMeta, limitLabel, isProOrHigher } from "../config/pricing.js";
+    import PageHeader from "../components/PageHeader.svelte";
+    import EmptyState from "../components/EmptyState.svelte";
+    import Card from "../components/ui/Card.svelte";
+    import Badge from "../components/ui/Badge.svelte";
+    import Button from "../components/ui/Button.svelte";
+    import ProgressBar from "../components/ui/ProgressBar.svelte";
 
     let {
         onLogout,
@@ -34,7 +41,6 @@
         groups: initialGroups = [],
     } = $props();
 
-    // Simple header for sidebar layout
     $effect(() => {
         document.title = "Profil - Jamaah.in";
     });
@@ -57,6 +63,15 @@
         }
     });
 
+    // Active settings tab
+    let tab = $state("profil");
+    const TABS = [
+        { id: "profil", label: "Profil Saya", icon: UserCheck },
+        { id: "keamanan", label: "Keamanan", icon: Eye },
+        { id: "langganan", label: "Langganan", icon: Crown },
+        { id: "notifikasi", label: "Notifikasi", icon: Bell },
+    ];
+
     // Edit profile
     let editName = $state("");
     let savingProfile = $state(false);
@@ -65,14 +80,14 @@
     // Avatar color
     let selectedColor = $state("blue");
     const avatarColors = [
-        { name: "emerald", bg: "bg-emerald-500", ring: "ring-emerald-300" },
-        { name: "blue", bg: "bg-blue-500", ring: "ring-blue-300" },
-        { name: "purple", bg: "bg-purple-500", ring: "ring-purple-300" },
-        { name: "rose", bg: "bg-rose-500", ring: "ring-rose-300" },
-        { name: "amber", bg: "bg-amber-500", ring: "ring-amber-300" },
-        { name: "cyan", bg: "bg-cyan-500", ring: "ring-cyan-300" },
-        { name: "indigo", bg: "bg-indigo-500", ring: "ring-indigo-300" },
-        { name: "slate", bg: "bg-slate-500", ring: "ring-slate-300" },
+        { name: "emerald", hex: "#1B7F5A" },
+        { name: "blue", hex: "#2563c9" },
+        { name: "purple", hex: "#7a5ae0" },
+        { name: "rose", hex: "#c0392b" },
+        { name: "amber", hex: "#C99A2E" },
+        { name: "cyan", hex: "#0f7a5a" },
+        { name: "indigo", hex: "#15564a" },
+        { name: "slate", hex: "#6b7d77" },
     ];
 
     // Change password
@@ -101,16 +116,11 @@
     let deleting = $state(false);
     let deleteError = $state("");
 
-    // (Local upgrade modal logic removed, now using global UpgradeModal)
-
     onMount(async () => {
-        // Load dark mode from localStorage
         darkMode = localStorage.getItem("darkMode") === "true";
         applyDarkMode();
 
         try {
-            // Only fetch profile details + activity in parallel
-            // subscription/trial/groups already passed as props
             const [me, actData] = await Promise.all([
                 ApiService.getMe(),
                 ApiService.getActivity().catch(() => ({ activities: [] })),
@@ -126,7 +136,6 @@
                 me.notify_expiry !== undefined ? me.notify_expiry : true;
             activities = actData.activities || [];
 
-            // Refresh subscription/trial from cache (fast, cached by api.js)
             if (!subscription) {
                 subscription = await ApiService.getSubscriptionStatus();
             }
@@ -142,7 +151,6 @@
             loadingActivity = false;
         }
 
-        // Load groups count if not passed
         if (!groupCount) {
             try {
                 const groupData = await ApiService.listGroups();
@@ -289,9 +297,7 @@
         return action;
     }
 
-    let planLabel = $derived(
-        planMeta(subscription?.plan).name + " Plan",
-    );
+    let planLabel = $derived(planMeta(subscription?.plan).name + " Plan");
     let usagePercent = $derived(
         subscription?.usage_limit
             ? Math.min(
@@ -303,310 +309,152 @@
               )
             : 0,
     );
-
-    // Get current avatar bg class
-    let avatarBg = $derived(
-        avatarColors.find((c) => c.name === selectedColor)?.bg ||
-            "bg-blue-500",
+    let usageColor = $derived(
+        usagePercent > 80
+            ? "var(--c-danger)"
+            : usagePercent > 50
+              ? "var(--c-warning)"
+              : "var(--c-primary)",
+    );
+    let avatarHex = $derived(
+        avatarColors.find((c) => c.name === selectedColor)?.hex || "#2563c9",
+    );
+    let groupLimit = $derived(
+        limitLabel(
+            subscription?.max_groups ?? planMeta(subscription?.plan).maxGroups,
+        ),
     );
 </script>
 
-<div class="profile-page min-h-screen bg-slate-50/70">
-    <!-- Mobile Header (sidebar handles desktop nav) -->
-    <header
-        class="hidden"
-    >
-        <h1 class="text-lg font-semibold text-slate-800">Profil</h1>
-        <div class="flex items-center gap-2">
-            <button
-                type="button"
-                onclick={toggleDarkMode}
-                class="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                title={darkMode ? "Mode Terang" : "Mode Gelap"}
-                aria-label={darkMode ? "Mode Terang" : "Mode Gelap"}
-            >
-                {#if darkMode}
-                    <Sun class="h-5 w-5 text-amber-500" />
-                {:else}
-                    <Moon class="h-5 w-5 text-slate-500" />
-                {/if}
-            </button>
-        </div>
-    </header>
-
+<div class="profile-page">
     {#if loading}
         <div class="loading-container">
-            <div class="spinner"></div>
+            <Loader2 class="h-8 w-8 animate-spin" style="color:var(--c-primary)" />
         </div>
     {:else if profile}
-        <header class="sticky top-16 z-20 flex min-h-[72px] items-center justify-between gap-4 border-b border-slate-200/80 bg-white/80 px-4 backdrop-blur-xl lg:top-0 lg:px-8">
-            <div class="min-w-0">
-                <h1 class="font-serif text-lg font-bold text-slate-900">Profil</h1>
-                <p class="hidden text-xs text-slate-400 sm:block">
-                    Pengaturan akun, paket, keamanan, dan preferensi.
-                </p>
+        <PageHeader
+            kicker="Pengaturan Akun"
+            title="Profil Saya"
+            subtitle="Kelola informasi pribadi, langganan, keamanan, dan preferensi akun Anda."
+        >
+            {#snippet actions()}
+                <Button variant="ghost" icon={darkMode ? Sun : Moon} onclick={toggleDarkMode}>
+                    {darkMode ? "Mode Terang" : "Mode Gelap"}
+                </Button>
+            {/snippet}
+        </PageHeader>
+
+        <!-- Mobile tab pills -->
+        <div class="mobile-tabs">
+            <div class="mobile-tabs-inner">
+                {#each TABS as t}
+                    <button
+                        type="button"
+                        class="mobile-tab {tab === t.id ? 'mobile-tab-active' : ''}"
+                        onclick={() => (tab = t.id)}
+                    >
+                        {t.label}
+                    </button>
+                {/each}
             </div>
-            <button
-                type="button"
-                onclick={toggleDarkMode}
-                class="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100"
-                title={darkMode ? "Mode Terang" : "Mode Gelap"}
-                aria-label={darkMode ? "Mode Terang" : "Mode Gelap"}
-            >
-                {#if darkMode}
-                    <Sun class="h-5 w-5 text-amber-500" />
-                {:else}
-                    <Moon class="h-5 w-5 text-slate-500" />
-                {/if}
-            </button>
-        </header>
-        <div class="profile-content">
-            <div class="profile-grid">
-                <!-- Left Column: Profile Card + Activity -->
-                <div class="profile-col-left">
-                    <!-- Profile Header Card -->
-                    <div class="profile-card">
-                        <div class="profile-header">
-                            <div class="profile-header-inner">
-                                <div class="avatar {avatarBg}">
-                                    {profile.name?.charAt(0)?.toUpperCase() ||
-                                        "U"}
-                                </div>
-                                <div class="profile-info">
-                                    <h1 class="profile-name">
-                                        {profile.name}
-                                        {#if profile.is_admin}
-                                            <span class="admin-badge">
-                                                <Shield class="h-3 w-3" />
-                                                Admin
-                                            </span>
-                                        {/if}
-                                    </h1>
-                                    <p class="profile-email">{profile.email}</p>
-                                    <p class="profile-joined">
-                                        Bergabung {formatDate(
-                                            profile.created_at,
-                                        )}
-                                    </p>
-                                </div>
+        </div>
+
+        <div class="profile-grid">
+            <!-- Left: Summary + Nav -->
+            <div class="profile-col-left">
+                <Card pad={false} style="overflow:hidden">
+                    <div class="summary-banner">
+                        <Sparkles
+                            size={90}
+                            class="banner-spark"
+                        />
+                    </div>
+                    <div class="summary-body">
+                        <div class="summary-avatar-wrap">
+                            <div class="summary-avatar-ring" style="background:{avatarHex}1f">
+                                <span class="summary-avatar-initial" style="color:{avatarHex}">
+                                    {profile.name?.charAt(0)?.toUpperCase() || "U"}
+                                </span>
                             </div>
                         </div>
-
-                        <!-- Avatar Color Picker -->
-                        <div class="avatar-picker">
-                            <span class="picker-label">Warna Avatar</span>
-                            <div class="color-options">
-                                {#each avatarColors as color}
-                                    <button
-                                        onclick={() =>
-                                            selectAvatarColor(color.name)}
-                                        class="color-dot {color.bg} {selectedColor ===
-                                        color.name
-                                            ? 'ring-2 ring-offset-2 ' +
-                                              color.ring
-                                            : ''}"
-                                        title={color.name}
-                                        aria-label="Pilih warna {color.name}"
-                                    ></button>
-                                {/each}
-                            </div>
-                        </div>
-
-                        <!-- Stats Row -->
-                        <div class="stats-row">
-                            <div class="stat-item">
-                                <div class="stat-icon stat-icon-scan">
-                                    <BarChart3 class="h-4 w-4" />
-                                </div>
-                                <div>
-                                    <p class="stat-value">
-                                        {profile.usage?.total ||
-                                            0}{#if profile.usage?.limit}<span
-                                                class="stat-limit"
-                                                >/{profile.usage.limit}</span
-                                            >{/if}
-                                    </p>
-                                    <p class="stat-label">Scan</p>
-                                </div>
-                            </div>
-                            <div class="stat-divider"></div>
-                            <div class="stat-item">
-                                <div class="stat-icon stat-icon-group">
-                                    <FolderOpen class="h-4 w-4" />
-                                </div>
-                                <div>
-                                    <p class="stat-value">
-                                        {groupCount}<span class="stat-limit"
-                                            >/{limitLabel(
-                                                subscription?.max_groups ??
-                                                    planMeta(subscription?.plan)
-                                                        .maxGroups,
-                                            )}</span
-                                        >
-                                    </p>
-                                    <p class="stat-label">Grup</p>
-                                </div>
-                            </div>
-                            <div class="stat-divider"></div>
-                            <div class="stat-item">
-                                <div class="stat-icon stat-icon-plan">
-                                    {#if isProOrHigher(subscription?.plan)}
-                                        <Crown class="h-4 w-4" />
-                                    {:else}
-                                        <Zap class="h-4 w-4" />
-                                    {/if}
-                                </div>
-                                <div>
-                                    <p class="stat-value">{planLabel}</p>
-                                    <p class="stat-label">Paket</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Usage Bar (free only) -->
-                        {#if !isProOrHigher(subscription?.plan) && subscription?.usage_limit}
-                            <div class="usage-bar-container">
-                                <div class="usage-bar-track">
-                                    <div
-                                        class="usage-bar-fill {usagePercent > 80
-                                            ? 'bar-red'
-                                            : usagePercent > 50
-                                              ? 'bar-amber'
-                                              : 'bar-blue'}"
-                                        style="width: {usagePercent}%"
-                                    ></div>
-                                </div>
-                                <p class="usage-bar-text">
-                                    {usagePercent}% kuota terpakai
-                                </p>
-                            </div>
-                        {/if}
-
-                        <!-- Subscription Details -->
-                        <div class="subscription-details">
-                            {#if isProOrHigher(subscription?.plan)}
-                                <div class="sub-detail-row">
-                                    <span class="sub-detail-label"
-                                        >Berlangganan sejak</span
-                                    >
-                                    <span class="sub-detail-value"
-                                        >{formatDate(
-                                            subscription.subscribed_at,
-                                        )}</span
-                                    >
-                                </div>
-                                <div class="sub-detail-row">
-                                    <span class="sub-detail-label"
-                                        >Berlaku hingga</span
-                                    >
-                                    <span class="sub-detail-value"
-                                        >{formatDate(
-                                            subscription.subscription_ends,
-                                        )}</span
-                                    >
-                                </div>
-                            {:else}
-                                {#if subscription?.trial_ends && subscription?.status === "trial"}
-                                    <div class="sub-detail-row">
-                                        <Clock
-                                            class="h-3.5 w-3.5 text-amber-500"
-                                        />
-                                        <span class="sub-detail-label"
-                                            >Trial berakhir</span
-                                        >
-                                        <span class="sub-detail-value"
-                                            >{formatDate(
-                                                subscription.trial_ends,
-                                            )}</span
-                                        >
-                                    </div>
-                                {/if}
-                                <button
-                                    onclick={onUpgradeRequest}
-                                    class="upgrade-btn-full"
-                                >
-                                    <Crown class="h-4 w-4" />
-                                    Upgrade ke Pro - Rp299.000/bulan
-                                </button>
-                                {#if trialStatus?.can_activate}
-                                    <button
-                                        onclick={onUpgradeRequest}
-                                        class="upgrade-btn-full"
-                                        style="background: linear-gradient(135deg, #2563eb, #1d4ed8); margin-top: 8px;"
-                                    >
-                                        Coba Pro 7 Hari Gratis
-                                    </button>
-                                {/if}
+                        <div class="summary-name">{profile.name}</div>
+                        <div class="summary-email">{profile.email}</div>
+                        <div class="summary-badges">
+                            {#if profile.is_admin}
+                                <Badge tone="success" dot>Admin</Badge>
                             {/if}
+                            <Badge tone={isProOrHigher(subscription?.plan) ? "warning" : "info"}>
+                                {planLabel}
+                            </Badge>
+                        </div>
+
+                        <div class="summary-stats">
+                            <div class="summary-stat">
+                                <div class="summary-stat-value tabular">
+                                    {profile.usage?.total || 0}{#if profile.usage?.limit}<span
+                                            class="summary-stat-limit">/{profile.usage.limit}</span
+                                        >{/if}
+                                </div>
+                                <div class="summary-stat-label">Scan</div>
+                            </div>
+                            <div class="summary-stat summary-stat-bordered">
+                                <div class="summary-stat-value tabular">
+                                    {groupCount}<span class="summary-stat-limit">/{groupLimit}</span>
+                                </div>
+                                <div class="summary-stat-label">Grup</div>
+                            </div>
+                            <div class="summary-stat summary-stat-bordered">
+                                <div class="summary-stat-value tabular">
+                                    {formatDate(profile.created_at)}
+                                </div>
+                                <div class="summary-stat-label">Bergabung</div>
+                            </div>
                         </div>
                     </div>
+                </Card>
 
-                    <!-- Recent Activity -->
-                    <div class="form-card">
-                        <h2 class="form-title">
-                            <Activity class="h-5 w-5 text-slate-400" />
-                            Aktivitas Terakhir
-                        </h2>
-                        {#if loadingActivity}
-                            <div class="activity-loading">
-                                <Loader2
-                                    class="h-5 w-5 animate-spin text-slate-300"
-                                />
-                            </div>
-                        {:else if activities.length === 0}
-                            <p class="activity-empty">
-                                Belum ada aktivitas scan.
-                            </p>
-                        {:else}
-                            <div class="activity-list">
-                                {#each activities as act}
-                                    <div class="activity-row">
-                                        <div class="activity-dot"></div>
-                                        <div class="activity-info">
-                                            <span class="activity-action"
-                                                >{actionLabel(act.action)}</span
-                                            >
-                                            <span class="activity-count"
-                                                >{act.count} dokumen</span
-                                            >
-                                        </div>
-                                        <span class="activity-date"
-                                            >{formatDateTime(
-                                                act.created_at,
-                                            )}</span
-                                        >
-                                    </div>
-                                {/each}
-                            </div>
-                        {/if}
+                <!-- Desktop nav -->
+                <Card pad={false} class="nav-card">
+                    <div class="nav-list">
+                        {#each TABS as t}
+                            {@const active = tab === t.id}
+                            <button
+                                type="button"
+                                class="nav-item {active ? 'nav-item-active' : ''}"
+                                onclick={() => (tab = t.id)}
+                            >
+                                <t.icon size={18} />
+                                <span class="nav-item-label">{t.label}</span>
+                                {#if active}<ChevronRight size={16} />{/if}
+                            </button>
+                        {/each}
                     </div>
-                </div>
+                </Card>
 
-                <!-- Right Column: Settings -->
-                <div class="profile-col-right">
-                    <!-- Edit Profile Card -->
-                    <div class="form-card">
-                        <h2 class="form-title">
-                            <User class="h-5 w-5 text-slate-400" />
-                            Edit Profil
-                        </h2>
+                {#if user?.is_super_admin}
+                    <a href="/#/super-admin" class="superadmin-link">
+                        <Shield size={16} />
+                        <span>Super Admin Dashboard</span>
+                    </a>
+                {/if}
+            </div>
 
-                        <!-- Super Admin Access -->
-                        {#if user?.is_super_admin}
-                            <a href="/#/super-admin" class="admin-link">
-                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22s8.5-5.5 5.5-5.5 5.5S3 9.5 3 12c0 2.21-1.79 4-4 4-4s4 1.79 4 4 4c0 2.21 1.79 4 4 4 4 1.79 4 4zm5.5 10a1.5 1.5 0 1 1.5-3 1.5 1.5 0 3-1.5 1.5 1.5 0 0 1.5-3 1.5c0-1.21-.679-1.5-1.5-1.5 0-.828.584-1.5 1.5-3.353-1.5-1.5-1.5z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4-6-4 6 6-2-2-2-4 4-2 2-4 6-2 2-4 4-2 2 4 4 2-2 2 4-6-2 2-4 4 2z" />
-                                </svg>
-                                <span class="admin-link-text">Super Admin Dashboard</span>
-                            </a>
-                        {/if}
-
-                        <div class="form-fields">
+            <!-- Right: Active panel -->
+            <div class="profile-col-right">
+                {#if tab === "profil"}
+                    <Card>
+                        <div class="section-head">
                             <div>
-                                <label for="profile-email" class="field-label"
-                                    >Email</label
-                                >
+                                <div class="section-title">Informasi Pribadi</div>
+                                <div class="section-desc">
+                                    Data ini ditampilkan pada akun internal dan dokumen travel.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="fields-grid">
+                            <div class="field">
+                                <label class="field-label" for="profile-email">Email</label>
                                 <input
                                     id="profile-email"
                                     type="email"
@@ -614,15 +462,10 @@
                                     disabled
                                     class="field-input field-disabled"
                                 />
-                                <p class="field-hint">
-                                    Email tidak dapat diubah
-                                </p>
+                                <p class="field-hint">Email tidak dapat diubah</p>
                             </div>
-
-                            <div>
-                                <label for="profile-name" class="field-label"
-                                    >Nama Lengkap</label
-                                >
+                            <div class="field">
+                                <label class="field-label" for="profile-name">Nama Lengkap</label>
                                 <input
                                     id="profile-name"
                                     type="text"
@@ -631,134 +474,102 @@
                                     placeholder="Nama lengkap"
                                 />
                             </div>
+                        </div>
 
-                            {#if profileMsg.text}
-                                <div
-                                    class="msg {profileMsg.type === 'success'
-                                        ? 'msg-success'
-                                        : 'msg-error'}"
-                                >
-                                    {#if profileMsg.type === "success"}
-                                        <CheckCircle class="h-4 w-4" />
-                                    {:else}
-                                        <AlertCircle class="h-4 w-4" />
-                                    {/if}
-                                    {profileMsg.text}
-                                </div>
-                            {/if}
+                        <div class="avatar-picker">
+                            <span class="field-label" style="margin:0">Warna Avatar</span>
+                            <div class="color-options">
+                                {#each avatarColors as color}
+                                    <button
+                                        type="button"
+                                        onclick={() => selectAvatarColor(color.name)}
+                                        class="color-dot {selectedColor === color.name ? 'color-dot-active' : ''}"
+                                        style="background:{color.hex}"
+                                        title={color.name}
+                                        aria-label="Pilih warna {color.name}"
+                                    ></button>
+                                {/each}
+                            </div>
+                        </div>
 
-                            <button
+                        {#if profileMsg.text}
+                            <div class="msg {profileMsg.type === 'success' ? 'msg-success' : 'msg-error'}">
+                                {#if profileMsg.type === "success"}
+                                    <CheckCircle class="h-4 w-4" />
+                                {:else}
+                                    <AlertCircle class="h-4 w-4" />
+                                {/if}
+                                {profileMsg.text}
+                            </div>
+                        {/if}
+
+                        <div class="section-action">
+                            <Button
+                                variant="primary"
+                                icon={Check}
                                 onclick={saveProfile}
-                                disabled={savingProfile ||
-                                    editName.trim() === profile.name}
-                                class="save-btn"
+                                disabled={savingProfile || editName.trim() === profile.name}
                             >
-                                <Save class="h-4 w-4" />
-                                {savingProfile
-                                    ? "Menyimpan..."
-                                    : "Simpan Perubahan"}
-                            </button>
+                                {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
+                            </Button>
                         </div>
-                    </div>
+                    </Card>
 
-                    <!-- Notification Preferences -->
-                    <div class="form-card">
-                        <h2 class="form-title">
-                            <Bell class="h-5 w-5 text-slate-400" />
-                            Notifikasi
-                        </h2>
-                        <div class="form-fields">
-                            <div class="toggle-row">
-                                <div>
-                                    <p class="toggle-label">
-                                        Peringatan batas kuota
-                                    </p>
-                                    <p class="toggle-desc">
-                                        Notifikasi saat mendekati batas scan
-                                    </p>
-                                </div>
-                                <button
-                                    onclick={() =>
-                                        (notifyUsageLimit = !notifyUsageLimit)}
-                                    class="toggle-switch {notifyUsageLimit
-                                        ? 'toggle-on'
-                                        : 'toggle-off'}"
-                                    aria-label="Toggle Peringatan batas kuota"
-                                >
-                                    <span
-                                        class="toggle-knob {notifyUsageLimit
-                                            ? 'knob-on'
-                                            : 'knob-off'}"
-                                    ></span>
-                                </button>
-                            </div>
-                            <div class="toggle-row">
-                                <div>
-                                    <p class="toggle-label">
-                                        Peringatan masa berlaku
-                                    </p>
-                                    <p class="toggle-desc">
-                                        Notifikasi sebelum trial/langganan
-                                        berakhir
-                                    </p>
-                                </div>
-                                <button
-                                    onclick={() =>
-                                        (notifyExpiry = !notifyExpiry)}
-                                    class="toggle-switch {notifyExpiry
-                                        ? 'toggle-on'
-                                        : 'toggle-off'}"
-                                    aria-label="Toggle Peringatan masa berlaku"
-                                >
-                                    <span
-                                        class="toggle-knob {notifyExpiry
-                                            ? 'knob-on'
-                                            : 'knob-off'}"
-                                    ></span>
-                                </button>
-                            </div>
-
-                            {#if notifMsg.text}
-                                <div
-                                    class="msg {notifMsg.type === 'success'
-                                        ? 'msg-success'
-                                        : 'msg-error'}"
-                                >
-                                    {#if notifMsg.type === "success"}
-                                        <CheckCircle class="h-4 w-4" />
-                                    {:else}
-                                        <AlertCircle class="h-4 w-4" />
-                                    {/if}
-                                    {notifMsg.text}
-                                </div>
-                            {/if}
-
-                            <button
-                                onclick={saveNotificationPrefs}
-                                disabled={savingNotifs}
-                                class="save-btn"
-                            >
-                                <Save class="h-4 w-4" />
-                                {savingNotifs
-                                    ? "Menyimpan..."
-                                    : "Simpan Preferensi"}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Change Password Card -->
-                    <div class="form-card">
-                        <h2 class="form-title">
-                            <Lock class="h-5 w-5 text-slate-400" />
-                            Ubah Password
-                        </h2>
-
-                        <div class="form-fields">
+                    <Card>
+                        <div class="section-head">
                             <div>
-                                <label
-                                    for="current-password"
-                                    class="field-label">Password Saat Ini</label
-                                >
+                                <div class="section-title">Aktivitas Terakhir</div>
+                                <div class="section-desc">Riwayat scan dokumen terbaru.</div>
+                            </div>
+                            <div class="section-icon">
+                                <Activity size={19} />
+                            </div>
+                        </div>
+
+                        {#if loadingActivity}
+                            <div class="activity-loading">
+                                <Loader2 class="h-5 w-5 animate-spin" style="color:var(--c-faint)" />
+                            </div>
+                        {:else if activities.length === 0}
+                            <EmptyState
+                                icon={Activity}
+                                title="Belum ada aktivitas"
+                                text="Aktivitas scan dokumen Anda akan muncul di sini."
+                            />
+                        {:else}
+                            <div class="activity-list">
+                                {#each activities as act}
+                                    <div class="activity-row">
+                                        <div class="activity-icon">
+                                            <BarChart3 size={18} />
+                                        </div>
+                                        <div class="activity-info">
+                                            <div class="activity-action">{actionLabel(act.action)}</div>
+                                            <div class="activity-count">{act.count} dokumen</div>
+                                        </div>
+                                        <span class="activity-date">{formatDateTime(act.created_at)}</span>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </Card>
+                {:else if tab === "keamanan"}
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Kata Sandi</div>
+                                <div class="section-desc">
+                                    Perbarui sandi secara berkala untuk menjaga keamanan akun.
+                                </div>
+                            </div>
+                            <div class="section-icon">
+                                <Lock size={19} />
+                            </div>
+                        </div>
+
+                        <div class="fields-grid">
+                            <div class="field field-full">
+                                <label class="field-label" for="current-password">Password Saat Ini</label>
                                 <input
                                     id="current-password"
                                     type="password"
@@ -767,11 +578,8 @@
                                     placeholder="Masukkan password saat ini"
                                 />
                             </div>
-
-                            <div>
-                                <label for="new-password" class="field-label"
-                                    >Password Baru</label
-                                >
+                            <div class="field">
+                                <label class="field-label" for="new-password">Password Baru</label>
                                 <input
                                     id="new-password"
                                     type="password"
@@ -780,13 +588,8 @@
                                     placeholder="Minimal 6 karakter"
                                 />
                             </div>
-
-                            <div>
-                                <label
-                                    for="confirm-password"
-                                    class="field-label"
-                                    >Konfirmasi Password Baru</label
-                                >
+                            <div class="field">
+                                <label class="field-label" for="confirm-password">Konfirmasi Password Baru</label>
                                 <input
                                     id="confirm-password"
                                     type="password"
@@ -795,58 +598,270 @@
                                     placeholder="Ulangi password baru"
                                 />
                             </div>
+                        </div>
 
-                            {#if passwordMsg.text}
-                                <div
-                                    class="msg {passwordMsg.type === 'success'
-                                        ? 'msg-success'
-                                        : 'msg-error'}"
-                                >
-                                    {#if passwordMsg.type === "success"}
-                                        <CheckCircle class="h-4 w-4" />
-                                    {:else}
-                                        <AlertCircle class="h-4 w-4" />
-                                    {/if}
-                                    {passwordMsg.text}
-                                </div>
-                            {/if}
+                        {#if passwordMsg.text}
+                            <div class="msg {passwordMsg.type === 'success' ? 'msg-success' : 'msg-error'}">
+                                {#if passwordMsg.type === "success"}
+                                    <CheckCircle class="h-4 w-4" />
+                                {:else}
+                                    <AlertCircle class="h-4 w-4" />
+                                {/if}
+                                {passwordMsg.text}
+                            </div>
+                        {/if}
 
-                            <button
+                        <div class="section-action">
+                            <Button
+                                variant="primary"
+                                icon={Check}
                                 onclick={savePassword}
-                                disabled={savingPassword ||
-                                    !currentPassword ||
-                                    !newPassword ||
-                                    !confirmPassword}
-                                class="save-btn save-btn-dark"
+                                disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
                             >
-                                <Lock class="h-4 w-4" />
-                                {savingPassword
-                                    ? "Mengubah..."
-                                    : "Ubah Password"}
+                                {savingPassword ? "Mengubah..." : "Perbarui Sandi"}
+                            </Button>
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Preferensi Tampilan</div>
+                                <div class="section-desc">Sesuaikan tampilan aplikasi sesuai selera.</div>
+                            </div>
+                        </div>
+                        <div class="setting-row" style="border-top:none">
+                            <div class="setting-icon">
+                                {#if darkMode}<Sun size={19} />{:else}<Moon size={19} />{/if}
+                            </div>
+                            <div class="setting-text">
+                                <div class="setting-title">Mode Gelap</div>
+                                <div class="setting-desc">Tampilan dengan latar gelap yang nyaman di mata.</div>
+                            </div>
+                            <button
+                                type="button"
+                                onclick={toggleDarkMode}
+                                class="toggle {darkMode ? 'toggle-on' : ''}"
+                                role="switch"
+                                aria-checked={darkMode}
+                                aria-label="Toggle Mode Gelap"
+                            >
+                                <span class="toggle-knob"></span>
                             </button>
                         </div>
-                    </div>
+                    </Card>
 
-                    <!-- Danger Zone -->
-                    <div class="form-card danger-card">
-                        <h2 class="form-title danger-title">
-                            <Trash2 class="h-5 w-5 text-red-400" />
-                            Zona Berbahaya
-                        </h2>
-                        <p class="danger-desc">
-                            Hapus akun secara permanen. Semua data grup dan
-                            riwayat akan dihapus. Tindakan ini tidak dapat
-                            dibatalkan.
-                        </p>
-                        <button
-                            onclick={() => (showDeleteModal = true)}
-                            class="delete-btn"
-                        >
-                            <Trash2 class="h-4 w-4" />
-                            Hapus Akun Saya
-                        </button>
-                    </div>
-                </div>
+                    <Card class="danger-card">
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title" style="color:var(--c-danger)">Zona Berbahaya</div>
+                                <div class="section-desc">
+                                    Hapus akun secara permanen. Semua data grup dan riwayat akan dihapus.
+                                    Tindakan ini tidak dapat dibatalkan.
+                                </div>
+                            </div>
+                            <div class="section-icon section-icon-danger">
+                                <Trash2 size={19} />
+                            </div>
+                        </div>
+                        <div class="section-action">
+                            <Button variant="danger" icon={Trash2} onclick={() => (showDeleteModal = true)}>
+                                Hapus Akun Saya
+                            </Button>
+                        </div>
+                    </Card>
+                {:else if tab === "langganan"}
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Paket Langganan</div>
+                                <div class="section-desc">Detail paket aktif dan batas penggunaan akun Anda.</div>
+                            </div>
+                            <div class="section-icon section-icon-accent">
+                                {#if isProOrHigher(subscription?.plan)}
+                                    <Crown size={19} />
+                                {:else}
+                                    <Zap size={19} />
+                                {/if}
+                            </div>
+                        </div>
+
+                        <div class="plan-hero">
+                            <div class="plan-hero-icon">
+                                {#if isProOrHigher(subscription?.plan)}
+                                    <Crown size={26} />
+                                {:else}
+                                    <Zap size={26} />
+                                {/if}
+                            </div>
+                            <div class="plan-hero-info">
+                                <div class="plan-hero-name">{planLabel}</div>
+                                <div class="plan-hero-sub">
+                                    {planMeta(subscription?.plan).desc}
+                                </div>
+                            </div>
+                            <Badge tone={isProOrHigher(subscription?.plan) ? "warning" : "info"}>
+                                {subscription?.status === "trial" ? "Trial" : "Aktif"}
+                            </Badge>
+                        </div>
+
+                        <div class="limits-grid">
+                            <div class="limit-box">
+                                <div class="limit-icon"><BarChart3 size={18} /></div>
+                                <div>
+                                    <div class="limit-value tabular">
+                                        {profile.usage?.total || 0}{#if profile.usage?.limit}<span
+                                                class="limit-cap">/{profile.usage.limit}</span
+                                            >{/if}
+                                    </div>
+                                    <div class="limit-label">Scan dokumen</div>
+                                </div>
+                            </div>
+                            <div class="limit-box">
+                                <div class="limit-icon"><FolderOpen size={18} /></div>
+                                <div>
+                                    <div class="limit-value tabular">
+                                        {groupCount}<span class="limit-cap">/{groupLimit}</span>
+                                    </div>
+                                    <div class="limit-label">Grup</div>
+                                </div>
+                            </div>
+                            <div class="limit-box">
+                                <div class="limit-icon"><User size={18} /></div>
+                                <div>
+                                    <div class="limit-value tabular">
+                                        {limitLabel(
+                                            subscription?.max_users ??
+                                                planMeta(subscription?.plan).maxUsers,
+                                        )}
+                                    </div>
+                                    <div class="limit-label">Pengguna</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {#if !isProOrHigher(subscription?.plan) && subscription?.usage_limit}
+                            <div class="usage-block">
+                                <div class="usage-block-head">
+                                    <span class="usage-block-label">Kuota scan terpakai</span>
+                                    <span class="usage-block-pct tabular">{usagePercent}%</span>
+                                </div>
+                                <ProgressBar value={usagePercent} max={100} color={usageColor} />
+                            </div>
+                        {/if}
+
+                        <div class="sub-details">
+                            {#if isProOrHigher(subscription?.plan)}
+                                <div class="sub-detail-row">
+                                    <span class="sub-detail-label">Berlangganan sejak</span>
+                                    <span class="sub-detail-value">{formatDate(subscription.subscribed_at)}</span>
+                                </div>
+                                <div class="sub-detail-row">
+                                    <span class="sub-detail-label">Berlaku hingga</span>
+                                    <span class="sub-detail-value">{formatDate(subscription.subscription_ends)}</span>
+                                </div>
+                            {:else}
+                                {#if subscription?.trial_ends && subscription?.status === "trial"}
+                                    <div class="sub-detail-row">
+                                        <span class="sub-detail-label">
+                                            <Clock size={14} style="color:var(--c-warning)" />
+                                            Trial berakhir
+                                        </span>
+                                        <span class="sub-detail-value">{formatDate(subscription.trial_ends)}</span>
+                                    </div>
+                                {/if}
+                            {/if}
+                        </div>
+
+                        {#if !isProOrHigher(subscription?.plan)}
+                            <div class="section-action upgrade-actions">
+                                <Button variant="accent" icon={Crown} full onclick={onUpgradeRequest}>
+                                    Upgrade ke Pro - Rp299.000/bulan
+                                </Button>
+                                {#if trialStatus?.can_activate}
+                                    <Button variant="soft" full onclick={onUpgradeRequest}>
+                                        Coba Pro 7 Hari Gratis
+                                    </Button>
+                                {/if}
+                            </div>
+                        {/if}
+                    </Card>
+                {:else if tab === "notifikasi"}
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Notifikasi</div>
+                                <div class="section-desc">
+                                    Pilih kejadian yang ingin Anda terima pemberitahuannya.
+                                </div>
+                            </div>
+                            <div class="section-icon">
+                                <Bell size={19} />
+                            </div>
+                        </div>
+
+                        <div class="setting-list">
+                            <div class="setting-row">
+                                <div class="setting-icon"><BarChart3 size={19} /></div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Peringatan batas kuota</div>
+                                    <div class="setting-desc">Notifikasi saat mendekati batas scan.</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick={() => (notifyUsageLimit = !notifyUsageLimit)}
+                                    class="toggle {notifyUsageLimit ? 'toggle-on' : ''}"
+                                    role="switch"
+                                    aria-checked={notifyUsageLimit}
+                                    aria-label="Toggle Peringatan batas kuota"
+                                >
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-icon"><Clock size={19} /></div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Peringatan masa berlaku</div>
+                                    <div class="setting-desc">
+                                        Notifikasi sebelum trial/langganan berakhir.
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick={() => (notifyExpiry = !notifyExpiry)}
+                                    class="toggle {notifyExpiry ? 'toggle-on' : ''}"
+                                    role="switch"
+                                    aria-checked={notifyExpiry}
+                                    aria-label="Toggle Peringatan masa berlaku"
+                                >
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {#if notifMsg.text}
+                            <div class="msg {notifMsg.type === 'success' ? 'msg-success' : 'msg-error'}">
+                                {#if notifMsg.type === "success"}
+                                    <CheckCircle class="h-4 w-4" />
+                                {:else}
+                                    <AlertCircle class="h-4 w-4" />
+                                {/if}
+                                {notifMsg.text}
+                            </div>
+                        {/if}
+
+                        <div class="section-action">
+                            <Button
+                                variant="primary"
+                                icon={Check}
+                                onclick={saveNotificationPrefs}
+                                disabled={savingNotifs}
+                            >
+                                {savingNotifs ? "Menyimpan..." : "Simpan Preferensi"}
+                            </Button>
+                        </div>
+                    </Card>
+                {/if}
             </div>
         </div>
     {/if}
@@ -866,25 +881,18 @@
         tabindex="-1"
     >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-            class="modal-content"
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={() => {}}
-        >
+        <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
             <div class="modal-header">
-                <h3 class="modal-title" style="color: #ef4444;">
+                <h3 class="modal-title" style="color:var(--c-danger)">
                     <Trash2 class="h-5 w-5" />
                     Hapus Akun
                 </h3>
-                <button
-                    onclick={() => (showDeleteModal = false)}
-                    class="modal-close">x</button
-                >
+                <button type="button" onclick={() => (showDeleteModal = false)} class="modal-close">×</button>
             </div>
             <div class="modal-body">
                 <p class="delete-warning">
-                    Tindakan ini <strong>tidak dapat dibatalkan</strong>.
-                    Masukkan password untuk konfirmasi.
+                    Tindakan ini <strong>tidak dapat dibatalkan</strong>. Masukkan password untuk
+                    konfirmasi.
                 </p>
                 <input
                     type="password"
@@ -899,22 +907,16 @@
                     </div>
                 {/if}
                 <div class="delete-actions">
-                    <button
-                        onclick={() => (showDeleteModal = false)}
-                        class="cancel-btn">Batal</button
-                    >
-                    <button
+                    <Button variant="ghost" onclick={() => (showDeleteModal = false)}>Batal</Button>
+                    <Button
+                        variant="primary"
+                        icon={Trash2}
                         onclick={confirmDeleteAccount}
                         disabled={deleting || !deletePassword}
-                        class="confirm-delete-btn"
+                        style="background:var(--c-danger);border-color:var(--c-danger)"
                     >
-                        {#if deleting}
-                            <Loader2 class="h-4 w-4 animate-spin" />
-                        {:else}
-                            <Trash2 class="h-4 w-4" />
-                        {/if}
-                        Hapus Permanen
-                    </button>
+                        {deleting ? "Menghapus..." : "Hapus Permanen"}
+                    </Button>
                 </div>
             </div>
         </div>
@@ -922,790 +924,638 @@
 {/if}
 
 <style>
-    /* ---- Admin Link ---- */
-    :global(.admin-link) {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        margin-bottom: 1rem;
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        color: white;
-        border-radius: 0.5rem;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-    :global(.admin-link:hover) {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
-    }
-    :global(.admin-link-text) {
-        font-weight: 600;
-    }
-    /* ---- Base ---- */
     .profile-page {
-        background: #f8fafc;
+        padding: 24px;
+        background: var(--c-bg);
         min-height: 100vh;
     }
-    :global(.dark) .profile-page {
-        background: #0f172a;
-    }
-
-    /* ---- Navbar ---- */
-    .profile-nav {
-        border-bottom: 1px solid #e2e8f0;
-        background: #fff;
-        padding: 0.75rem 1rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-    :global(.dark) .profile-nav {
-        background: #1e293b;
-        border-color: #334155;
-    }
-    @media (min-width: 640px) {
-        .profile-nav {
-            padding: 1rem 1.5rem;
+    @media (max-width: 640px) {
+        .profile-page {
+            padding: 16px;
         }
     }
-    .nav-left {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    @media (min-width: 640px) {
-        .nav-left {
-            gap: 0.75rem;
-        }
-    }
-    .back-btn {
-        color: #64748b;
-        background: none;
-        border: none;
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: color 0.2s;
-        display: flex;
-        align-items: center;
-    }
-    .back-btn:hover {
-        color: #334155;
-    }
-    :global(.dark) .back-btn {
-        color: #94a3b8;
-    }
-    :global(.dark) .back-btn:hover {
-        color: #f1f5f9;
-    }
-    .logout-btn {
-        color: #64748b;
-        font-size: 0.875rem;
-        background: none;
-        border: none;
-        padding: 0.5rem 0.75rem;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: color 0.2s;
-    }
-    .logout-btn:hover {
-        color: #ef4444;
-    }
 
-    /* ---- Loading ---- */
     .loading-container {
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 5rem 0;
-    }
-    .spinner {
-        width: 2rem;
-        height: 2rem;
-        border: 2px solid transparent;
-        border-bottom-color: #3b82f6;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
+        padding: 6rem 0;
     }
 
-    /* ---- Content Container ---- */
-    .profile-content {
-        width: 100%;
-        margin: 0;
-        padding: 1rem;
-    }
-    @media (min-width: 640px) {
-        .profile-content {
-            padding: 1.5rem;
-        }
-    }
-    @media (min-width: 1024px) {
-        .profile-content {
-            padding: 2rem;
-        }
-    }
-
-    /* ---- Two-Column Grid ---- */
+    /* ---- Grid ---- */
     .profile-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: var(--gap);
+        align-items: start;
     }
-    @media (min-width: 640px) {
+    @media (max-width: 1024px) {
         .profile-grid {
-            gap: 1.25rem;
-        }
-    }
-    @media (min-width: 1024px) {
-        .profile-grid {
-            display: grid;
-            grid-template-columns: 380px 1fr;
-            gap: 1.5rem;
-            align-items: start;
+            grid-template-columns: 1fr;
         }
     }
     .profile-col-left {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: var(--gap);
+        position: sticky;
+        top: 0;
     }
-    @media (min-width: 1024px) {
+    @media (max-width: 1024px) {
         .profile-col-left {
-            position: sticky;
-            top: 4.5rem;
-            gap: 1.25rem;
+            position: static;
         }
     }
     .profile-col-right {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
-    }
-    @media (min-width: 640px) {
-        .profile-col-right {
-            gap: 1.25rem;
-        }
+        gap: var(--gap);
+        min-width: 0;
     }
 
-    /* ---- Profile Card ---- */
-    .profile-card {
-        background: #fff;
-        border-radius: 1.5rem;
-        border: 1px solid #f1f5f9;
+    /* ---- Summary card ---- */
+    .summary-banner {
+        height: 90px;
+        background: linear-gradient(120deg, var(--c-primary-deep), var(--c-primary));
+        position: relative;
         overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     }
-    :global(.dark) .profile-card {
-        background: #1e293b;
-        border-color: #334155;
+    :global(.banner-spark) {
+        position: absolute;
+        right: -16px;
+        top: -16px;
+        color: rgba(255, 255, 255, 0.12);
     }
-
-    /* ---- Profile Header ---- */
-    .profile-header {
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        padding: 1.25rem 1rem;
-        color: white;
+    .summary-body {
+        padding: 0 22px 22px;
+        margin-top: -42px;
+        text-align: center;
     }
-    @media (min-width: 640px) {
-        .profile-header {
-            padding: 1.5rem;
-        }
+    .summary-avatar-wrap {
+        width: 88px;
+        height: 88px;
+        margin: 0 auto 14px;
     }
-    .profile-header-inner {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-    @media (min-width: 640px) {
-        .profile-header-inner {
-            gap: 1rem;
-        }
-    }
-    .avatar {
-        width: 3.5rem;
-        height: 3.5rem;
+    .summary-avatar-ring {
+        width: 88px;
+        height: 88px;
         border-radius: 50%;
+        border: 4px solid var(--c-surface);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.25rem;
-        font-weight: 700;
-        flex-shrink: 0;
-        color: white;
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+        box-sizing: border-box;
     }
-    @media (min-width: 640px) {
-        .avatar {
-            width: 4rem;
-            height: 4rem;
-            font-size: 1.5rem;
-        }
+    .summary-avatar-initial {
+        font-size: 32px;
+        font-weight: 800;
     }
-    .profile-info {
-        min-width: 0;
+    .summary-name {
+        font-size: 18.5px;
+        font-weight: 800;
+        color: var(--c-ink);
     }
-    .profile-name {
-        font-size: 1.1rem;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-    @media (min-width: 640px) {
-        .profile-name {
-            font-size: 1.25rem;
-        }
-    }
-    .admin-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        padding: 0.125rem 0.5rem;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 99px;
-        font-size: 0.7rem;
-        font-weight: 500;
-    }
-    .profile-email {
-        color: rgba(219, 234, 254, 0.92);
-        font-size: 0.8rem;
+    .summary-email {
+        font-size: 13px;
+        color: var(--c-muted);
+        margin-top: 3px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    .profile-joined {
-        color: rgba(219, 234, 254, 0.72);
-        font-size: 0.7rem;
-        margin-top: 0.125rem;
+    .summary-badges {
+        margin-top: 12px;
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .summary-stats {
+        display: flex;
+        margin-top: 20px;
+        padding-top: 18px;
+        border-top: 1px solid var(--c-line-soft);
+    }
+    .summary-stat {
+        flex: 1;
+        min-width: 0;
+        padding: 0 4px;
+    }
+    .summary-stat-bordered {
+        border-left: 1px solid var(--c-line-soft);
+    }
+    .summary-stat-value {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--c-ink);
+    }
+    .summary-stat-limit {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--c-faint);
+    }
+    .summary-stat-label {
+        font-size: 11px;
+        color: var(--c-faint);
+        margin-top: 2px;
     }
 
-    /* ---- Avatar Color Picker ---- */
-    .avatar-picker {
+    /* ---- Nav card ---- */
+    :global(.nav-card) {
+        display: block;
+    }
+    @media (max-width: 1024px) {
+        :global(.nav-card) {
+            display: none;
+        }
+    }
+    .nav-list {
+        padding: 10px;
+    }
+    .nav-item {
+        width: 100%;
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #f1f5f9;
+        gap: 12px;
+        padding: 11px 13px;
+        border-radius: var(--radius);
+        margin-bottom: 2px;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--c-ink-soft);
+        background: transparent;
+        transition: background 0.14s;
     }
-    :global(.dark) .avatar-picker {
-        border-color: #334155;
+    .nav-item:hover {
+        background: var(--c-bg);
     }
-    .picker-label {
-        font-size: 0.75rem;
-        color: #64748b;
+    .nav-item-active {
+        font-weight: 700;
+        color: var(--c-primary-deep);
+        background: var(--c-primary-soft);
+    }
+    .nav-item-label {
+        flex: 1;
+    }
+
+    /* ---- Super admin link ---- */
+    .superadmin-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 16px;
+        background: var(--c-accent-soft);
+        color: var(--c-accent);
+        border-radius: var(--radius);
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+        transition: filter 0.15s;
+    }
+    .superadmin-link:hover {
+        filter: brightness(0.97);
+    }
+
+    /* ---- Mobile tabs ---- */
+    .mobile-tabs {
+        display: none;
+        margin-bottom: var(--gap);
+        overflow-x: auto;
+    }
+    @media (max-width: 1024px) {
+        .mobile-tabs {
+            display: block;
+        }
+    }
+    .mobile-tabs-inner {
+        display: inline-flex;
+        gap: 4px;
+        background: var(--c-bg-2);
+        padding: 4px;
+        border-radius: var(--radius);
+    }
+    .mobile-tab {
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: var(--radius-sm);
         white-space: nowrap;
+        color: var(--c-muted);
+        background: transparent;
+    }
+    .mobile-tab-active {
+        color: var(--c-ink);
+        background: var(--c-surface);
+        box-shadow: var(--shadow-sm);
+    }
+
+    /* ---- Section head ---- */
+    .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+    .section-title {
+        font-size: 16.5px;
+        font-weight: 800;
+        color: var(--c-ink);
+    }
+    .section-desc {
+        font-size: 13px;
+        color: var(--c-muted);
+        margin-top: 4px;
+        line-height: 1.45;
+    }
+    .section-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: var(--radius);
+        background: var(--c-primary-soft);
+        color: var(--c-primary-deep);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .section-icon-accent {
+        background: var(--c-accent-soft);
+        color: var(--c-accent);
+    }
+    .section-icon-danger {
+        background: var(--c-danger-soft);
+        color: var(--c-danger);
+    }
+    .section-action {
+        margin-top: 18px;
+    }
+
+    /* ---- Fields ---- */
+    .fields-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px 22px;
+    }
+    @media (max-width: 560px) {
+        .fields-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .field-full {
+        grid-column: 1 / -1;
+    }
+    .field-label {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--c-faint);
+        margin-bottom: 7px;
+    }
+    .field-input {
+        width: 100%;
+        padding: 11px 13px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--c-ink);
+        background: var(--c-surface);
+        border: 1px solid var(--c-line);
+        border-radius: var(--radius);
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-input:focus {
+        border-color: var(--c-primary);
+        box-shadow: 0 0 0 3px var(--c-primary-soft);
+    }
+    .field-disabled {
+        background: var(--c-bg-2);
+        color: var(--c-muted);
+        cursor: not-allowed;
+    }
+    .field-hint {
+        font-size: 11.5px;
+        color: var(--c-faint);
+        margin-top: 6px;
+    }
+
+    /* ---- Avatar picker ---- */
+    .avatar-picker {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--c-line-soft);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
     }
     .color-options {
         display: flex;
-        gap: 0.5rem;
+        gap: 8px;
         flex-wrap: wrap;
     }
     .color-dot {
-        width: 1.5rem;
-        height: 1.5rem;
+        width: 26px;
+        height: 26px;
         border-radius: 50%;
-        border: none;
+        border: 2px solid transparent;
         cursor: pointer;
         transition: transform 0.15s;
     }
     .color-dot:hover {
-        transform: scale(1.2);
+        transform: scale(1.15);
+    }
+    .color-dot-active {
+        border-color: var(--c-surface);
+        box-shadow: 0 0 0 2px var(--c-ink);
     }
 
-    /* ---- Stats Row ---- */
-    .stats-row {
+    /* ---- Setting rows ---- */
+    .setting-list {
+        margin-top: -4px;
+    }
+    .setting-row {
         display: flex;
         align-items: center;
-        padding: 1rem;
-        gap: 0.75rem;
+        gap: 14px;
+        padding: 16px 0;
+        border-top: 1px solid var(--c-line-soft);
     }
-    @media (min-width: 640px) {
-        .stats-row {
-            padding: 1rem 1.5rem;
-        }
-    }
-    .stat-item {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .stat-icon {
-        width: 2rem;
-        height: 2rem;
-        border-radius: 0.75rem;
+    .setting-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: var(--radius);
+        background: var(--c-primary-soft);
+        color: var(--c-primary-deep);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
     }
-    .stat-icon-scan {
-        background: #dbeafe;
-        color: #2563eb;
+    .setting-text {
+        flex: 1;
+        min-width: 0;
     }
-    .stat-icon-group {
-        background: #dbeafe;
-        color: #2563eb;
-    }
-    .stat-icon-plan {
-        background: #fef3c7;
-        color: #d97706;
-    }
-    :global(.dark) .stat-icon-scan {
-        background: #1e3a5f;
-    }
-    :global(.dark) .stat-icon-group {
-        background: #1e3a8a;
-    }
-    :global(.dark) .stat-icon-plan {
-        background: #451a03;
-    }
-    .stat-value {
+    .setting-title {
+        font-size: 14px;
         font-weight: 700;
-        font-size: 1rem;
-        color: #1e293b;
-        line-height: 1.2;
+        color: var(--c-ink);
     }
-    :global(.dark) .stat-value {
-        color: #f1f5f9;
-    }
-    .stat-limit {
-        font-weight: 400;
-        font-size: 0.8rem;
-        color: #94a3b8;
-    }
-    .stat-label {
-        font-size: 0.7rem;
-        color: #94a3b8;
-    }
-    .stat-divider {
-        width: 1px;
-        height: 2rem;
-        background: #e2e8f0;
-    }
-    :global(.dark) .stat-divider {
-        background: #334155;
+    .setting-desc {
+        font-size: 12.5px;
+        color: var(--c-muted);
+        margin-top: 2px;
+        line-height: 1.45;
     }
 
-    /* ---- Usage Bar ---- */
-    .usage-bar-container {
-        padding: 0 1rem 1rem;
+    /* ---- Toggle ---- */
+    .toggle {
+        width: 46px;
+        height: 27px;
+        border-radius: 999px;
+        padding: 3px;
+        background: var(--c-bg-2);
+        transition: background 0.2s;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: flex-start;
+        border: none;
+        cursor: pointer;
     }
-    @media (min-width: 640px) {
-        .usage-bar-container {
-            padding: 0 1.5rem 1rem;
+    .toggle-on {
+        background: var(--c-primary);
+        justify-content: flex-end;
+    }
+    .toggle-knob {
+        width: 21px;
+        height: 21px;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s;
+    }
+
+    /* ---- Plan hero ---- */
+    .plan-hero {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        background: var(--c-primary-tint);
+        border: 1px solid var(--c-line-soft);
+        border-radius: var(--radius-lg);
+        margin-bottom: 18px;
+    }
+    .plan-hero-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: var(--radius-lg);
+        background: var(--c-accent-soft);
+        color: var(--c-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .plan-hero-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .plan-hero-name {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--c-ink);
+    }
+    .plan-hero-sub {
+        font-size: 12.5px;
+        color: var(--c-muted);
+        margin-top: 3px;
+    }
+
+    /* ---- Limits grid ---- */
+    .limits-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 4px;
+    }
+    @media (max-width: 560px) {
+        .limits-grid {
+            grid-template-columns: 1fr;
         }
     }
-    .usage-bar-track {
-        width: 100%;
-        height: 0.5rem;
-        background: #f1f5f9;
-        border-radius: 99px;
-        overflow: hidden;
+    .limit-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px;
+        background: var(--c-bg);
+        border: 1px solid var(--c-line-soft);
+        border-radius: var(--radius);
     }
-    :global(.dark) .usage-bar-track {
-        background: #334155;
+    .limit-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius);
+        background: var(--c-primary-soft);
+        color: var(--c-primary-deep);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
-    .usage-bar-fill {
-        height: 100%;
-        border-radius: 99px;
-        transition: width 0.5s ease;
+    .limit-value {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--c-ink);
+        line-height: 1.2;
     }
-    .bar-red {
-        background: #f87171;
+    .limit-cap {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--c-faint);
     }
-    .bar-amber {
-        background: #fbbf24;
-    }
-    .bar-blue {
-        background: #60a5fa;
-    }
-    .usage-bar-text {
-        font-size: 0.7rem;
-        color: #94a3b8;
-        margin-top: 0.25rem;
-        text-align: right;
+    .limit-label {
+        font-size: 11.5px;
+        color: var(--c-faint);
+        margin-top: 2px;
     }
 
-    /* ---- Subscription Details ---- */
-    .subscription-details {
-        padding: 0.75rem 1rem 1rem;
-        border-top: 1px solid #f1f5f9;
+    /* ---- Usage block ---- */
+    .usage-block {
+        margin-top: 16px;
+    }
+    .usage-block-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .usage-block-label {
+        font-size: 13px;
+        color: var(--c-muted);
+    }
+    .usage-block-pct {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--c-ink);
+    }
+
+    /* ---- Subscription details ---- */
+    .sub-details {
+        margin-top: 16px;
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-    }
-    :global(.dark) .subscription-details {
-        border-color: #334155;
+        gap: 10px;
     }
     .sub-detail-row {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        font-size: 0.8rem;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 13.5px;
     }
     .sub-detail-label {
-        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--c-muted);
     }
     .sub-detail-value {
-        color: #1e293b;
-        font-weight: 500;
-        margin-left: auto;
-    }
-    :global(.dark) .sub-detail-value {
-        color: #e2e8f0;
-    }
-    .upgrade-btn-full {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        width: 100%;
-        padding: 0.625rem;
-        background: linear-gradient(135deg, #3b82f6, #2563eb);
-        color: white;
-        font-size: 0.8rem;
+        color: var(--c-ink);
         font-weight: 600;
-        border-radius: 0.75rem;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
-        margin-top: 0.25rem;
     }
-    .upgrade-btn-full:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
-    }
-    .wa-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        width: 100%;
-        padding: 0.625rem;
-        background: #dcfce7;
-        color: #166534;
-        font-size: 0.8rem;
-        font-weight: 500;
-        border-radius: 0.75rem;
-        text-decoration: none;
-        transition: background 0.2s;
-    }
-    .wa-btn:hover {
-        background: #bbf7d0;
-    }
-    :global(.dark) .wa-btn {
-        background: #1e3a8a;
-        color: #6ee7b7;
-    }
-
-    /* ---- Form Card ---- */
-    .form-card {
-        background: #fff;
-        border-radius: 1.5rem;
-        border: 1px solid #f1f5f9;
-        padding: 1.25rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-    :global(.dark) .form-card {
-        background: #1e293b;
-        border-color: #334155;
-    }
-    @media (min-width: 640px) {
-        .form-card {
-            padding: 1.5rem;
-        }
-    }
-    .form-title {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 1rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 1rem;
-    }
-    :global(.dark) .form-title {
-        color: #f1f5f9;
-    }
-    .form-fields {
+    .upgrade-actions {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    /* ---- Fields ---- */
-    .field-label {
-        display: block;
-        font-size: 0.8rem;
-        font-weight: 500;
-        color: #475569;
-        margin-bottom: 0.25rem;
-    }
-    :global(.dark) .field-label {
-        color: #94a3b8;
-    }
-    .field-input {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 0.75rem;
-        font-size: 0.875rem;
-        color: #1e293b;
-        background: #f8fafc;
-        outline: none;
-        transition:
-            border-color 0.2s,
-            box-shadow 0.2s;
-        box-sizing: border-box;
-    }
-    :global(.dark) .field-input {
-        background: #0f172a;
-        border-color: #334155;
-        color: #e2e8f0;
-    }
-    .field-input:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-    }
-    .field-disabled {
-        background: #f8fafc;
-        color: #94a3b8;
-        cursor: not-allowed;
-    }
-    :global(.dark) .field-disabled {
-        background: #1e293b;
-        color: #64748b;
-    }
-    .field-hint {
-        font-size: 0.7rem;
-        color: #94a3b8;
-        margin-top: 0.25rem;
-    }
-
-    /* ---- Toggle Switch ---- */
-    .toggle-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 0.5rem 0;
-    }
-    .toggle-label {
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #1e293b;
-    }
-    :global(.dark) .toggle-label {
-        color: #e2e8f0;
-    }
-    .toggle-desc {
-        font-size: 0.75rem;
-        color: #94a3b8;
-    }
-    .toggle-switch {
-        position: relative;
-        width: 2.75rem;
-        height: 1.5rem;
-        border-radius: 99px;
-        border: none;
-        cursor: pointer;
-        transition: background 0.2s;
-        flex-shrink: 0;
-    }
-    .toggle-on {
-        background: #3b82f6;
-    }
-    .toggle-off {
-        background: #cbd5e1;
-    }
-    :global(.dark) .toggle-off {
-        background: #475569;
-    }
-    .toggle-knob {
-        position: absolute;
-        top: 2px;
-        width: 1.25rem;
-        height: 1.25rem;
-        background: white;
-        border-radius: 50%;
-        transition: left 0.2s;
-    }
-    .knob-on {
-        left: calc(100% - 1.25rem - 2px);
-    }
-    .knob-off {
-        left: 2px;
+        gap: 10px;
     }
 
     /* ---- Messages ---- */
     .msg {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
-        border-radius: 1.5rem;
-        font-size: 0.8rem;
+        gap: 8px;
+        padding: 9px 13px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        margin-top: 16px;
     }
     .msg-success {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-    :global(.dark) .msg-success {
-        background: #1e3a8a;
-        color: #6ee7b7;
+        background: var(--c-success-soft);
+        color: var(--c-success);
     }
     .msg-error {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-    :global(.dark) .msg-error {
-        background: #450a0a;
-        color: #fca5a5;
+        background: var(--c-danger-soft);
+        color: var(--c-danger);
     }
 
-    /* ---- Save Buttons ---- */
-    .save-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        width: 100%;
-        padding: 0.75rem;
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
-        color: white;
-        font-size: 0.875rem;
-        font-weight: 600;
-        border-radius: 0.75rem;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .save-btn:hover:not(:disabled) {
-        background: #1d4ed8;
-    }
-    .save-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .save-btn-dark {
-        background: #334155;
-    }
-    .save-btn-dark:hover:not(:disabled) {
-        background: #1e293b;
-    }
-
-    /* ---- Activity Log ---- */
+    /* ---- Activity ---- */
     .activity-loading {
         display: flex;
         justify-content: center;
-        padding: 1.5rem;
-    }
-    .activity-empty {
-        text-align: center;
-        color: #94a3b8;
-        font-size: 0.85rem;
-        padding: 1.5rem 0;
+        padding: 2rem;
     }
     .activity-list {
         display: flex;
         flex-direction: column;
-        gap: 0;
     }
     .activity-row {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        padding: 0.625rem 0;
-        border-bottom: 1px solid #f1f5f9;
+        gap: 14px;
+        padding: 14px 0;
+        border-top: 1px solid var(--c-line-soft);
     }
-    :global(.dark) .activity-row {
-        border-color: #334155;
+    .activity-row:first-child {
+        border-top: none;
     }
-    .activity-row:last-child {
-        border-bottom: none;
-    }
-    .activity-dot {
-        width: 0.5rem;
-        height: 0.5rem;
-        border-radius: 50%;
-        background: #3b82f6;
+    .activity-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: var(--radius);
+        background: var(--c-primary-soft);
+        color: var(--c-primary-deep);
+        display: flex;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
     }
     .activity-info {
         flex: 1;
-        display: flex;
-        flex-direction: column;
         min-width: 0;
     }
     .activity-action {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #1e293b;
-    }
-    :global(.dark) .activity-action {
-        color: #e2e8f0;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--c-ink);
     }
     .activity-count {
-        font-size: 0.7rem;
-        color: #94a3b8;
+        font-size: 12.5px;
+        color: var(--c-muted);
+        margin-top: 2px;
     }
     .activity-date {
-        font-size: 0.7rem;
-        color: #94a3b8;
+        font-size: 12px;
+        color: var(--c-faint);
         white-space: nowrap;
     }
 
-    /* ---- Danger Zone ---- */
-    .danger-card {
-        border-color: #fecaca;
-    }
-    :global(.dark) .danger-card {
-        border-color: #450a0a;
-    }
-    .danger-title {
-        color: #ef4444 !important;
-    }
-    .danger-desc {
-        font-size: 0.8rem;
-        color: #64748b;
-        margin-bottom: 1rem;
-        line-height: 1.5;
-    }
-    .delete-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.625rem 1.25rem;
-        background: #fee2e2;
-        color: #dc2626;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border-radius: 0.75rem;
-        border: 1px solid #fecaca;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .delete-btn:hover {
-        background: #fecaca;
+    /* ---- Danger card ---- */
+    :global(.danger-card) {
+        border-color: var(--c-danger-soft) !important;
     }
 
-    /* ---- Modals ---- */
+    /* ---- Modal ---- */
     .modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.5);
+        background: rgba(15, 33, 28, 0.5);
         backdrop-filter: blur(4px);
         display: flex;
         align-items: center;
@@ -1714,183 +1564,50 @@
         padding: 1rem;
     }
     .modal-content {
-        background: #fff;
-        border-radius: 1rem;
+        background: var(--c-surface);
+        border-radius: var(--radius-lg);
         width: 100%;
         max-width: 24rem;
         overflow: hidden;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-    }
-    :global(.dark) .modal-content {
-        background: #1e293b;
+        box-shadow: var(--shadow-lg);
     }
     .modal-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 1rem 1.25rem;
-        border-bottom: 1px solid #f1f5f9;
-    }
-    :global(.dark) .modal-header {
-        border-color: #334155;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--c-line);
     }
     .modal-title {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        font-size: 1rem;
-        font-weight: 600;
-        color: #1e293b;
-    }
-    :global(.dark) .modal-title {
-        color: #f1f5f9;
+        gap: 8px;
+        font-size: 16px;
+        font-weight: 800;
     }
     .modal-close {
         background: none;
         border: none;
-        color: #94a3b8;
-        font-size: 1.25rem;
+        color: var(--c-faint);
+        font-size: 22px;
+        line-height: 1;
         cursor: pointer;
-        padding: 0.25rem;
+        padding: 4px;
     }
     .modal-body {
-        padding: 1.25rem;
+        padding: 20px;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 14px;
     }
-
-    /* ---- Delete Modal ---- */
     .delete-warning {
-        font-size: 0.85rem;
-        color: #64748b;
+        font-size: 13.5px;
+        color: var(--c-muted);
         line-height: 1.5;
-    }
-    :global(.dark) .delete-warning {
-        color: #94a3b8;
     }
     .delete-actions {
         display: flex;
-        gap: 0.75rem;
+        gap: 10px;
         justify-content: flex-end;
-    }
-    .cancel-btn {
-        padding: 0.5rem 1rem;
-        background: #f1f5f9;
-        color: #475569;
-        border: none;
-        border-radius: 0.5rem;
-        font-size: 0.85rem;
-        cursor: pointer;
-        font-weight: 500;
-    }
-    .cancel-btn:hover {
-        background: #e2e8f0;
-    }
-    .confirm-delete-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.5rem 1rem;
-        background: #ef4444;
-        color: white;
-        border: none;
-        border-radius: 0.5rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-    .confirm-delete-btn:hover:not(:disabled) {
-        background: #dc2626;
-    }
-    .confirm-delete-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    /* ---- Upgrade Modal ---- */
-    .price-box {
-        text-align: center;
-        padding: 1rem;
-        background: linear-gradient(135deg, #dbeafe, #eff6ff);
-        border-radius: 0.75rem;
-    }
-    :global(.dark) .price-box {
-        background: linear-gradient(135deg, #1e3a8a, #1e40af);
-    }
-    .price-amount {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: #2563eb;
-    }
-    :global(.dark) .price-amount {
-        color: #6ee7b7;
-    }
-    .price-period {
-        font-size: 0.8rem;
-        color: #64748b;
-    }
-    .price-alt {
-        font-size: 0.75rem;
-        color: #94a3b8;
-        margin-top: 0.25rem;
-    }
-    .transfer-box {
-        background: #f8fafc;
-        padding: 0.75rem;
-        border-radius: 0.75rem;
-        border: 1px solid #e2e8f0;
-    }
-    :global(.dark) .transfer-box {
-        background: #0f172a;
-        border-color: #334155;
-    }
-    .transfer-label {
-        font-size: 0.75rem;
-        color: #94a3b8;
-        margin-bottom: 0.25rem;
-    }
-    .transfer-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .transfer-number {
-        font-weight: 700;
-        font-size: 0.9rem;
-        color: #1e293b;
-    }
-    :global(.dark) .transfer-number {
-        color: #f1f5f9;
-    }
-    .copy-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        font-size: 0.75rem;
-        color: #3b82f6;
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-weight: 500;
-    }
-    .wa-confirm-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        width: 100%;
-        padding: 0.75rem;
-        background: #22c55e;
-        color: white;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border-radius: 0.75rem;
-        text-decoration: none;
-        transition: background 0.2s;
-    }
-    .wa-confirm-btn:hover {
-        background: #16a34a;
     }
 </style>

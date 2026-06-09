@@ -25,6 +25,10 @@
   import PageHeader from '../components/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
   import EmptyState from '../components/EmptyState.svelte';
+  import Card from '../components/ui/Card.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
+  import ProgressBar from '../components/ui/ProgressBar.svelte';
   import { ApiService } from '../services/api';
   import { showToast } from '../services/toast.svelte.js';
 
@@ -459,6 +463,27 @@
   function typeLabel(packageType) {
     return PACKAGE_TYPES.find((type) => type.value === packageType)?.label || packageType;
   }
+
+  // Deterministic brand color per package type for the card/drawer gradient banner.
+  const TYPE_COLORS = {
+    umroh_reguler: '#1B7F5A',
+    umroh_plus: '#0F3D2E',
+    haji_khusus: '#C99A2E',
+    haji_onh_plus: '#2563a8',
+  };
+  function brandColor(pkg) {
+    return TYPE_COLORS[pkg?.package_type] || '#1B7F5A';
+  }
+
+  // Trip duration in days (inclusive) from departure → return, when both exist.
+  function durationDays(pkg) {
+    if (!pkg?.departure_date || !pkg?.return_date) return null;
+    const start = new Date(pkg.departure_date);
+    const end = new Date(pkg.return_date);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+    const diff = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    return diff > 0 ? diff : null;
+  }
 </script>
 
 <div class="flex h-screen flex-col bg-slate-50">
@@ -470,14 +495,7 @@
     >
       {#snippet actions()}
         {#if canEditPackages}
-          <button
-            type="button"
-            onclick={openCreateForm}
-            class="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary-600/30 transition-all hover:bg-primary-700 hover:shadow-md"
-          >
-            <Plus class="h-4 w-4" />
-            Buat Paket
-          </button>
+          <Button variant="primary" icon={Plus} onclick={openCreateForm}>Buat Paket</Button>
         {/if}
       {/snippet}
     </PageHeader>
@@ -491,19 +509,12 @@
     </div>
 
     <!-- Filter tabs -->
-    <div class="mt-5 flex gap-1 overflow-x-auto pb-0.5">
-      {#each STATUS_TABS as tab}
-        <button
-          type="button"
-          onclick={() => (filterStatus = tab.id)}
-          class="flex-shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all
-            {filterStatus === tab.id
-              ? 'bg-primary-600 text-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}"
-        >
-          {tab.label}
-        </button>
-      {/each}
+    <div class="mt-5 overflow-x-auto pb-0.5">
+      <FilterTabs
+        tabs={STATUS_TABS.map((tab) => ({ value: tab.id, label: tab.label }))}
+        value={filterStatus}
+        onChange={(value) => (filterStatus = value)}
+      />
     </div>
 
     <!-- Package grid -->
@@ -525,13 +536,14 @@
       {:else}
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {#each filtered as pkg}
-            <button
-              type="button"
-              onclick={() => openDetail(pkg)}
-              class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <!-- Gradient banner -->
-              <div class="relative flex min-h-[104px] flex-col justify-end bg-gradient-to-br from-primary-600 to-primary-700 p-4">
+            {@const accent = brandColor(pkg)}
+            {@const duration = durationDays(pkg)}
+            <Card hover pad={false} onclick={() => openDetail(pkg)} style="overflow:hidden;display:flex;flex-direction:column">
+              <!-- Gradient brand banner -->
+              <div
+                class="relative flex min-h-[104px] flex-col justify-end p-4"
+                style="background:linear-gradient(120deg, {accent}, {accent}cc)"
+              >
                 <div class="absolute right-3.5 top-3.5">
                   <StatusBadge status={pkg.status} size="xs" />
                 </div>
@@ -542,7 +554,7 @@
                     <Lock class="h-3.5 w-3.5" /> Internal
                   {/if}
                 </div>
-                <h3 class="font-serif text-[19px] font-bold leading-tight text-white drop-shadow-sm">
+                <h3 class="font-serif text-[20px] font-bold leading-tight text-white" style="text-shadow:0 1px 8px rgba(0,0,0,.2)">
                   {pkg.name}
                 </h3>
                 <p class="mt-0.5 text-[12px] font-medium text-white/85">{typeLabel(pkg.package_type)}</p>
@@ -550,11 +562,17 @@
 
               <!-- Body -->
               <div class="flex flex-1 flex-col gap-3.5 p-5">
-                <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-slate-500">
+                <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px]" style="color:var(--c-muted)">
                   <span class="flex items-center gap-1.5">
                     <CalendarDays class="h-3.5 w-3.5 flex-shrink-0" />
                     {formatDate(pkg.departure_date)} - {formatDate(pkg.return_date)}
                   </span>
+                  {#if duration}
+                    <span class="flex items-center gap-1.5">
+                      <Layers class="h-3.5 w-3.5 flex-shrink-0" />
+                      {duration} hari
+                    </span>
+                  {/if}
                   <span class="flex items-center gap-1.5">
                     <Plane class="h-3.5 w-3.5 flex-shrink-0" />
                     {pkg.airline || '-'} {#if pkg.flight_number_go}&middot; {pkg.flight_number_go}{/if}
@@ -566,33 +584,32 @@
                 </div>
 
                 <div>
-                  <div class="mb-1 flex items-center justify-between text-[11.5px]">
-                    <span class="font-semibold text-slate-500">Kuota terisi</span>
-                    <span class="font-bold tabular text-[#10211c]" style="font-variant-numeric:tabular-nums">{pkg.reserved_seats}/{pkg.total_seats}</span>
+                  <div class="mb-1.5 flex items-center justify-between text-[12px]">
+                    <span class="font-semibold" style="color:var(--c-muted)">Kuota terisi</span>
+                    <span class="font-bold" style="font-variant-numeric:tabular-nums;color:var(--c-ink)">{pkg.reserved_seats}/{pkg.total_seats}</span>
                   </div>
-                  <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      class="h-full rounded-full {pkg.reserved_seats >= pkg.total_seats ? 'bg-red-400' : 'bg-primary-600'}"
-                      style="width: {pkg.total_seats > 0 ? Math.min(100, Math.round((pkg.reserved_seats / pkg.total_seats) * 100)) : 0}%"
-                    ></div>
-                  </div>
+                  <ProgressBar
+                    value={pkg.reserved_seats}
+                    max={pkg.total_seats}
+                    color={pkg.reserved_seats >= pkg.total_seats ? 'var(--c-danger)' : accent}
+                  />
                 </div>
 
-                <div class="mt-auto flex items-end justify-between border-t border-slate-100 pt-3.5">
+                <div class="mt-auto flex items-end justify-between border-t pt-3.5" style="border-color:var(--c-line-soft)">
                   <div>
-                    <p class="text-[11.5px] font-semibold text-slate-400">Mulai dari</p>
+                    <p class="text-[11.5px] font-semibold" style="color:var(--c-faint)">Mulai dari</p>
                     {#if getLowestPrice(pkg)}
-                      <p class="text-[19px] font-extrabold tabular text-[#10211c]" style="font-variant-numeric:tabular-nums">{formatIDR(getLowestPrice(pkg))}</p>
+                      <p class="text-[19px] font-extrabold" style="font-variant-numeric:tabular-nums;color:var(--c-ink)">{formatIDR(getLowestPrice(pkg))}</p>
                     {:else}
-                      <p class="text-sm font-semibold text-slate-400">Harga belum diatur</p>
+                      <p class="text-sm font-semibold" style="color:var(--c-faint)">Harga belum diatur</p>
                     {/if}
                   </div>
-                  <span class="flex items-center gap-1 text-[12.5px] font-bold text-primary-600">
+                  <span class="flex items-center gap-1 text-[12.5px] font-bold" style="color:var(--c-primary)">
                     Detail <ChevronRight class="h-4 w-4" />
                   </span>
                 </div>
               </div>
-            </button>
+            </Card>
           {/each}
         </div>
       {/if}
@@ -626,6 +643,23 @@
           {typeLabel(selectedPackage.package_type)}
         </span>
       </div>
+
+      <!-- Brand price hero (Suluk design) -->
+      {#if getLowestPrice(selectedPackage)}
+        <div
+          class="rounded-2xl p-5 text-white"
+          style="background:linear-gradient(120deg, {brandColor(selectedPackage)}, {brandColor(selectedPackage)}cc)"
+        >
+          <p class="text-xs font-bold uppercase tracking-[0.04em] text-white/85">Mulai dari / Jamaah</p>
+          <p class="mt-1 text-[30px] font-extrabold" style="font-variant-numeric:tabular-nums">{formatIDR(getLowestPrice(selectedPackage))}</p>
+          <p class="mt-1 text-[13px] text-white/90">
+            {selectedPackage.reserved_seats} dari {selectedPackage.total_seats} kursi terisi
+            {#if getLowestPrice(selectedPackage) && selectedPackage.reserved_seats > 0}
+              &middot; {formatIDR(getLowestPrice(selectedPackage) * selectedPackage.reserved_seats)} potensi omzet
+            {/if}
+          </p>
+        </div>
+      {/if}
 
       <div class="rounded-2xl border border-slate-100 p-4">
         <div class="mb-3 flex items-center gap-2">

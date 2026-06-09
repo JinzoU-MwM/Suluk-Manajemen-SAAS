@@ -9,6 +9,9 @@
   import PageHeader from '../components/PageHeader.svelte';
   import StatCard from '../components/StatCard.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import Card from '../components/ui/Card.svelte';
+  import Button from '../components/ui/Button.svelte';
+  import FilterTabs from '../components/ui/FilterTabs.svelte';
   import { showToast } from '../services/toast.svelte.js';
   import { ApiService } from '../services/api.js';
 
@@ -48,6 +51,15 @@
     rejected: 'red',
   };
 
+  const FILTER_TABS = [
+    { value: 'all', label: 'Semua' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'approved', label: 'Disetujui' },
+    { value: 'processed', label: 'Diproses' },
+    { value: 'completed', label: 'Selesai' },
+    { value: 'rejected', label: 'Ditolak' },
+  ];
+
   async function loadData() {
     loading = true;
     try {
@@ -63,6 +75,11 @@
     } finally {
       loading = false;
     }
+  }
+
+  function setFilter(v) {
+    statusFilter = v;
+    loadData();
   }
 
   onMount(() => { loadData(); });
@@ -143,12 +160,10 @@
   <PageHeader
     kicker="Pembatalan"
     title="Pembatalan & Refund"
-    subtitle="Kelola pengembalian dana dan kebijakan refund."
+    subtitle="Kelola pengajuan pembatalan jamaah dan proses pengembalian dana sesuai kebijakan."
   >
     {#snippet actions()}
-      <button type="button" onclick={openNewPolicy} class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-        <Plus class="h-4 w-4" /> Kebijakan
-      </button>
+      <Button variant="ghost" icon={Plus} onclick={openNewPolicy}>Kebijakan</Button>
     {/snippet}
   </PageHeader>
 
@@ -158,91 +173,97 @@
     <!-- Summary -->
     {@const s = summary()}
     <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <StatCard icon={Wallet} label="Total Refund" value={formatIDR(s.totalAmount)} accent="#c0392b" />
-      <StatCard icon={XCircle} label="Menunggu Approval" value={String(s.pending)} accent="#C99A2E" />
-      <StatCard icon={CheckCheck} label="Disetujui" value={String(s.approved)} accent="#2563a8" />
-      <StatCard icon={CheckCircle} label="Selesai" value={String(s.completed)} accent="#1B7F5A" />
+      <StatCard icon={Wallet} label="Total Refund" value={formatIDR(s.totalAmount)} accent="var(--c-danger)" />
+      <StatCard icon={XCircle} label="Menunggu Approval" value={String(s.pending)} accent="var(--c-warning)" />
+      <StatCard icon={CheckCheck} label="Disetujui" value={String(s.approved)} accent="var(--c-info)" />
+      <StatCard icon={CheckCircle} label="Selesai" value={String(s.completed)} accent="var(--c-success)" />
     </div>
 
     <!-- Policies bar -->
-    <div class="mb-4 flex flex-wrap gap-2">
-      {#each policies as p}
-        <span class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-          {p.name}: {p.refund_pct}% @ {p.days_before}h
-          <button type="button" onclick={() => editPolicy(p)} class="ml-1 text-slate-400 hover:text-slate-600"><Pencil class="h-3 w-3" /></button>
-        </span>
-      {/each}
-    </div>
+    {#if policies.length}
+      <div class="mb-4 flex flex-wrap gap-2">
+        {#each policies as p}
+          <span
+            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
+            style="background:var(--c-bg-2);color:var(--c-muted)"
+          >
+            {p.name}: {p.refund_pct}% @ {p.days_before}h
+            <button type="button" onclick={() => editPolicy(p)} class="ml-0.5" style="color:var(--c-faint)" aria-label="Edit kebijakan"><Pencil class="h-3 w-3" /></button>
+          </span>
+        {/each}
+      </div>
+    {/if}
 
     <!-- Filter -->
-    <div class="mb-4 flex items-center gap-2">
-      <select bind:value={statusFilter} onchange={loadData} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 outline-none focus:border-primary-400">
-        <option value="all">Semua Status</option>
-        <option value="pending">Pending</option>
-        <option value="approved">Disetujui</option>
-        <option value="processed">Diproses</option>
-        <option value="completed">Selesai</option>
-        <option value="rejected">Ditolak</option>
-      </select>
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+      <FilterTabs tabs={FILTER_TABS} value={statusFilter} onChange={setFilter} />
     </div>
 
     <!-- Refund Table -->
-    <div class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+    <Card pad={false} style="padding:8px 4px">
       {#if refunds.length === 0}
-        <div class="flex flex-col items-center justify-center py-16 text-slate-400">
-          <ShieldAlert class="h-10 w-10 mb-2" />
+        <div class="flex flex-col items-center justify-center py-16" style="color:var(--c-faint)">
+          <ShieldAlert class="mb-2 h-10 w-10" />
           <p class="text-sm">Belum ada data refund</p>
         </div>
       {:else}
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left">
-              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Invoice</th>
-              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Jumlah</th>
-              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">%</th>
-              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Alasan</th>
-              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
-              <th class="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Tanggal</th>
-              <th class="px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each refunds as r}
-              <tr class="cursor-pointer transition-colors hover:bg-primary-50/30" onclick={() => openRefundDetail(r)}>
-                <td class="border-b border-slate-100 px-4 py-3.5">
-                  <div class="flex items-center gap-3">
-                    <Avatar name={r.jamaah_name || r.invoice_id || '?'} size={36} />
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-semibold text-[#10211c]">{r.jamaah_name || 'Jamaah'}</p>
-                      <p class="truncate font-mono text-xs text-slate-400">{r.invoice_id?.substring(0, 8)}...</p>
-                    </div>
-                  </div>
-                </td>
-                <td class="border-b border-slate-100 px-4 py-3.5 font-semibold text-slate-800" style="font-variant-numeric:tabular-nums">{formatIDR(r.amount)}</td>
-                <td class="border-b border-slate-100 px-4 py-3.5 text-slate-600">{r.refund_pct}%</td>
-                <td class="border-b border-slate-100 px-4 py-3.5 max-w-[150px] truncate text-xs text-slate-500">{r.reason || '-'}</td>
-                <td class="border-b border-slate-100 px-4 py-3.5"><StatusBadge status={r.status} size="xs" /></td>
-                <td class="border-b border-slate-100 px-4 py-3.5 text-xs text-slate-500">{formatDate(r.created_at)}</td>
-                <td class="border-b border-slate-100 px-4 py-3.5 text-right">
-                  <div role="presentation" class="flex items-center justify-end gap-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
-                    {#if r.status === 'pending'}
-                      <button type="button" onclick={() => refundAction(r.id, 'approve')} class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"><CheckCheck class="h-3 w-3 inline mr-1" />Setuju</button>
-                      <button type="button" onclick={() => refundAction(r.id, 'reject')} class="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-200"><Ban class="h-3 w-3 inline mr-1" />Tolak</button>
-                    {/if}
-                    {#if r.status === 'approved'}
-                      <button type="button" onclick={() => refundAction(r.id, 'process')} class="rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-200"><RotateCcw class="h-3 w-3 inline mr-1" />Proses</button>
-                    {/if}
-                    {#if r.status === 'processed'}
-                      <button type="button" onclick={() => refundAction(r.id, 'complete')} class="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"><CheckCheck class="h-3 w-3 inline mr-1" />Selesai</button>
-                    {/if}
-                  </div>
-                </td>
+        <div class="overflow-x-auto">
+          <table class="w-full" style="border-collapse:collapse;font-size:13.5px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Jamaah</th>
+                <th style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Jumlah</th>
+                <th style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">%</th>
+                <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Alasan</th>
+                <th style="text-align:center;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Status</th>
+                <th style="text-align:left;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Tanggal</th>
+                <th style="text-align:right;padding:0 16px 12px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c-faint);white-space:nowrap;border-bottom:1px solid var(--c-line)">Aksi</th>
               </tr>
-            {/each}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {#each refunds as r}
+                <tr
+                  class="cursor-pointer transition-colors"
+                  style="transition:background .12s"
+                  onclick={() => openRefundDetail(r)}
+                  onmouseenter={(e) => e.currentTarget.style.background = 'var(--c-primary-tint)'}
+                  onmouseleave={(e) => e.currentTarget.style.background = ''}
+                >
+                  <td style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle">
+                    <div class="flex items-center gap-3">
+                      <Avatar name={r.jamaah_name || r.invoice_id || '?'} size={36} />
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-bold" style="color:var(--c-ink)">{r.jamaah_name || 'Jamaah'}</p>
+                        <p class="truncate font-mono text-xs" style="color:var(--c-faint)">{r.invoice_id?.substring(0, 8)}...</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="tabular" style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);text-align:right;font-weight:800;color:var(--c-ink);font-variant-numeric:tabular-nums;white-space:nowrap">{formatIDR(r.amount)}</td>
+                  <td class="tabular" style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);text-align:right;color:var(--c-ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap">{r.refund_pct}%</td>
+                  <td style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;max-width:160px;color:var(--c-muted);font-size:12.5px" class="truncate">{r.reason || '-'}</td>
+                  <td style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);text-align:center;white-space:nowrap"><StatusBadge status={r.status} size="xs" /></td>
+                  <td style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);color:var(--c-muted);font-size:12.5px;white-space:nowrap">{formatDate(r.created_at)}</td>
+                  <td style="padding:14px 16px;border-bottom:1px solid var(--c-line-soft);text-align:right;white-space:nowrap">
+                    <div role="presentation" class="flex items-center justify-end gap-1.5" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+                      {#if r.status === 'pending'}
+                        <button type="button" onclick={() => refundAction(r.id, 'approve')} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold" style="background:var(--c-success-soft);color:var(--c-success)"><CheckCheck class="h-3 w-3" />Setuju</button>
+                        <button type="button" onclick={() => refundAction(r.id, 'reject')} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold" style="background:var(--c-danger-soft);color:var(--c-danger)"><Ban class="h-3 w-3" />Tolak</button>
+                      {/if}
+                      {#if r.status === 'approved'}
+                        <button type="button" onclick={() => refundAction(r.id, 'process')} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold" style="background:var(--c-info-soft);color:var(--c-info)"><RotateCcw class="h-3 w-3" />Proses</button>
+                      {/if}
+                      {#if r.status === 'processed'}
+                        <button type="button" onclick={() => refundAction(r.id, 'complete')} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold" style="background:var(--c-success-soft);color:var(--c-success)"><CheckCheck class="h-3 w-3" />Selesai</button>
+                      {/if}
+                    </div>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
       {/if}
-    </div>
+    </Card>
   {/if}
 </div>
 
@@ -250,29 +271,29 @@
 <SlideDrawer open={showPolicyDrawer} onClose={() => showPolicyDrawer = false} title={editingPolicy ? 'Edit Kebijakan Refund' : 'Tambah Kebijakan Refund'} width="480px">
   <div class="flex flex-col gap-4 p-4">
     <div class="flex flex-col gap-1">
-      <label for="pol-name" class="text-xs font-medium text-slate-700">Nama Kebijakan</label>
-      <input id="pol-name" type="text" bind:value={policyForm.name} placeholder="Contoh: 30 hari sebelum keberangkatan" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" />
+      <label for="pol-name" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Nama Kebijakan</label>
+      <input id="pol-name" type="text" bind:value={policyForm.name} placeholder="Contoh: 30 hari sebelum keberangkatan" class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)" />
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1">
-        <label for="pol-days" class="text-xs font-medium text-slate-700">Hari Sebelum</label>
-        <input id="pol-days" type="number" bind:value={policyForm.days_before} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" />
+        <label for="pol-days" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Hari Sebelum</label>
+        <input id="pol-days" type="number" bind:value={policyForm.days_before} class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)" />
       </div>
       <div class="flex flex-col gap-1">
-        <label for="pol-pct" class="text-xs font-medium text-slate-700">Persentase (%)</label>
-        <input id="pol-pct" type="number" bind:value={policyForm.refund_pct} min="0" max="100" step="0.01" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" />
+        <label for="pol-pct" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Persentase (%)</label>
+        <input id="pol-pct" type="number" bind:value={policyForm.refund_pct} min="0" max="100" step="0.01" class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)" />
       </div>
     </div>
     <div class="flex flex-col gap-1">
-      <label for="pol-desc" class="text-xs font-medium text-slate-700">Deskripsi</label>
-      <textarea id="pol-desc" bind:value={policyForm.description} rows="3" placeholder="Optional..." class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400"></textarea>
+      <label for="pol-desc" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Deskripsi</label>
+      <textarea id="pol-desc" bind:value={policyForm.description} rows="3" placeholder="Optional..." class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)"></textarea>
     </div>
     <div class="flex gap-2 pt-2">
-      <button type="button" onclick={() => showPolicyDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-      <button type="button" onclick={savePolicy} disabled={savingPolicy} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingPolicy ? 'Menyimpan...' : editingPolicy ? 'Update' : 'Simpan'}</button>
+      <Button variant="ghost" full onclick={() => showPolicyDrawer = false}>Batal</Button>
+      <Button variant="primary" full disabled={savingPolicy} onclick={savePolicy}>{savingPolicy ? 'Menyimpan...' : editingPolicy ? 'Update' : 'Simpan'}</Button>
     </div>
     {#if editingPolicy}
-      <button type="button" onclick={() => deletePolicy(editingPolicy.id)} class="rounded-xl border border-red-200 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"><Trash2 class="h-4 w-4 inline mr-1" />Hapus Kebijakan</button>
+      <Button variant="danger" full icon={Trash2} onclick={() => deletePolicy(editingPolicy.id)}>Hapus Kebijakan</Button>
     {/if}
   </div>
 </SlideDrawer>
@@ -281,58 +302,58 @@
 <SlideDrawer open={showRefundDrawer} onClose={() => showRefundDrawer = false} title="Detail Refund" width="480px">
   {#if selectedRefund}
     <div class="flex flex-col gap-4 p-4">
-      <div class="rounded-xl border border-slate-100 p-4 space-y-3">
+      <div class="space-y-3 rounded-xl p-4" style="border:1px solid var(--c-line-soft)">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Status</span>
+          <span class="text-xs" style="color:var(--c-muted)">Status</span>
           <StatusBadge status={selectedRefund.status} size="sm" />
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Jumlah</span>
-          <span class="text-sm font-bold text-slate-800">{formatIDR(selectedRefund.amount)}</span>
+          <span class="text-xs" style="color:var(--c-muted)">Jumlah</span>
+          <span class="text-sm font-bold" style="color:var(--c-ink);font-variant-numeric:tabular-nums">{formatIDR(selectedRefund.amount)}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Persentase</span>
-          <span class="text-sm font-semibold text-slate-700">{selectedRefund.refund_pct}%</span>
+          <span class="text-xs" style="color:var(--c-muted)">Persentase</span>
+          <span class="text-sm font-semibold" style="color:var(--c-ink-soft)">{selectedRefund.refund_pct}%</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Invoice</span>
-          <span class="text-xs font-mono text-slate-500">{selectedRefund.invoice_id}</span>
+          <span class="text-xs" style="color:var(--c-muted)">Invoice</span>
+          <span class="font-mono text-xs" style="color:var(--c-muted)">{selectedRefund.invoice_id}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Alasan</span>
-          <span class="text-sm text-slate-700">{selectedRefund.reason || '-'}</span>
+          <span class="text-xs" style="color:var(--c-muted)">Alasan</span>
+          <span class="text-sm" style="color:var(--c-ink-soft)">{selectedRefund.reason || '-'}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Catatan</span>
-          <span class="text-sm text-slate-700">{selectedRefund.notes || '-'}</span>
+          <span class="text-xs" style="color:var(--c-muted)">Catatan</span>
+          <span class="text-sm" style="color:var(--c-ink-soft)">{selectedRefund.notes || '-'}</span>
         </div>
         <div class="flex items-center justify-between">
-          <span class="text-xs text-slate-500">Dibuat</span>
-          <span class="text-sm text-slate-600">{formatDate(selectedRefund.created_at)}</span>
+          <span class="text-xs" style="color:var(--c-muted)">Dibuat</span>
+          <span class="text-sm" style="color:var(--c-muted)">{formatDate(selectedRefund.created_at)}</span>
         </div>
         {#if selectedRefund.approved_at}
           <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-500">Disetujui</span>
-            <span class="text-sm text-slate-600">{formatDate(selectedRefund.approved_at)}</span>
+            <span class="text-xs" style="color:var(--c-muted)">Disetujui</span>
+            <span class="text-sm" style="color:var(--c-muted)">{formatDate(selectedRefund.approved_at)}</span>
           </div>
         {/if}
         {#if selectedRefund.processed_at}
           <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-500">Diproses</span>
-            <span class="text-sm text-slate-600">{formatDate(selectedRefund.processed_at)}</span>
+            <span class="text-xs" style="color:var(--c-muted)">Diproses</span>
+            <span class="text-sm" style="color:var(--c-muted)">{formatDate(selectedRefund.processed_at)}</span>
           </div>
         {/if}
       </div>
       <div class="flex flex-wrap gap-2">
         {#if selectedRefund.status === 'pending'}
-          <button type="button" onclick={() => { refundAction(selectedRefund.id, 'approve'); showRefundDrawer = false; }} class="flex-1 rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Setujui</button>
-          <button type="button" onclick={() => { refundAction(selectedRefund.id, 'reject'); showRefundDrawer = false; }} class="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700">Tolak</button>
+          <Button variant="primary" full onclick={() => { refundAction(selectedRefund.id, 'approve'); showRefundDrawer = false; }}>Setujui</Button>
+          <Button variant="danger" full onclick={() => { refundAction(selectedRefund.id, 'reject'); showRefundDrawer = false; }}>Tolak</Button>
         {/if}
         {#if selectedRefund.status === 'approved'}
-          <button type="button" onclick={() => { refundAction(selectedRefund.id, 'process'); showRefundDrawer = false; }} class="w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">Proses Refund</button>
+          <Button variant="primary" full onclick={() => { refundAction(selectedRefund.id, 'process'); showRefundDrawer = false; }}>Proses Refund</Button>
         {/if}
         {#if selectedRefund.status === 'processed'}
-          <button type="button" onclick={() => { refundAction(selectedRefund.id, 'complete'); showRefundDrawer = false; }} class="w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Tandai Selesai</button>
+          <Button variant="primary" full onclick={() => { refundAction(selectedRefund.id, 'complete'); showRefundDrawer = false; }}>Tandai Selesai</Button>
         {/if}
       </div>
     </div>
