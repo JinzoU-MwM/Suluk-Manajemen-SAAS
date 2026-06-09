@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -112,6 +114,10 @@ func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.Act
 		orgName = org.Name
 	}
 	tier := plan.Get(req.Plan)
+	appURL := strings.TrimSpace(os.Getenv("APP_PUBLIC_URL"))
+	if appURL == "" {
+		appURL = "https://suluk.site"
+	}
 	subject, html := buildInvoiceEmail(invoiceData{
 		OrgName:       orgName,
 		CustomerName:  user.Name,
@@ -123,6 +129,8 @@ func (s *AuthService) SendSubscriptionInvoice(ctx context.Context, req model.Act
 		OrderID:       req.OrderID,
 		StartsAt:      time.Now(),
 		ExpiresAt:     expiresAt,
+		AppURL:        appURL,
+		Features:      tier.Features,
 	})
 	return s.email.Send(ctx, user.Email, subject, html)
 }
