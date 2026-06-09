@@ -1,7 +1,7 @@
 // Service Worker — Jamaah.in PWA
 // Cache static assets only; keep API/dynamic requests network-first to avoid stale data.
 
-const CACHE_NAME = 'jamaah-v2';
+const CACHE_NAME = 'jamaah-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
