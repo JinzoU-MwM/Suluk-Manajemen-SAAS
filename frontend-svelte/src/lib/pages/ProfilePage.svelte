@@ -1,24 +1,29 @@
 <script>
     import { onMount } from "svelte";
     import {
-        User,
         UserCheck,
-        Crown,
+        Building,
         Shield,
         Lock,
         Eye,
+        Mail,
+        Phone,
+        MapPin,
+        Calendar,
         Check,
         CheckCircle,
         AlertCircle,
         Clock,
         Zap,
+        Crown,
         Trash2,
         Activity,
         Bell,
         Moon,
         Sun,
-        FolderOpen,
         BarChart3,
+        LogOut,
+        Image as ImageIcon,
         ChevronRight,
         Sparkles,
         Loader2,
@@ -68,11 +73,12 @@
     const TABS = [
         { id: "profil", label: "Profil Saya", icon: UserCheck },
         { id: "keamanan", label: "Keamanan", icon: Eye },
-        { id: "langganan", label: "Langganan", icon: Crown },
+        { id: "perusahaan", label: "Perusahaan", icon: Building },
         { id: "notifikasi", label: "Notifikasi", icon: Bell },
     ];
 
-    // Edit profile
+    // Edit profile (Profil tab)
+    let editing = $state(false);
     let editName = $state("");
     let savingProfile = $state(false);
     let profileMsg = $state({ type: "", text: "" });
@@ -187,11 +193,18 @@
                 type: "success",
                 text: "Profil berhasil diperbarui!",
             };
+            editing = false;
         } catch (e) {
             profileMsg = { type: "error", text: e.message };
         } finally {
             savingProfile = false;
         }
+    }
+
+    function cancelEdit() {
+        editName = profile?.name || "";
+        profileMsg = { type: "", text: "" };
+        editing = false;
     }
 
     async function selectAvatarColor(color) {
@@ -271,7 +284,7 @@
     }
 
     function formatDate(iso) {
-        if (!iso) return "-";
+        if (!iso) return "—";
         const d = new Date(iso);
         return d.toLocaleDateString("id-ID", {
             day: "numeric",
@@ -280,8 +293,17 @@
         });
     }
 
+    function formatJoin(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        return d.toLocaleDateString("id-ID", {
+            month: "long",
+            year: "numeric",
+        });
+    }
+
     function formatDateTime(iso) {
-        if (!iso) return "-";
+        if (!iso) return "—";
         const d = new Date(iso);
         return d.toLocaleDateString("id-ID", {
             day: "numeric",
@@ -297,7 +319,18 @@
         return action;
     }
 
-    let planLabel = $derived(planMeta(subscription?.plan).name + " Plan");
+    function roleLabel(role) {
+        if (!role) return "Anggota";
+        const map = {
+            owner: "Owner / Direktur Utama",
+            admin: "Administrator",
+            staff: "Staf",
+            member: "Anggota",
+        };
+        return map[role] || role;
+    }
+
+    let planName = $derived(planMeta(subscription?.plan).name);
     let usagePercent = $derived(
         subscription?.usage_limit
             ? Math.min(
@@ -324,6 +357,7 @@
             subscription?.max_groups ?? planMeta(subscription?.plan).maxGroups,
         ),
     );
+    let pro = $derived(isProOrHigher(subscription?.plan));
 </script>
 
 <div class="profile-page">
@@ -335,12 +369,10 @@
         <PageHeader
             kicker="Pengaturan Akun"
             title="Profil Saya"
-            subtitle="Kelola informasi pribadi, langganan, keamanan, dan preferensi akun Anda."
+            subtitle="Kelola informasi pribadi, keamanan, dan preferensi akun Anda."
         >
             {#snippet actions()}
-                <Button variant="ghost" icon={darkMode ? Sun : Moon} onclick={toggleDarkMode}>
-                    {darkMode ? "Mode Terang" : "Mode Gelap"}
-                </Button>
+                <Button variant="ghost" icon={LogOut} onclick={onLogout}>Keluar</Button>
             {/snippet}
         </PageHeader>
 
@@ -360,32 +392,41 @@
         </div>
 
         <div class="profile-grid">
-            <!-- Left: Summary + Nav -->
+            <!-- LEFT: Summary + Nav -->
             <div class="profile-col-left">
                 <Card pad={false} style="overflow:hidden">
                     <div class="summary-banner">
-                        <Sparkles
-                            size={90}
-                            class="banner-spark"
-                        />
+                        <Sparkles size={90} class="banner-spark" />
                     </div>
                     <div class="summary-body">
                         <div class="summary-avatar-wrap">
-                            <div class="summary-avatar-ring" style="background:{avatarHex}1f">
-                                <span class="summary-avatar-initial" style="color:{avatarHex}">
+                            <div class="summary-avatar-ring">
+                                <div
+                                    class="summary-avatar"
+                                    style="background:{avatarHex}1f;color:{avatarHex}"
+                                >
                                     {profile.name?.charAt(0)?.toUpperCase() || "U"}
-                                </span>
+                                </div>
                             </div>
+                            <button
+                                type="button"
+                                class="summary-avatar-cam"
+                                title="Ubah foto"
+                                aria-label="Ubah foto profil"
+                                onclick={() => (tab = "profil")}
+                            >
+                                <ImageIcon size={14} />
+                            </button>
                         </div>
                         <div class="summary-name">{profile.name}</div>
-                        <div class="summary-email">{profile.email}</div>
+                        <div class="summary-role">{roleLabel(profile.role)}</div>
                         <div class="summary-badges">
+                            <Badge tone={pro ? "warning" : "info"} dot>
+                                {planName} Plan
+                            </Badge>
                             {#if profile.is_admin}
                                 <Badge tone="success" dot>Admin</Badge>
                             {/if}
-                            <Badge tone={isProOrHigher(subscription?.plan) ? "warning" : "info"}>
-                                {planLabel}
-                            </Badge>
                         </div>
 
                         <div class="summary-stats">
@@ -405,10 +446,52 @@
                             </div>
                             <div class="summary-stat summary-stat-bordered">
                                 <div class="summary-stat-value tabular">
-                                    {formatDate(profile.created_at)}
+                                    {formatJoin(profile.created_at)}
                                 </div>
                                 <div class="summary-stat-label">Bergabung</div>
                             </div>
+                        </div>
+
+                        <!-- Subscription block (folded into summary) -->
+                        <div class="plan-block">
+                            <div class="plan-block-row">
+                                <div class="plan-block-icon">
+                                    {#if pro}<Crown size={16} />{:else}<Zap size={16} />{/if}
+                                </div>
+                                <div class="plan-block-info">
+                                    <div class="plan-block-name">{planName} Plan</div>
+                                    <div class="plan-block-desc">
+                                        {planMeta(subscription?.plan).desc}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {#if !pro && subscription?.usage_limit}
+                                <div class="plan-usage">
+                                    <div class="plan-usage-head">
+                                        <span>Kuota scan</span>
+                                        <span class="tabular">{usagePercent}%</span>
+                                    </div>
+                                    <ProgressBar value={usagePercent} max={100} color={usageColor} />
+                                </div>
+                            {/if}
+
+                            {#if !pro}
+                                <Button
+                                    variant="accent"
+                                    size="sm"
+                                    icon={Crown}
+                                    full
+                                    onclick={onUpgradeRequest}
+                                >
+                                    Upgrade ke Pro
+                                </Button>
+                                {#if trialStatus?.can_activate}
+                                    <Button variant="soft" size="sm" full onclick={onUpgradeRequest}>
+                                        Coba 7 Hari Gratis
+                                    </Button>
+                                {/if}
+                            {/if}
                         </div>
                     </div>
                 </Card>
@@ -439,7 +522,7 @@
                 {/if}
             </div>
 
-            <!-- Right: Active panel -->
+            <!-- RIGHT: Active panel -->
             <div class="profile-col-right">
                 {#if tab === "profil"}
                     <Card>
@@ -450,32 +533,92 @@
                                     Data ini ditampilkan pada akun internal dan dokumen travel.
                                 </div>
                             </div>
+                            {#if editing}
+                                <div class="section-head-actions">
+                                    <Button variant="ghost" size="sm" onclick={cancelEdit}>Batal</Button>
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        icon={Check}
+                                        onclick={saveProfile}
+                                        disabled={savingProfile || !editName.trim()}
+                                    >
+                                        {savingProfile ? "Menyimpan…" : "Simpan"}
+                                    </Button>
+                                </div>
+                            {:else}
+                                <Button
+                                    variant="soft"
+                                    size="sm"
+                                    icon={UserCheck}
+                                    onclick={() => (editing = true)}
+                                >
+                                    Edit
+                                </Button>
+                            {/if}
                         </div>
 
                         <div class="fields-grid">
+                            <!-- Nama -->
                             <div class="field">
-                                <label class="field-label" for="profile-email">Email</label>
-                                <input
-                                    id="profile-email"
-                                    type="email"
-                                    value={profile.email}
-                                    disabled
-                                    class="field-input field-disabled"
-                                />
-                                <p class="field-hint">Email tidak dapat diubah</p>
+                                <label class="field-label" for="f-name">Nama Lengkap</label>
+                                {#if editing}
+                                    <input
+                                        id="f-name"
+                                        type="text"
+                                        bind:value={editName}
+                                        class="field-input"
+                                        placeholder="Nama lengkap"
+                                    />
+                                {:else}
+                                    <div class="field-view">{profile.name || "—"}</div>
+                                {/if}
                             </div>
+                            <!-- Jabatan -->
                             <div class="field">
-                                <label class="field-label" for="profile-name">Nama Lengkap</label>
-                                <input
-                                    id="profile-name"
-                                    type="text"
-                                    bind:value={editName}
-                                    class="field-input"
-                                    placeholder="Nama lengkap"
-                                />
+                                <span class="field-label">Jabatan</span>
+                                <div class="field-view">{roleLabel(profile.role)}</div>
+                            </div>
+                            <!-- Email -->
+                            <div class="field">
+                                <span class="field-label">Email</span>
+                                <div class="field-view">
+                                    <Mail size={16} class="field-ic" />
+                                    {profile.email || "—"}
+                                </div>
+                            </div>
+                            <!-- Telepon -->
+                            <div class="field">
+                                <span class="field-label">No. Telepon</span>
+                                <div class="field-view">
+                                    <Phone size={16} class="field-ic" />
+                                    {profile.phone || "—"}
+                                </div>
+                            </div>
+                            <!-- Kota -->
+                            <div class="field">
+                                <span class="field-label">Kota</span>
+                                <div class="field-view">
+                                    <MapPin size={16} class="field-ic" />
+                                    {profile.city || "—"}
+                                </div>
+                            </div>
+                            <!-- Bergabung -->
+                            <div class="field">
+                                <span class="field-label">Bergabung Sejak</span>
+                                <div class="field-view">
+                                    <Calendar size={16} class="field-ic" />
+                                    {formatJoin(profile.created_at)}
+                                </div>
+                            </div>
+                            <!-- Bio (full) -->
+                            <div class="field field-full">
+                                <span class="field-label">Bio</span>
+                                <div class="field-bio">{profile.bio || "—"}</div>
                             </div>
                         </div>
 
+                        <!-- Avatar color picker -->
                         <div class="avatar-picker">
                             <span class="field-label" style="margin:0">Warna Avatar</span>
                             <div class="color-options">
@@ -502,125 +645,6 @@
                                 {profileMsg.text}
                             </div>
                         {/if}
-
-                        <div class="section-action">
-                            <Button
-                                variant="primary"
-                                icon={Check}
-                                onclick={saveProfile}
-                                disabled={savingProfile || editName.trim() === profile.name}
-                            >
-                                {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
-                            </Button>
-                        </div>
-                    </Card>
-
-                    <Card>
-                        <div class="section-head">
-                            <div>
-                                <div class="section-title">Aktivitas Terakhir</div>
-                                <div class="section-desc">Riwayat scan dokumen terbaru.</div>
-                            </div>
-                            <div class="section-icon">
-                                <Activity size={19} />
-                            </div>
-                        </div>
-
-                        {#if loadingActivity}
-                            <div class="activity-loading">
-                                <Loader2 class="h-5 w-5 animate-spin" style="color:var(--c-faint)" />
-                            </div>
-                        {:else if activities.length === 0}
-                            <EmptyState
-                                icon={Activity}
-                                title="Belum ada aktivitas"
-                                text="Aktivitas scan dokumen Anda akan muncul di sini."
-                            />
-                        {:else}
-                            <div class="activity-list">
-                                {#each activities as act}
-                                    <div class="activity-row">
-                                        <div class="activity-icon">
-                                            <BarChart3 size={18} />
-                                        </div>
-                                        <div class="activity-info">
-                                            <div class="activity-action">{actionLabel(act.action)}</div>
-                                            <div class="activity-count">{act.count} dokumen</div>
-                                        </div>
-                                        <span class="activity-date">{formatDateTime(act.created_at)}</span>
-                                    </div>
-                                {/each}
-                            </div>
-                        {/if}
-                    </Card>
-                {:else if tab === "keamanan"}
-                    <Card>
-                        <div class="section-head">
-                            <div>
-                                <div class="section-title">Kata Sandi</div>
-                                <div class="section-desc">
-                                    Perbarui sandi secara berkala untuk menjaga keamanan akun.
-                                </div>
-                            </div>
-                            <div class="section-icon">
-                                <Lock size={19} />
-                            </div>
-                        </div>
-
-                        <div class="fields-grid">
-                            <div class="field field-full">
-                                <label class="field-label" for="current-password">Password Saat Ini</label>
-                                <input
-                                    id="current-password"
-                                    type="password"
-                                    bind:value={currentPassword}
-                                    class="field-input"
-                                    placeholder="Masukkan password saat ini"
-                                />
-                            </div>
-                            <div class="field">
-                                <label class="field-label" for="new-password">Password Baru</label>
-                                <input
-                                    id="new-password"
-                                    type="password"
-                                    bind:value={newPassword}
-                                    class="field-input"
-                                    placeholder="Minimal 6 karakter"
-                                />
-                            </div>
-                            <div class="field">
-                                <label class="field-label" for="confirm-password">Konfirmasi Password Baru</label>
-                                <input
-                                    id="confirm-password"
-                                    type="password"
-                                    bind:value={confirmPassword}
-                                    class="field-input"
-                                    placeholder="Ulangi password baru"
-                                />
-                            </div>
-                        </div>
-
-                        {#if passwordMsg.text}
-                            <div class="msg {passwordMsg.type === 'success' ? 'msg-success' : 'msg-error'}">
-                                {#if passwordMsg.type === "success"}
-                                    <CheckCircle class="h-4 w-4" />
-                                {:else}
-                                    <AlertCircle class="h-4 w-4" />
-                                {/if}
-                                {passwordMsg.text}
-                            </div>
-                        {/if}
-
-                        <div class="section-action">
-                            <Button
-                                variant="primary"
-                                icon={Check}
-                                onclick={savePassword}
-                                disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
-                            >
-                                {savingPassword ? "Mengubah..." : "Perbarui Sandi"}
-                            </Button>
-                        </div>
                     </Card>
 
                     <Card>
@@ -651,153 +675,282 @@
                         </div>
                     </Card>
 
-                    <Card class="danger-card">
+                    <Card>
                         <div class="section-head">
                             <div>
-                                <div class="section-title" style="color:var(--c-danger)">Zona Berbahaya</div>
+                                <div class="section-title">Aktivitas Terakhir</div>
+                                <div class="section-desc">Riwayat scan dokumen terbaru.</div>
+                            </div>
+                            <div class="section-icon"><Activity size={19} /></div>
+                        </div>
+
+                        {#if loadingActivity}
+                            <div class="activity-loading">
+                                <Loader2 class="h-5 w-5 animate-spin" style="color:var(--c-faint)" />
+                            </div>
+                        {:else if activities.length === 0}
+                            <EmptyState
+                                icon={Activity}
+                                title="Belum ada aktivitas"
+                                text="Aktivitas scan dokumen Anda akan muncul di sini."
+                            />
+                        {:else}
+                            <div class="activity-list">
+                                {#each activities as act}
+                                    <div class="activity-row">
+                                        <div class="activity-icon"><BarChart3 size={18} /></div>
+                                        <div class="activity-info">
+                                            <div class="activity-action">{actionLabel(act.action)}</div>
+                                            <div class="activity-count">{act.count} dokumen</div>
+                                        </div>
+                                        <span class="activity-date">{formatDateTime(act.created_at)}</span>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                    </Card>
+                {:else if tab === "keamanan"}
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Kata Sandi</div>
                                 <div class="section-desc">
+                                    Perbarui sandi secara berkala untuk menjaga keamanan akun.
+                                </div>
+                            </div>
+                            <div class="section-icon"><Lock size={19} /></div>
+                        </div>
+
+                        <div class="fields-grid">
+                            <div class="field field-full">
+                                <label class="field-label" for="current-password">Sandi Saat Ini</label>
+                                <div class="field-edit">
+                                    <Eye size={16} class="field-edit-ic" />
+                                    <input
+                                        id="current-password"
+                                        type="password"
+                                        bind:value={currentPassword}
+                                        class="field-input field-input-ic"
+                                        placeholder="Masukkan sandi saat ini"
+                                    />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="new-password">Sandi Baru</label>
+                                <div class="field-edit">
+                                    <Eye size={16} class="field-edit-ic" />
+                                    <input
+                                        id="new-password"
+                                        type="password"
+                                        bind:value={newPassword}
+                                        class="field-input field-input-ic"
+                                        placeholder="Minimal 6 karakter"
+                                    />
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="confirm-password">Konfirmasi Sandi Baru</label>
+                                <div class="field-edit">
+                                    <Eye size={16} class="field-edit-ic" />
+                                    <input
+                                        id="confirm-password"
+                                        type="password"
+                                        bind:value={confirmPassword}
+                                        class="field-input field-input-ic"
+                                        placeholder="Ulangi sandi baru"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {#if passwordMsg.text}
+                            <div class="msg {passwordMsg.type === 'success' ? 'msg-success' : 'msg-error'}">
+                                {#if passwordMsg.type === "success"}
+                                    <CheckCircle class="h-4 w-4" />
+                                {:else}
+                                    <AlertCircle class="h-4 w-4" />
+                                {/if}
+                                {passwordMsg.text}
+                            </div>
+                        {/if}
+
+                        <div class="section-action">
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                icon={Check}
+                                onclick={savePassword}
+                                disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
+                            >
+                                {savingPassword ? "Mengubah…" : "Perbarui Sandi"}
+                            </Button>
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Keamanan Akun</div>
+                                <div class="section-desc">Lapisan perlindungan tambahan untuk akun Anda.</div>
+                            </div>
+                        </div>
+                        <div class="setting-list">
+                            <div class="setting-row">
+                                <div class="setting-icon"><CheckCircle size={19} /></div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Verifikasi Dua Langkah (2FA)</div>
+                                    <div class="setting-desc">
+                                        Lapisan keamanan tambahan saat masuk dari perangkat baru.
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="toggle"
+                                    role="switch"
+                                    aria-checked="false"
+                                    aria-label="Toggle 2FA"
+                                    disabled
+                                    title="Segera hadir"
+                                >
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-icon"><Bell size={19} /></div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Notifikasi Login Mencurigakan</div>
+                                    <div class="setting-desc">
+                                        Kirim peringatan email saat ada login tak dikenal.
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick={() => (notifyExpiry = !notifyExpiry)}
+                                    class="toggle {notifyExpiry ? 'toggle-on' : ''}"
+                                    role="switch"
+                                    aria-checked={notifyExpiry}
+                                    aria-label="Toggle notifikasi login"
+                                >
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Sesi Aktif</div>
+                                <div class="section-desc">Perangkat yang saat ini masuk ke akun Anda.</div>
+                            </div>
+                        </div>
+                        <div class="setting-list">
+                            <div class="setting-row">
+                                <div class="setting-icon setting-icon-muted">
+                                    <Activity size={19} />
+                                </div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Perangkat ini</div>
+                                    <div class="setting-desc">Sesi yang sedang Anda gunakan.</div>
+                                </div>
+                                <Badge status="Aktif" dot>Sekarang</Badge>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card class="danger-card">
+                        <div class="setting-row setting-row-danger" style="border-top:none">
+                            <div class="setting-icon section-icon-danger"><Trash2 size={19} /></div>
+                            <div class="setting-text">
+                                <div class="setting-title" style="color:var(--c-danger)">Hapus Akun</div>
+                                <div class="setting-desc">
                                     Hapus akun secara permanen. Semua data grup dan riwayat akan dihapus.
                                     Tindakan ini tidak dapat dibatalkan.
                                 </div>
                             </div>
-                            <div class="section-icon section-icon-danger">
-                                <Trash2 size={19} />
-                            </div>
-                        </div>
-                        <div class="section-action">
-                            <Button variant="danger" icon={Trash2} onclick={() => (showDeleteModal = true)}>
-                                Hapus Akun Saya
+                            <Button
+                                variant="danger"
+                                size="sm"
+                                icon={Trash2}
+                                onclick={() => (showDeleteModal = true)}
+                            >
+                                Hapus Akun
                             </Button>
                         </div>
                     </Card>
-                {:else if tab === "langganan"}
+                {:else if tab === "perusahaan"}
                     <Card>
                         <div class="section-head">
                             <div>
-                                <div class="section-title">Paket Langganan</div>
-                                <div class="section-desc">Detail paket aktif dan batas penggunaan akun Anda.</div>
+                                <div class="section-title">Profil Perusahaan</div>
+                                <div class="section-desc">
+                                    Informasi legal travel yang tampil pada invoice & kontrak.
+                                </div>
                             </div>
-                            <div class="section-icon section-icon-accent">
-                                {#if isProOrHigher(subscription?.plan)}
-                                    <Crown size={19} />
-                                {:else}
-                                    <Zap size={19} />
-                                {/if}
-                            </div>
+                            <div class="section-icon"><Building size={19} /></div>
                         </div>
 
-                        <div class="plan-hero">
-                            <div class="plan-hero-icon">
-                                {#if isProOrHigher(subscription?.plan)}
-                                    <Crown size={26} />
-                                {:else}
-                                    <Zap size={26} />
-                                {/if}
-                            </div>
-                            <div class="plan-hero-info">
-                                <div class="plan-hero-name">{planLabel}</div>
-                                <div class="plan-hero-sub">
-                                    {planMeta(subscription?.plan).desc}
-                                </div>
-                            </div>
-                            <Badge tone={isProOrHigher(subscription?.plan) ? "warning" : "info"}>
-                                {subscription?.status === "trial" ? "Trial" : "Aktif"}
-                            </Badge>
-                        </div>
-
-                        <div class="limits-grid">
-                            <div class="limit-box">
-                                <div class="limit-icon"><BarChart3 size={18} /></div>
-                                <div>
-                                    <div class="limit-value tabular">
-                                        {profile.usage?.total || 0}{#if profile.usage?.limit}<span
-                                                class="limit-cap">/{profile.usage.limit}</span
-                                            >{/if}
-                                    </div>
-                                    <div class="limit-label">Scan dokumen</div>
-                                </div>
-                            </div>
-                            <div class="limit-box">
-                                <div class="limit-icon"><FolderOpen size={18} /></div>
-                                <div>
-                                    <div class="limit-value tabular">
-                                        {groupCount}<span class="limit-cap">/{groupLimit}</span>
-                                    </div>
-                                    <div class="limit-label">Grup</div>
-                                </div>
-                            </div>
-                            <div class="limit-box">
-                                <div class="limit-icon"><User size={18} /></div>
-                                <div>
-                                    <div class="limit-value tabular">
-                                        {limitLabel(
-                                            subscription?.max_users ??
-                                                planMeta(subscription?.plan).maxUsers,
-                                        )}
-                                    </div>
-                                    <div class="limit-label">Pengguna</div>
+                        <div class="company-head">
+                            <div class="company-tile"><Building size={28} /></div>
+                            <div>
+                                <div class="company-name">{user?.organization?.name || "—"}</div>
+                                <div class="company-sub">
+                                    <Badge status="Lunas">PPIU Berizin</Badge>
+                                    Travel Umrah & Haji
                                 </div>
                             </div>
                         </div>
 
-                        {#if !isProOrHigher(subscription?.plan) && subscription?.usage_limit}
-                            <div class="usage-block">
-                                <div class="usage-block-head">
-                                    <span class="usage-block-label">Kuota scan terpakai</span>
-                                    <span class="usage-block-pct tabular">{usagePercent}%</span>
-                                </div>
-                                <ProgressBar value={usagePercent} max={100} color={usageColor} />
+                        <div class="fields-grid">
+                            <div class="field">
+                                <span class="field-label">Nama Legal</span>
+                                <div class="field-view">{user?.organization?.name || "—"}</div>
                             </div>
-                        {/if}
-
-                        <div class="sub-details">
-                            {#if isProOrHigher(subscription?.plan)}
-                                <div class="sub-detail-row">
-                                    <span class="sub-detail-label">Berlangganan sejak</span>
-                                    <span class="sub-detail-value">{formatDate(subscription.subscribed_at)}</span>
+                            <div class="field">
+                                <span class="field-label">No. Izin PPIU</span>
+                                <div class="field-view">{user?.organization?.ppiu_no || "—"}</div>
+                            </div>
+                            <div class="field">
+                                <span class="field-label">NPWP</span>
+                                <div class="field-view">{user?.organization?.npwp || "—"}</div>
+                            </div>
+                            <div class="field">
+                                <span class="field-label">No. SK Kemenag</span>
+                                <div class="field-view">{user?.organization?.sk_no || "—"}</div>
+                            </div>
+                            <div class="field">
+                                <span class="field-label">Telepon Kantor</span>
+                                <div class="field-view">
+                                    <Phone size={16} class="field-ic" />
+                                    {user?.organization?.phone || "—"}
                                 </div>
-                                <div class="sub-detail-row">
-                                    <span class="sub-detail-label">Berlaku hingga</span>
-                                    <span class="sub-detail-value">{formatDate(subscription.subscription_ends)}</span>
+                            </div>
+                            <div class="field">
+                                <span class="field-label">Email Resmi</span>
+                                <div class="field-view">
+                                    <Mail size={16} class="field-ic" />
+                                    {user?.organization?.email || "—"}
                                 </div>
-                            {:else}
-                                {#if subscription?.trial_ends && subscription?.status === "trial"}
-                                    <div class="sub-detail-row">
-                                        <span class="sub-detail-label">
-                                            <Clock size={14} style="color:var(--c-warning)" />
-                                            Trial berakhir
-                                        </span>
-                                        <span class="sub-detail-value">{formatDate(subscription.trial_ends)}</span>
-                                    </div>
-                                {/if}
-                            {/if}
+                            </div>
+                            <div class="field field-full">
+                                <span class="field-label">Alamat Kantor</span>
+                                <div class="field-view">
+                                    <MapPin size={16} class="field-ic" />
+                                    {user?.organization?.address || "—"}
+                                </div>
+                            </div>
                         </div>
-
-                        {#if !isProOrHigher(subscription?.plan)}
-                            <div class="section-action upgrade-actions">
-                                <Button variant="accent" icon={Crown} full onclick={onUpgradeRequest}>
-                                    Upgrade ke Pro - Rp299.000/bulan
-                                </Button>
-                                {#if trialStatus?.can_activate}
-                                    <Button variant="soft" full onclick={onUpgradeRequest}>
-                                        Coba Pro 7 Hari Gratis
-                                    </Button>
-                                {/if}
-                            </div>
-                        {/if}
                     </Card>
                 {:else if tab === "notifikasi"}
                     <Card>
                         <div class="section-head">
                             <div>
-                                <div class="section-title">Notifikasi</div>
+                                <div class="section-title">Notifikasi Aktivitas</div>
                                 <div class="section-desc">
                                     Pilih kejadian yang ingin Anda terima pemberitahuannya.
                                 </div>
                             </div>
-                            <div class="section-icon">
-                                <Bell size={19} />
-                            </div>
+                            <div class="section-icon"><Bell size={19} /></div>
                         </div>
 
                         <div class="setting-list">
@@ -853,12 +1006,60 @@
                         <div class="section-action">
                             <Button
                                 variant="primary"
+                                size="sm"
                                 icon={Check}
                                 onclick={saveNotificationPrefs}
                                 disabled={savingNotifs}
                             >
-                                {savingNotifs ? "Menyimpan..." : "Simpan Preferensi"}
+                                {savingNotifs ? "Menyimpan…" : "Simpan Preferensi"}
                             </Button>
+                        </div>
+                    </Card>
+
+                    <Card>
+                        <div class="section-head">
+                            <div>
+                                <div class="section-title">Saluran Pengiriman</div>
+                                <div class="section-desc">Tampilan dan kanal pemberitahuan akun.</div>
+                            </div>
+                        </div>
+                        <div class="setting-list">
+                            <div class="setting-row">
+                                <div class="setting-icon"><Mail size={19} /></div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Email</div>
+                                    <div class="setting-desc">Ringkasan dan peringatan ke email Anda.</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick={() => (notifyExpiry = !notifyExpiry)}
+                                    class="toggle {notifyExpiry ? 'toggle-on' : ''}"
+                                    role="switch"
+                                    aria-checked={notifyExpiry}
+                                    aria-label="Toggle Email"
+                                >
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
+                            <div class="setting-row">
+                                <div class="setting-icon">
+                                    {#if darkMode}<Sun size={19} />{:else}<Moon size={19} />{/if}
+                                </div>
+                                <div class="setting-text">
+                                    <div class="setting-title">Mode Gelap</div>
+                                    <div class="setting-desc">Tampilan dengan latar gelap.</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onclick={toggleDarkMode}
+                                    class="toggle {darkMode ? 'toggle-on' : ''}"
+                                    role="switch"
+                                    aria-checked={darkMode}
+                                    aria-label="Toggle Mode Gelap"
+                                >
+                                    <span class="toggle-knob"></span>
+                                </button>
+                            </div>
                         </div>
                     </Card>
                 {/if}
@@ -915,7 +1116,7 @@
                         disabled={deleting || !deletePassword}
                         style="background:var(--c-danger);border-color:var(--c-danger)"
                     >
-                        {deleting ? "Menghapus..." : "Hapus Permanen"}
+                        {deleting ? "Menghapus…" : "Hapus Permanen"}
                     </Button>
                 </div>
             </div>
@@ -992,6 +1193,7 @@
         text-align: center;
     }
     .summary-avatar-wrap {
+        position: relative;
         width: 88px;
         height: 88px;
         margin: 0 auto 14px;
@@ -1001,27 +1203,43 @@
         height: 88px;
         border-radius: 50%;
         border: 4px solid var(--c-surface);
+        background: var(--c-surface);
+        box-sizing: border-box;
+    }
+    .summary-avatar {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-sizing: border-box;
-    }
-    .summary-avatar-initial {
         font-size: 32px;
         font-weight: 800;
+    }
+    .summary-avatar-cam {
+        position: absolute;
+        right: 2px;
+        bottom: 2px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--c-primary);
+        color: #fff;
+        border: 3px solid var(--c-surface);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
     }
     .summary-name {
         font-size: 18.5px;
         font-weight: 800;
         color: var(--c-ink);
     }
-    .summary-email {
+    .summary-role {
         font-size: 13px;
         color: var(--c-muted);
         margin-top: 3px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
     .summary-badges {
         margin-top: 12px;
@@ -1058,6 +1276,59 @@
         font-size: 11px;
         color: var(--c-faint);
         margin-top: 2px;
+    }
+
+    /* ---- Plan block (folded subscription) ---- */
+    .plan-block {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--c-line-soft);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        text-align: left;
+    }
+    .plan-block-row {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+    }
+    .plan-block-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius);
+        background: var(--c-accent-soft);
+        color: var(--c-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .plan-block-info {
+        min-width: 0;
+    }
+    .plan-block-name {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--c-ink);
+    }
+    .plan-block-desc {
+        font-size: 11.5px;
+        color: var(--c-muted);
+        margin-top: 2px;
+        line-height: 1.4;
+    }
+    .plan-usage {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .plan-usage-head {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--c-muted);
+        font-weight: 600;
     }
 
     /* ---- Nav card ---- */
@@ -1158,6 +1429,11 @@
         gap: 16px;
         margin-bottom: 18px;
     }
+    .section-head-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+    }
     .section-title {
         font-size: 16.5px;
         font-weight: 800;
@@ -1180,10 +1456,6 @@
         justify-content: center;
         flex-shrink: 0;
     }
-    .section-icon-accent {
-        background: var(--c-accent-soft);
-        color: var(--c-accent);
-    }
     .section-icon-danger {
         background: var(--c-danger-soft);
         color: var(--c-danger);
@@ -1196,7 +1468,7 @@
     .fields-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 18px 22px;
+        gap: 20px 22px;
     }
     @media (max-width: 560px) {
         .fields-grid {
@@ -1215,6 +1487,39 @@
         color: var(--c-faint);
         margin-bottom: 7px;
     }
+    .field-view {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--c-ink);
+        padding: 10px 0;
+    }
+    :global(.field-ic) {
+        color: var(--c-primary);
+        flex-shrink: 0;
+    }
+    .field-bio {
+        font-size: 14px;
+        color: var(--c-ink-soft);
+        line-height: 1.6;
+    }
+    .field-edit {
+        position: relative;
+    }
+    :global(.field-edit-ic) {
+        position: absolute;
+        left: 13px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--c-faint);
+        pointer-events: none;
+        z-index: 1;
+    }
+    .field-input-ic {
+        padding-left: 38px !important;
+    }
     .field-input {
         width: 100%;
         padding: 11px 13px;
@@ -1232,15 +1537,40 @@
         border-color: var(--c-primary);
         box-shadow: 0 0 0 3px var(--c-primary-soft);
     }
-    .field-disabled {
-        background: var(--c-bg-2);
-        color: var(--c-muted);
-        cursor: not-allowed;
+
+    /* ---- Company head ---- */
+    .company-head {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 4px 0 20px;
+        margin-bottom: 18px;
+        border-bottom: 1px solid var(--c-line-soft);
     }
-    .field-hint {
-        font-size: 11.5px;
-        color: var(--c-faint);
+    .company-tile {
+        width: 60px;
+        height: 60px;
+        border-radius: var(--radius-lg);
+        background: var(--c-primary-soft);
+        color: var(--c-primary-deep);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .company-name {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--c-ink);
+    }
+    .company-sub {
+        font-size: 13px;
+        color: var(--c-muted);
         margin-top: 6px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
     }
 
     /* ---- Avatar picker ---- */
@@ -1285,6 +1615,9 @@
         padding: 16px 0;
         border-top: 1px solid var(--c-line-soft);
     }
+    .setting-row-danger {
+        padding: 0;
+    }
     .setting-icon {
         width: 38px;
         height: 38px;
@@ -1295,6 +1628,10 @@
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+    }
+    .setting-icon-muted {
+        background: var(--c-bg-2);
+        color: var(--c-ink-soft);
     }
     .setting-text {
         flex: 1;
@@ -1326,6 +1663,10 @@
         border: none;
         cursor: pointer;
     }
+    .toggle:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
     .toggle-on {
         background: var(--c-primary);
         justify-content: flex-end;
@@ -1337,142 +1678,6 @@
         background: #fff;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         transition: all 0.2s;
-    }
-
-    /* ---- Plan hero ---- */
-    .plan-hero {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 16px;
-        background: var(--c-primary-tint);
-        border: 1px solid var(--c-line-soft);
-        border-radius: var(--radius-lg);
-        margin-bottom: 18px;
-    }
-    .plan-hero-icon {
-        width: 52px;
-        height: 52px;
-        border-radius: var(--radius-lg);
-        background: var(--c-accent-soft);
-        color: var(--c-accent);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-    .plan-hero-info {
-        flex: 1;
-        min-width: 0;
-    }
-    .plan-hero-name {
-        font-size: 16px;
-        font-weight: 800;
-        color: var(--c-ink);
-    }
-    .plan-hero-sub {
-        font-size: 12.5px;
-        color: var(--c-muted);
-        margin-top: 3px;
-    }
-
-    /* ---- Limits grid ---- */
-    .limits-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-bottom: 4px;
-    }
-    @media (max-width: 560px) {
-        .limits-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-    .limit-box {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 14px;
-        background: var(--c-bg);
-        border: 1px solid var(--c-line-soft);
-        border-radius: var(--radius);
-    }
-    .limit-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: var(--radius);
-        background: var(--c-primary-soft);
-        color: var(--c-primary-deep);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-    .limit-value {
-        font-size: 15px;
-        font-weight: 800;
-        color: var(--c-ink);
-        line-height: 1.2;
-    }
-    .limit-cap {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--c-faint);
-    }
-    .limit-label {
-        font-size: 11.5px;
-        color: var(--c-faint);
-        margin-top: 2px;
-    }
-
-    /* ---- Usage block ---- */
-    .usage-block {
-        margin-top: 16px;
-    }
-    .usage-block-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-    }
-    .usage-block-label {
-        font-size: 13px;
-        color: var(--c-muted);
-    }
-    .usage-block-pct {
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--c-ink);
-    }
-
-    /* ---- Subscription details ---- */
-    .sub-details {
-        margin-top: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .sub-detail-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        font-size: 13.5px;
-    }
-    .sub-detail-label {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--c-muted);
-    }
-    .sub-detail-value {
-        color: var(--c-ink);
-        font-weight: 600;
-    }
-    .upgrade-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
     }
 
     /* ---- Messages ---- */

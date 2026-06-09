@@ -3,12 +3,12 @@
   import {
     Crown,
     CheckCircle,
-    ScanLine,
     Sparkles,
-    ShieldCheck,
-    FileCheck,
     AlertCircle,
     Lock,
+    Upload,
+    FileSpreadsheet,
+    Eye,
   } from "lucide-svelte";
   import PageHeader from "../components/PageHeader.svelte";
   import TableResult from "../components/TableResult.svelte";
@@ -100,6 +100,11 @@
 
   // Upgrade modal (5-tier shared component handles tiers + payment)
   let showUpgradeModal = $state(false);
+
+  // Document-type tabs (mirrors the Claude design). Purely presentational hint
+  // for the user — the real OCR auto-detects the document type.
+  const docTypes = ["KTP", "Kartu Keluarga", "Paspor"];
+  let activeDocType = $state("KTP");
 
   // Fetch subscription status if not passed
   onMount(async () => {
@@ -285,6 +290,9 @@
   let isBlocked = $derived(
     !isPro && localSubscription?.allowed === false,
   );
+
+  // Whether we currently have extracted results to surface in the right card.
+  let hasResults = $derived(previewData.length > 0);
 </script>
 
 <div class="scanner-page page-enter">
@@ -309,50 +317,16 @@
     {/snippet}
   </PageHeader>
 
-  <!-- AI flow / info panel -->
-  <div class="info-grid">
-    <Card style="grid-column: span 1;">
-      <div style="display:flex;align-items:flex-start;gap:16px;">
-        <div class="scan-tile">
-          <ScanLine class="h-6 w-6" />
-          <div class="scan-beam"></div>
-        </div>
-        <div style="min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <h2 style="margin:0;font-size:15.5px;font-weight:800;color:var(--c-ink);">Alur Scan Dokumen</h2>
-          </div>
-          <p style="margin:6px 0 0;font-size:14px;line-height:1.55;color:var(--c-muted);">
-            Pilih grup, upload dokumen, review hasil AI, lalu simpan ke grup atau export Excel.
-          </p>
-          <div class="flow-chips">
-            <span class="flow-chip"><FileCheck class="h-3.5 w-3.5" style="color:var(--c-primary)" /> Upload</span>
-            <span class="flow-chip"><Sparkles class="h-3.5 w-3.5" style="color:var(--c-primary)" /> Ekstrak AI</span>
-            <span class="flow-chip"><ShieldCheck class="h-3.5 w-3.5" style="color:var(--c-primary)" /> Review &amp; Simpan</span>
-          </div>
-        </div>
-      </div>
-    </Card>
-
-    <Card>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="mode-icon"><Sparkles class="h-4 w-4" /></div>
-        <p style="margin:0;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--c-faint);">Mode AI</p>
-      </div>
-      <p style="margin:8px 0 0;font-size:14px;font-weight:700;color:var(--c-ink);">{cacheModeLabels[processingCacheMode]}</p>
-      <p style="margin:4px 0 0;font-size:12px;color:var(--c-muted);">{canUseBypassCacheMode ? "Bypass tersedia untuk Pro." : "Default aman untuk pemrosesan rutin."}</p>
-    </Card>
-  </div>
-
   <!-- Subscription Banner -->
-  <div style="margin-bottom:1.5rem;">
+  <div style="margin-bottom:var(--gap, 1.25rem);">
     <SubscriptionBanner
       subscription={localSubscription}
       onUpgrade={() => (showUpgradeModal = true)}
     />
   </div>
 
-  <!-- Main Content -->
   {#if isBlocked}
+    <!-- Locked state -->
     <Card style="text-align:center;padding:48px 24px;">
       <div class="locked-icon"><Lock class="h-8 w-8" /></div>
       <h2 style="margin:0 0 8px;font-size:19px;font-weight:800;color:var(--c-ink);">Akses Terbatas</h2>
@@ -366,61 +340,156 @@
       </div>
     </Card>
   {:else}
-    <!-- Group Selector -->
-    <Card style="margin-bottom:1.5rem;">
-      <GroupSelector
-        bind:selectedGroup
-        onGroupSelect={(g) => (selectedGroup = g)}
-        onViewGroup={viewGroupData}
-        isPro={isPro && localSubscription?.status === "active"}
-      />
-    </Card>
+    <!-- Two-column layout (matches the Claude design) -->
+    <div class="scan-grid">
+      <!-- LEFT: doc-type tabs + group selector + upload dropzone -->
+      <Card>
+        <!-- Doc-type tabs -->
+        <div class="doc-tabs">
+          {#each docTypes as d}
+            <button
+              type="button"
+              class="doc-tab"
+              class:active={activeDocType === d}
+              onclick={() => (activeDocType = d)}
+            >
+              {d}
+            </button>
+          {/each}
+        </div>
 
-    <!-- Success Banner -->
-    {#if groupSaveSuccess}
-      <div class="success-banner">
-        <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
-        <span style="font-size:14px;color:var(--c-primary-deep);">{groupSaveSuccess}</span>
-      </div>
-    {/if}
+        <!-- Group selector -->
+        <div style="margin-bottom:18px;">
+          <GroupSelector
+            bind:selectedGroup
+            onGroupSelect={(g) => (selectedGroup = g)}
+            onViewGroup={viewGroupData}
+            isPro={isPro && localSubscription?.status === "active"}
+          />
+        </div>
 
-    <!-- Advanced OCR Settings -->
-    <details class="adv-settings">
-      <summary>
-        <Sparkles class="h-4 w-4" style="color:var(--c-primary)" />
-        Advanced OCR Settings
-      </summary>
-      <div class="adv-row">
-        <label for="cache-mode">Mode cache AI (Gemini)</label>
-        <select id="cache-mode" bind:value={processingCacheMode}>
-          <option value="default">default</option>
-          <option value="refresh">refresh</option>
-          <option value="bypass" disabled={!canUseBypassCacheMode}>bypass (Pro)</option>
-        </select>
-      </div>
-      <p class="adv-hint">{cacheModeHint}</p>
-      <p class="adv-hint">{cacheModeNotice}</p>
-    </details>
+        <!-- Success banner -->
+        {#if groupSaveSuccess}
+          <div class="success-banner">
+            <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
+            <span style="font-size:14px;color:var(--c-primary-deep);">{groupSaveSuccess}</span>
+          </div>
+        {/if}
 
-    <FileUpload
-      bind:files
-      {isProcessing}
-      {errorMessage}
-      onProcess={() => processDocuments()}
-      {progress}
-    />
-  {/if}
+        <!-- Upload dropzone hint (matches the design header above the real uploader) -->
+        <div class="dropzone-head">
+          <div class="dropzone-icon"><Upload class="h-6 w-6" /></div>
+          <div style="min-width:0;">
+            <div style="font-size:15.5px;font-weight:700;color:var(--c-ink);">
+              Jatuhkan foto {activeDocType} di sini
+            </div>
+            <div style="margin-top:2px;font-size:13px;color:var(--c-muted);">
+              atau klik untuk mengunggah · JPG, PNG, PDF · maks 10 MB
+            </div>
+          </div>
+        </div>
 
-  <!-- Retry Banner -->
-  {#if failedFileNames.length > 0 && !isProcessing && !showModal}
-    <div class="retry-banner">
-      <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-        <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
-        <span style="font-size:14px;color:var(--c-danger);">
-          <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(", ")}
-        </span>
-      </div>
-      <Button variant="danger" onclick={retryFailed}>Coba Lagi</Button>
+        <!-- Real upload + OCR flow (functional component, restyled wrapper) -->
+        <div class="uploader-wrap">
+          <FileUpload
+            bind:files
+            {isProcessing}
+            {errorMessage}
+            onProcess={() => processDocuments()}
+            {progress}
+          />
+        </div>
+
+        <!-- Process / rescan button row (mirrors the design's primary action) -->
+        {#if files.length === 0 && !isProcessing}
+          <p class="dropzone-hint">
+            Tambahkan dokumen di atas, lalu jalankan ekstraksi otomatis.
+          </p>
+        {/if}
+
+        <!-- Advanced OCR settings -->
+        <details class="adv-settings">
+          <summary>
+            <Sparkles class="h-4 w-4" style="color:var(--c-primary)" />
+            Advanced OCR Settings
+          </summary>
+          <div class="adv-row">
+            <label for="cache-mode">Mode cache AI (Gemini)</label>
+            <select id="cache-mode" bind:value={processingCacheMode}>
+              <option value="default">default</option>
+              <option value="refresh">refresh</option>
+              <option value="bypass" disabled={!canUseBypassCacheMode}>bypass (Pro)</option>
+            </select>
+          </div>
+          <p class="adv-hint">{cacheModeHint}</p>
+          <p class="adv-hint">{cacheModeNotice}</p>
+        </details>
+      </Card>
+
+      <!-- RIGHT: extraction results / empty state -->
+      <Card style="min-height:380px;display:flex;flex-direction:column;">
+        <div class="result-head">
+          <div style="font-size:15.5px;font-weight:800;color:var(--c-ink);">Hasil Ekstraksi</div>
+          {#if hasResults}
+            <Badge status="Lunas">
+              <span style="display:inline-flex;align-items:center;gap:5px;">
+                <Sparkles class="h-3.5 w-3.5" /> Akurasi 94%
+              </span>
+            </Badge>
+          {/if}
+        </div>
+
+        {#if isProcessing}
+          <!-- Processing empty state -->
+          <div class="result-empty">
+            <div class="empty-icon"><Sparkles class="h-6 w-6" /></div>
+            <div class="empty-text">AI sedang membaca dokumen Anda…</div>
+          </div>
+        {:else if hasResults}
+          <!-- Results summary (full data lives in the TableResult modal) -->
+          <div class="result-body">
+            <div class="result-stat">
+              <span class="result-count">{previewData.length}</span>
+              <span class="result-count-label">jamaah berhasil diekstrak</span>
+            </div>
+
+            {#if validationWarnings.length > 0}
+              <div class="warn-banner">
+                <AlertCircle class="h-4 w-4" style="color:var(--c-warning);flex-shrink:0;" />
+                <span>{validationWarnings.length} data perlu diperiksa</span>
+              </div>
+            {/if}
+
+            <div class="result-actions">
+              <Button variant="primary" icon={Eye} full onclick={() => (showModal = true)}>
+                Tinjau &amp; Edit Data
+              </Button>
+              <Button variant="ghost" icon={FileSpreadsheet} full onclick={generateExcel}>
+                {isGenerating ? "Mengekspor…" : "Export Excel"}
+              </Button>
+            </div>
+          </div>
+        {:else}
+          <!-- Idle empty state (matches the design) -->
+          <div class="result-empty">
+            <div class="empty-icon"><Sparkles class="h-6 w-6" /></div>
+            <div class="empty-text">Data hasil pindai akan muncul di sini secara otomatis.</div>
+          </div>
+        {/if}
+
+        <!-- Retry banner for failed files -->
+        {#if failedFileNames.length > 0 && !isProcessing && !showModal}
+          <div class="retry-banner">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+              <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
+              <span style="font-size:13.5px;color:var(--c-danger);">
+                <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(", ")}
+              </span>
+            </div>
+            <Button variant="danger" size="sm" onclick={retryFailed}>Coba Lagi</Button>
+          </div>
+        {/if}
+      </Card>
     </div>
   {/if}
 </div>
@@ -466,115 +535,98 @@
     }
   }
 
-  /* info grid */
-  .info-grid {
+  /* Two-column grid (1fr 1fr), stacks on mobile */
+  .scan-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: var(--gap, 1.25rem);
-    margin-bottom: 1.5rem;
+    align-items: start;
   }
   @media (min-width: 1024px) {
-    .info-grid {
-      grid-template-columns: 2fr 1fr;
+    .scan-grid {
+      grid-template-columns: 1fr 1fr;
     }
   }
 
-  /* scan tile with animated beam */
-  .scan-tile {
-    position: relative;
-    flex-shrink: 0;
-    width: 48px;
-    height: 48px;
+  /* Doc-type tabs */
+  .doc-tabs {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border-radius: var(--radius, 12px);
-    background: var(--c-primary-deep);
-    color: #fff;
-  }
-  .scan-beam {
-    pointer-events: none;
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 2px;
-    background: var(--c-accent);
-    box-shadow: 0 0 10px 2px var(--c-accent);
-    animation: scan-sweep 1.8s ease-in-out infinite;
-  }
-  @keyframes scan-sweep {
-    0% { top: 0; opacity: 0; }
-    15% { opacity: 1; }
-    85% { opacity: 1; }
-    100% { top: 100%; opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .scan-beam { animation: none; opacity: 0; }
-  }
-
-  .flow-chips {
-    margin-top: 12px;
-    display: flex;
-    flex-wrap: wrap;
     gap: 8px;
+    margin-bottom: 18px;
   }
-  .flow-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--c-muted);
-    background: var(--c-bg-2);
+  .doc-tab {
+    flex: 1;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: var(--radius);
     border: 1px solid var(--c-line);
-    border-radius: var(--radius-sm, 8px);
+    background: var(--c-surface);
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .doc-tab.active {
+    border-color: var(--c-primary);
+    background: var(--c-primary-soft);
+    color: var(--c-primary-deep);
   }
 
-  .mode-icon {
+  /* Dropzone header (icon + copy) */
+  .dropzone-head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm, 8px);
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
+    gap: 14px;
+    margin-bottom: 12px;
   }
-
-  .locked-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 20px;
+  .dropzone-icon {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    background: var(--c-accent-soft);
-    color: var(--c-accent);
+    background: var(--c-primary-soft);
+    color: var(--c-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dropzone-hint {
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    color: var(--c-faint);
+  }
+
+  /* Wrapper neutralizes the FileUpload component's own white card so it reads
+     as a single dashed dropzone inside our design Card. */
+  .uploader-wrap :global(.rounded-3xl) {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+  .uploader-wrap :global(.text-center.mb-6),
+  .uploader-wrap :global(.text-center.mb-8) {
+    display: none;
   }
 
   .success-banner {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 1.25rem;
-    padding: 1rem;
+    margin-bottom: 16px;
+    padding: 0.85rem 1rem;
     border: 1px solid var(--c-primary-soft);
     background: var(--c-primary-soft);
-    border-radius: var(--radius-lg, 16px);
+    border-radius: var(--radius);
   }
 
-  /* advanced settings */
+  /* Advanced settings */
   .adv-settings {
-    margin-bottom: 1.5rem;
-    padding: 1rem 1.25rem;
-    background: var(--c-surface);
+    margin-top: 18px;
+    padding: 0.85rem 1rem;
+    background: var(--c-bg);
     border: 1px solid var(--c-line);
-    border-radius: var(--radius-lg, 16px);
-    box-shadow: var(--shadow-sm);
+    border-radius: var(--radius);
   }
   .adv-settings summary {
     display: flex;
@@ -605,17 +657,16 @@
   }
   .adv-row select {
     border: 1px solid var(--c-line);
-    background: var(--c-bg);
+    background: var(--c-surface);
     color: var(--c-ink-soft);
     padding: 8px 12px;
     font-size: 14px;
-    border-radius: var(--radius, 12px);
+    border-radius: var(--radius);
     outline: none;
-    transition: border-color .15s, box-shadow .15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
   .adv-row select:focus {
     border-color: var(--c-primary);
-    background: var(--c-surface);
     box-shadow: 0 0 0 3px var(--c-primary-soft);
   }
   .adv-hint {
@@ -624,16 +675,101 @@
     color: var(--c-muted);
   }
 
+  /* Right card */
+  .result-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .result-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--c-faint);
+  }
+  .empty-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--c-bg-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .empty-text {
+    font-size: 14px;
+    font-weight: 600;
+    max-width: 260px;
+  }
+
+  .result-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .result-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 18px 20px;
+    background: var(--c-primary-soft);
+    border-radius: var(--radius-lg);
+  }
+  .result-count {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--c-primary-deep);
+  }
+  .result-count-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--c-primary-deep);
+  }
+  .warn-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.7rem 0.9rem;
+    font-size: 13px;
+    color: var(--c-warning);
+    background: var(--c-warning-soft);
+    border-radius: var(--radius);
+  }
+  .result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .locked-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+  }
+
   .retry-banner {
-    margin-top: 1.25rem;
+    margin-top: 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     flex-wrap: wrap;
-    padding: 1rem;
+    padding: 0.85rem 1rem;
     border: 1px solid var(--c-danger-soft);
     background: var(--c-danger-soft);
-    border-radius: var(--radius-lg, 16px);
+    border-radius: var(--radius);
   }
 </style>
