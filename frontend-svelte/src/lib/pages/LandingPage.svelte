@@ -9,6 +9,22 @@
     mobileMenuOpen = false;
   }
 
+  // Smooth-scroll to an on-page section. Uses scrollIntoView (reliable across
+  // scroll containers) and preventDefault so the hash router is never triggered
+  // and the URL stays clean.
+  function scrollToSection(e, id) {
+    e?.preventDefault();
+    closeMenu();
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function scrollTop(e) {
+    e?.preventDefault();
+    closeMenu();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   // WhatsApp contact for the Enterprise "Hubungi Sales" CTA.
   const SALES_WA = "https://wa.me/6285159980404?text=" +
     encodeURIComponent("Halo, saya tertarik dengan paket Enterprise Suluk.");
@@ -53,7 +69,7 @@
   <!-- NAV -->
   <nav class="lp-nav">
     <div class="lp-container lp-nav-inner">
-      <a class="lp-brand" href="#top">
+      <a class="lp-brand" href="#top" onclick={(e) => scrollTop(e)}>
         <span class="lp-brand-mark"><img src="/brand/suluk-mark.png" alt="Suluk" style="height:42px;width:auto;display:block" /></span>
         <span>
           <span class="lp-brand-name">Suluk</span>
@@ -61,11 +77,11 @@
         </span>
       </a>
       <div class="lp-nav-links">
-        <a href="#fitur">Fitur</a>
-        <a href="#modul">Modul</a>
-        <a href="#cara">Cara Kerja</a>
-        <a href="#harga">Harga</a>
-        <a href="#testimoni">Testimoni</a>
+        <a href="#fitur" onclick={(e) => scrollToSection(e, "fitur")}>Fitur</a>
+        <a href="#modul" onclick={(e) => scrollToSection(e, "modul")}>Modul</a>
+        <a href="#cara" onclick={(e) => scrollToSection(e, "cara")}>Cara Kerja</a>
+        <a href="#harga" onclick={(e) => scrollToSection(e, "harga")}>Harga</a>
+        <a href="#testimoni" onclick={(e) => scrollToSection(e, "testimoni")}>Testimoni</a>
       </div>
       <div class="lp-nav-actions">
         <button class="lp-login" onclick={() => onGoToLogin()}>Masuk</button>
@@ -76,11 +92,11 @@
       </div>
     </div>
     <div class="lp-mobile-menu" class:open={mobileMenuOpen}>
-      <a href="#fitur" onclick={() => closeMenu()}>Fitur</a>
-      <a href="#modul" onclick={() => closeMenu()}>Modul</a>
-      <a href="#cara" onclick={() => closeMenu()}>Cara Kerja</a>
-      <a href="#harga" onclick={() => closeMenu()}>Harga</a>
-      <a href="#testimoni" onclick={() => closeMenu()}>Testimoni</a>
+      <a href="#fitur" onclick={(e) => scrollToSection(e, "fitur")}>Fitur</a>
+      <a href="#modul" onclick={(e) => scrollToSection(e, "modul")}>Modul</a>
+      <a href="#cara" onclick={(e) => scrollToSection(e, "cara")}>Cara Kerja</a>
+      <a href="#harga" onclick={(e) => scrollToSection(e, "harga")}>Harga</a>
+      <a href="#testimoni" onclick={(e) => scrollToSection(e, "testimoni")}>Testimoni</a>
       <button class="lp-btn lp-btn-primary" onclick={() => onGoToRegister()}>Coba Gratis 14 Hari</button>
     </div>
   </nav>
@@ -354,7 +370,7 @@
     <div class="lp-container">
       <div class="lp-footer-grid">
         <div class="lp-footer-about">
-          <a class="lp-brand" href="#top" style="margin-bottom:0">
+          <a class="lp-brand" href="#top" style="margin-bottom:0" onclick={(e) => scrollTop(e)}>
             <span class="lp-brand-mark"><img src="/brand/suluk-mark-white.png" alt="Suluk" style="height:42px;width:auto;display:block" /></span>
             <span><span class="lp-brand-name" style="color:#fff">Suluk</span><div class="lp-brand-sub">ERP FOR TRAVEL</div></span>
           </a>
@@ -436,7 +452,7 @@
   .lp-trust-item .v { font-size: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--c-primary-deep); }
   .lp-trust-item .l { font-size: 13.5px; color: var(--c-muted); margin-top: 4px; }
 
-  .lp-sec { padding: 88px 0; }
+  .lp-sec { padding: 88px 0; scroll-margin-top: 84px; }
   .lp-sec-head { text-align: center; max-width: 640px; margin: 0 auto 52px; }
   .lp-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--c-primary); margin-bottom: 14px; }
   .lp-h2 { font-family: var(--font-display); font-size: 40px; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; margin: 0 0 16px; text-wrap: balance; }
