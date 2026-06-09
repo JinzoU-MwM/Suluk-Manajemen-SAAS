@@ -16,6 +16,61 @@ function getToken() {
     }
 }
 
+function getRefreshToken() {
+    if (typeof window === 'undefined') return null;
+    try {
+        return localStorage.getItem('refresh_token');
+    } catch {
+        return null;
+    }
+}
+
+/** Persist tokens after login/refresh. */
+export function setTokens(accessToken, refreshToken) {
+    try {
+        if (accessToken) localStorage.setItem('access_token', accessToken);
+        if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+    } catch { /* ignore */ }
+}
+
+/** Clear tokens (on logout or unrecoverable 401). */
+export function clearTokens() {
+    try {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+    } catch { /* ignore */ }
+}
+
+// A single in-flight refresh shared across concurrent 401s so we don't spawn a
+// refresh storm when several requests expire at once.
+let refreshInFlight = null;
+
+async function refreshAccessToken() {
+    const rt = getRefreshToken();
+    if (!rt) return false;
+    if (!refreshInFlight) {
+        refreshInFlight = fetch(`${API_URL}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: rt }),
+        })
+            .then(async (r) => {
+                if (!r.ok) return false;
+                const json = await r.json().catch(() => null);
+                const data = json && json.success && json.data ? json.data : json;
+                if (data && data.access_token) {
+                    setTokens(data.access_token, data.refresh_token);
+                    return true;
+                }
+                return false;
+            })
+            .catch(() => false)
+            .finally(() => { refreshInFlight = null; });
+    }
+    return refreshInFlight;
+}
+
 /**
  * Create request headers with JWT Bearer token.
  */
@@ -31,17 +86,28 @@ export function authHeaders(extra = {}) {
 /**
  * Cookie-aware fetch for API requests.
  */
-export function apiFetch(url, options = {}) {
+export async function apiFetch(url, options = {}, _allowRetry = true) {
     const token = getToken();
     const headers = { ...(options.headers || {}) };
     if (token && !headers['Authorization']) {
         headers['Authorization'] = `Bearer ${token}`;
     }
-    return fetch(url, {
+    const resp = await fetch(url, {
         credentials: 'include',
         ...options,
         headers,
     });
+
+    // On an expired/invalid access token, transparently refresh once and retry.
+    const isAuthFlow = url.includes('/auth/refresh') || url.includes('/auth/login') || url.includes('/auth/register');
+    if (resp.status === 401 && _allowRetry && !isAuthFlow && getRefreshToken()) {
+        const ok = await refreshAccessToken();
+        if (ok) {
+            return apiFetch(url, options, false);
+        }
+        clearTokens();
+    }
+    return resp;
 }
 
 /**
