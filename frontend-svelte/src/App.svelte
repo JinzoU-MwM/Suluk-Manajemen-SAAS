@@ -237,6 +237,7 @@
   // Lazy-loaded page components (reduces initial bundle for mobile/Landing)
   let DashboardPage = $state(null);
   let MobileApp = $state(null);
+  let MobileLogin = $state(null);
   let ProfilePage = $state(null);
   let SuperAdminDashboardPage = $state(null);
   let InventoryPage = $state(null);
@@ -268,8 +269,9 @@
   async function ensurePage(page) {
     if (page === "dashboard" && !DashboardPage) {
       DashboardPage = (await import("./lib/pages/Dashboard.svelte")).default;
-    } else if (page === "mobile" && !MobileApp) {
-      MobileApp = (await import("./lib/mobile/MobileApp.svelte")).default;
+    } else if (page === "mobile") {
+      if (!MobileLogin) MobileLogin = (await import("./lib/mobile/screens/MobileLogin.svelte")).default;
+      if (!MobileApp) MobileApp = (await import("./lib/mobile/MobileApp.svelte")).default;
     } else if (page === "profile" && !ProfilePage) {
       ProfilePage = (await import("./lib/pages/ProfilePage.svelte")).default;
     } else if (page === "super-admin" && !SuperAdminDashboardPage) {
@@ -738,7 +740,8 @@
       currentPage !== "register" &&
       currentPage !== "mutawwif" &&
       currentPage !== "registration" &&
-      currentPage !== "contract-sign",
+      currentPage !== "contract-sign" &&
+      currentPage !== "mobile",
   );
 
   $effect(() => {
@@ -812,7 +815,11 @@
         <div class="min-h-screen flex items-center justify-center text-slate-500">Memuat aplikasi…</div>
       {/if}
     {:else}
-      <Login initialMode="login" onLoginSuccess={handleLoginSuccess} onBack={() => { setMobileMode(false); currentPage = "landing"; }} />
+      {#if MobileLogin}
+        <MobileLogin onLoginSuccess={handleLoginSuccess} />
+      {:else}
+        <div class="min-h-screen flex items-center justify-center text-slate-500">Memuat…</div>
+      {/if}
     {/if}
   {:else if showSidebar}
     <!-- Layout with Sidebar (matches Claude design app shell) -->
@@ -1125,18 +1132,23 @@
     {/if}
   {/if}
 
-  <!-- Global Upgrade Modal -->
-  <UpgradeModal
-    show={showGlobalUpgradeModal}
-    onClose={() => (showGlobalUpgradeModal = false)}
-    onSuccess={async (newSub) => {
-      subscription = newSub;
-      showGlobalUpgradeModal = false;
-      await loadUserData();
-    }}
-  />
-  {#if showSupportChat}
-    <SupportChatBubble />
+  <!-- Desktop-only global overlays — never render over the mobile shell -->
+  {#if currentPage !== "mobile"}
+    <!-- Global Upgrade Modal -->
+    <UpgradeModal
+      show={showGlobalUpgradeModal}
+      onClose={() => (showGlobalUpgradeModal = false)}
+      onSuccess={async (newSub) => {
+        subscription = newSub;
+        showGlobalUpgradeModal = false;
+        await loadUserData();
+      }}
+    />
+    {#if showSupportChat}
+      <SupportChatBubble />
+    {/if}
   {/if}
 </main>
-<Toast />
+{#if currentPage !== "mobile"}
+  <Toast />
+{/if}

@@ -15,6 +15,7 @@
   let owner = $state(null);
   let packages = $state([]);
   let pendingApprovals = $state(0);
+  let unread = $state(0);
 
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
   function dateChip(s) {
@@ -40,6 +41,11 @@
       pendingApprovals = Array.isArray(items) ? items.length : 0;
     } catch {
       pendingApprovals = 0;
+    }
+    try {
+      unread = (await ApiService.getUnreadNotificationCount()) || 0;
+    } catch {
+      unread = 0;
     }
   });
 
@@ -74,7 +80,9 @@
         style="position:relative;width:42px;height:42px;border-radius:13px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:#fff"
       >
         <Bell size={20} />
-        <span style="position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:999px;background:#C99A2E;border:2px solid var(--c-primary-deep)"></span>
+        {#if unread > 0}
+          <span style="position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:999px;background:#C99A2E;border:2px solid var(--c-primary-deep)"></span>
+        {/if}
       </button>
     </div>
     <div style="margin-top:20px;position:relative">

@@ -4,11 +4,12 @@
   $effect(() => {
     let raf, start;
     const target = to;
+    const from = 0;
     function tick(t) {
       if (!start) start = t;
       const p = Math.min(1, (t - start) / dur);
       const e = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      val = target * e;
+      val = from + (target - from) * e;
       if (p < 1) raf = requestAnimationFrame(tick);
       else val = target;
     }

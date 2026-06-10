@@ -74,6 +74,7 @@
 .m-hero::after {
   content: ''; position: absolute; width: 220px; height: 220px; border-radius: 50%;
   background: rgba(255,255,255,.06); right: -70px; top: -90px;
+  pointer-events: none; /* decorative — must not intercept taps (e.g. the bell) */
 }
 
 /* cards */
@@ -218,7 +219,7 @@ textarea.m-input { resize: vertical; min-height: 76px; line-height: 1.45; }
 .m-slide { animation: mSlide .28s cubic-bezier(.2,.7,.3,1) both; }
 
 @keyframes mFade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes mSlide { from { transform: translateX(30px); } to { transform: none; } }
+@keyframes mSlide { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
 @keyframes mSheetUp { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes mToast { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes mSpin { to { transform: rotate(360deg); } }
@@ -244,11 +245,20 @@ textarea.m-input { resize: vertical; min-height: 76px; line-height: 1.45; }
   .m-stagger > *:nth-child(8) { animation-delay: .38s; }
   .m-stagger > *:nth-child(n+9) { animation-delay: .42s; }
 }
-@keyframes mEnterUp { from { transform: translateY(14px); } to { transform: none; } }
+@keyframes mEnterUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 /* tab content cross-fade on switch */
 .m-tabview { animation: mTabIn .34s cubic-bezier(.2,.7,.3,1) both; }
-@keyframes mTabIn { from { transform: translateY(8px); } to { transform: none; } }
+@keyframes mTabIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* pushed (detail) screens glide + fade in over the tab content */
+.m-screen { animation: mScreenPush .34s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes mScreenPush { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+
+/* GPU hint for the animated layers */
+.m-stagger > *, .m-tabview, .m-hero-in, .m-pop, .m-enter, .m-screen, .m-sheet, .m-slide {
+  will-change: opacity, transform;
+}
 
 /* tab bar polish */
 .m-tab svg { transition: transform .28s cubic-bezier(.34,1.56,.64,1); }
@@ -292,7 +302,7 @@ textarea.m-input { resize: vertical; min-height: 76px; line-height: 1.45; }
 .m-check-p { stroke-dasharray: 48; stroke-dashoffset: 48; animation: mDraw .35s .35s cubic-bezier(.6,0,.4,1) forwards; }
 @keyframes mDraw { to { stroke-dashoffset: 0; } }
 .m-pop { animation: mPop .4s cubic-bezier(.34,1.56,.64,1) both; }
-@keyframes mPop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes mPop { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
 
 /* sparkline bars grow */
 .m-spark-bar { transform-origin: bottom; animation: mGrow .7s cubic-bezier(.2,.8,.3,1) both; }
@@ -307,7 +317,7 @@ textarea.m-input { resize: vertical; min-height: 76px; line-height: 1.45; }
 
 /* hero entrance */
 .m-hero-in { animation: mHeroIn .55s cubic-bezier(.2,.7,.3,1) both; }
-@keyframes mHeroIn { from { transform: translateY(-10px); } to { transform: none; } }
+@keyframes mHeroIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 
 /* scanline */
 .m-scanline { box-shadow: 0 0 14px 3px var(--c-accent); }
@@ -322,3 +332,12 @@ textarea.m-input { resize: vertical; min-height: 76px; line-height: 1.45; }
 /* root tab screen fills the tabview column; pushed screen overlays the content area (tab bar stays) */
 .m-screen-root { height: 100%; display: flex; flex-direction: column; min-height: 0; }
 .m-screen { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; background: var(--c-bg); }
+
+/* Accessibility + safety: with reduced motion, disable entrance animations so
+   content shows at its natural (fully visible) state — never stuck mid-fade. */
+@media (prefers-reduced-motion: reduce) {
+  .m-stagger > *, .m-enter, .m-hero-in, .m-tabview, .m-screen, .m-slide, .m-pop,
+  .m-fade, .m-spark-bar, .m-count, .m-check-c, .m-check-p {
+    animation: none !important;
+  }
+}
