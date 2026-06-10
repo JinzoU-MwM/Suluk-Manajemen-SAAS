@@ -231,6 +231,8 @@ describe("API domain modules", () => {
     });
     const api = createPackageApi({
       cacheInvalidate: () => {},
+      cacheGet: () => null,
+      cacheSet: () => {},
     });
 
     const res = await api.listPackages({
@@ -239,7 +241,7 @@ describe("API domain modules", () => {
       pageSize: 25,
     });
 
-    expect(res.data).toHaveLength(1);
+    expect(res).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/packages/?page=2&page_size=25&status=open",
       expect.objectContaining({
@@ -256,6 +258,8 @@ describe("API domain modules", () => {
     const invalidateMock = vi.fn();
     const api = createPackageApi({
       cacheInvalidate: invalidateMock,
+      cacheGet: () => null,
+      cacheSet: () => {},
     });
 
     await api.updatePackage("pkg-7", { is_published: true });

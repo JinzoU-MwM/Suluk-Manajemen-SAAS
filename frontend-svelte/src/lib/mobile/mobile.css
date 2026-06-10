@@ -1,0 +1,322 @@
+/* ============================================================
+   SULUK MOBILE — staff PWA
+   Ported from the design bundle's mobile.css. Reuses the brand
+   --c-* tokens already defined in src/app.css. The prototype's
+   iOS device frame is dropped: this is full-screen and uses
+   env(safe-area-inset-*) for the notch / home indicator.
+   ============================================================ */
+
+.m-app {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-bg);
+  font-family: var(--font-ui);
+  color: var(--c-ink);
+  overflow: hidden;
+  z-index: 50;
+}
+.m-app * { box-sizing: border-box; }
+.m-app button { font-family: inherit; border: none; background: none; cursor: pointer; }
+
+/* scroll region */
+.m-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.m-scroll::-webkit-scrollbar { width: 0; height: 0; }
+
+/* generic page padding */
+.m-pad { padding: 0 18px; }
+.m-gap { height: 14px; }
+
+/* headers (safe-area top replaces the faked iOS status bar) */
+.m-head {
+  padding: calc(env(safe-area-inset-top) + 16px) 18px 14px;
+  position: relative;
+  flex-shrink: 0;
+}
+.m-head-row { display: flex; align-items: center; gap: 12px; }
+.m-head-title { font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.m-head-sub { font-size: 13.5px; color: var(--c-muted); margin-top: 4px; }
+
+/* compact nav header (pushed screens) */
+.m-nav {
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 12px) 10px 12px;
+  flex-shrink: 0;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-line);
+}
+.m-nav-btn {
+  height: 38px; min-width: 38px; padding: 0 6px;
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--c-primary); font-size: 16px; font-weight: 600;
+  border-radius: 10px;
+}
+.m-nav-btn:active { opacity: .5; }
+.m-nav-title { flex: 1; text-align: center; font-size: 17px; font-weight: 700; letter-spacing: -.01em; padding-right: 38px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* green hero header */
+.m-hero {
+  padding: calc(env(safe-area-inset-top) + 14px) 18px 22px;
+  background: linear-gradient(150deg, var(--c-primary-deep), var(--c-primary));
+  color: #fff;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.m-hero::after {
+  content: ''; position: absolute; width: 220px; height: 220px; border-radius: 50%;
+  background: rgba(255,255,255,.06); right: -70px; top: -90px;
+}
+
+/* cards */
+.m-card {
+  background: var(--c-surface);
+  border-radius: 18px;
+  border: 1px solid var(--c-line);
+  box-shadow: 0 1px 2px rgba(16,33,28,.04);
+}
+.m-card-pad { padding: 16px; }
+
+/* list rows */
+.m-row {
+  display: flex; align-items: center; gap: 13px;
+  padding: 13px 16px;
+  background: var(--c-surface);
+  position: relative;
+  transition: background .12s;
+  width: 100%;
+  text-align: left;
+}
+.m-row:active { background: var(--c-bg-2); }
+.m-row + .m-row::before {
+  content: ''; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--c-line-soft);
+}
+.m-row-ic { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.m-row-main { flex: 1; min-width: 0; }
+.m-row-title { font-size: 15px; font-weight: 600; color: var(--c-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-row-sub { font-size: 12.5px; color: var(--c-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-chev { color: var(--c-faint); flex-shrink: 0; }
+
+/* section label */
+.m-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--c-faint); padding: 0 4px 9px; }
+
+/* buttons */
+.m-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: inherit; font-weight: 700; border-radius: 14px;
+  padding: 14px 20px; font-size: 15.5px; transition: transform .1s, filter .15s;
+  width: 100%;
+}
+.m-btn:active { transform: scale(.98); }
+.m-btn-primary { background: var(--c-primary); color: #fff; }
+.m-btn-deep { background: var(--c-primary-deep); color: #fff; }
+.m-btn-soft { background: var(--c-primary-soft); color: var(--c-primary-deep); }
+.m-btn-ghost { background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-line); }
+.m-btn-danger { background: var(--c-danger-soft); color: var(--c-danger); }
+
+/* pills / chips */
+.m-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+}
+
+/* segmented control */
+.m-seg { display: flex; gap: 3px; background: var(--c-bg-2); padding: 3px; border-radius: 11px; }
+.m-seg button {
+  flex: 1; padding: 8px 10px; font-family: inherit; font-size: 13px; font-weight: 600;
+  border-radius: 8px; color: var(--c-muted); white-space: nowrap; transition: all .15s;
+}
+.m-seg button.on { background: var(--c-surface); color: var(--c-ink); box-shadow: 0 1px 3px rgba(16,33,28,.1); }
+
+/* horizontal scroll chips */
+.m-hscroll { display: flex; gap: 8px; overflow-x: auto; padding: 2px 18px; scrollbar-width: none; }
+.m-hscroll::-webkit-scrollbar { display: none; }
+.m-hchip {
+  flex-shrink: 0; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: var(--c-surface); color: var(--c-muted); border: 1px solid var(--c-line); white-space: nowrap;
+}
+.m-hchip.on { background: var(--c-primary); color: #fff; border-color: var(--c-primary); }
+
+/* search */
+.m-search { position: relative; }
+.m-search input {
+  width: 100%; padding: 11px 14px 11px 40px; font-size: 15px; font-family: inherit;
+  background: var(--c-bg-2); border: none; border-radius: 12px; color: var(--c-ink); outline: none;
+}
+.m-search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--c-faint); }
+
+/* inputs */
+.m-field label { display: block; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--c-faint); margin-bottom: 7px; }
+.m-input {
+  width: 100%; padding: 13px 14px; font-size: 15px; font-family: inherit; color: var(--c-ink);
+  background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 12px; outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.m-input:focus { border-color: var(--c-primary); box-shadow: 0 0 0 3px var(--c-primary-soft); }
+
+/* progress */
+.m-prog { height: 7px; background: var(--c-bg-2); border-radius: 999px; overflow: hidden; }
+.m-prog > i { display: block; height: 100%; border-radius: 999px; transition: width .6s cubic-bezier(.2,.7,.3,1); }
+
+/* tab bar (safe-area bottom replaces the faked home indicator) */
+.m-tabbar {
+  flex-shrink: 0;
+  display: flex;
+  padding: 9px 8px calc(env(safe-area-inset-bottom) + 12px);
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border-top: 1px solid var(--c-line);
+}
+.m-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 4px 0; color: var(--c-faint); transition: color .15s; position: relative;
+}
+.m-tab.on { color: var(--c-primary); }
+.m-tab span { font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
+.m-tab-scan { margin-top: -16px; }
+.m-tab-scan .ic {
+  width: 52px; height: 52px; border-radius: 17px; background: linear-gradient(150deg, var(--c-primary), var(--c-primary-deep));
+  display: flex; align-items: center; justify-content: center; color: #fff;
+  box-shadow: 0 8px 18px -4px rgba(15,61,46,.5); border: 3px solid var(--c-surface);
+}
+
+/* bottom sheet */
+.m-sheet-wrap { position: absolute; inset: 0; z-index: 80; display: flex; flex-direction: column; justify-content: flex-end; }
+.m-sheet-bd { position: absolute; inset: 0; background: rgba(15,33,28,.4); animation: mFade .2s ease; }
+.m-sheet {
+  position: relative; background: var(--c-surface); border-radius: 26px 26px 0 0;
+  max-height: 88%; display: flex; flex-direction: column; animation: mSheetUp .3s cubic-bezier(.2,.8,.3,1);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 30px);
+}
+.m-sheet-grip { width: 38px; height: 5px; border-radius: 999px; background: var(--c-line); margin: 10px auto 4px; flex-shrink: 0; }
+.m-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 12px; }
+.m-sheet-title { font-size: 18px; font-weight: 800; }
+.m-sheet-body { overflow-y: auto; padding: 0 20px; }
+.m-sheet-x { width: 30px; height: 30px; border-radius: 50%; background: var(--c-bg-2); display: flex; align-items: center; justify-content: center; color: var(--c-muted); }
+
+/* toast */
+.m-toast-wrap { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 100px); z-index: 90; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.m-toast {
+  display: flex; align-items: center; gap: 9px; background: var(--c-ink); color: #fff;
+  font-size: 13.5px; font-weight: 600; padding: 11px 16px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  animation: mToast .3s cubic-bezier(.2,.8,.3,1); max-width: 86%;
+}
+
+/* misc */
+.tnum { font-variant-numeric: tabular-nums; }
+.m-fade { animation: mFade .25s ease both; }
+.m-slide { animation: mSlide .28s cubic-bezier(.2,.7,.3,1) both; }
+
+@keyframes mFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mSlide { from { transform: translateX(30px); } to { transform: none; } }
+@keyframes mSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes mToast { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes mSpin { to { transform: rotate(360deg); } }
+.m-spin { animation: mSpin .9s linear infinite; display: inline-flex; }
+
+/* ============================================================
+   POLISH LAYER — micro-interactions & entrance animations
+   ============================================================ */
+.m-card { transition: transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .16s; }
+.m-card:active { transform: scale(.985); }
+.m-tab, .m-row-ic, .m-app button { -webkit-tap-highlight-color: transparent; }
+
+/* staggered entrance — transform-led so content is never hidden if frozen */
+@media (prefers-reduced-motion: no-preference) {
+  .m-stagger > * { animation: mEnterUp .5s cubic-bezier(.2,.75,.3,1) both; }
+  .m-stagger > *:nth-child(1) { animation-delay: .03s; }
+  .m-stagger > *:nth-child(2) { animation-delay: .08s; }
+  .m-stagger > *:nth-child(3) { animation-delay: .13s; }
+  .m-stagger > *:nth-child(4) { animation-delay: .18s; }
+  .m-stagger > *:nth-child(5) { animation-delay: .23s; }
+  .m-stagger > *:nth-child(6) { animation-delay: .28s; }
+  .m-stagger > *:nth-child(7) { animation-delay: .33s; }
+  .m-stagger > *:nth-child(8) { animation-delay: .38s; }
+  .m-stagger > *:nth-child(n+9) { animation-delay: .42s; }
+}
+@keyframes mEnterUp { from { transform: translateY(14px); } to { transform: none; } }
+
+/* tab content cross-fade on switch */
+.m-tabview { animation: mTabIn .34s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes mTabIn { from { transform: translateY(8px); } to { transform: none; } }
+
+/* tab bar polish */
+.m-tab svg { transition: transform .28s cubic-bezier(.34,1.56,.64,1); }
+.m-tab.on svg { transform: translateY(-2px) scale(1.06); }
+.m-tab span { transition: color .15s, opacity .15s; }
+.m-tab .m-tab-dot {
+  position: absolute; bottom: -2px; left: 50%; width: 5px; height: 5px; border-radius: 999px;
+  background: var(--c-primary); transform: translateX(-50%) scale(0); transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+.m-tab.on .m-tab-dot { transform: translateX(-50%) scale(1); }
+
+/* scan FAB — idle breathing + press spring */
+.m-tab-scan .ic { transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .3s; animation: mScanBreathe 3.2s ease-in-out infinite; }
+.m-tab-scan:active .ic { transform: scale(.9); }
+@keyframes mScanBreathe {
+  0%, 100% { box-shadow: 0 8px 18px -4px rgba(15,61,46,.5); }
+  50% { box-shadow: 0 10px 26px -2px rgba(27,127,90,.6); }
+}
+
+/* button shine on primary */
+.m-btn-primary, .m-btn-deep { position: relative; overflow: hidden; }
+.m-btn-primary::after, .m-btn-deep::after {
+  content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.28), transparent);
+  transform: skewX(-18deg); transition: left .5s ease;
+}
+.m-btn-primary:active::after, .m-btn-deep:active::after { left: 130%; }
+
+/* segmented control thumb feel */
+.m-seg button { transition: color .2s, background .2s, box-shadow .2s, transform .12s; }
+.m-seg button:active { transform: scale(.96); }
+.m-seg button.on { animation: mSegPop .25s ease; }
+@keyframes mSegPop { 0% { transform: scale(.94); } 60% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+/* chips press */
+.m-hchip { transition: all .18s; }
+.m-hchip:active { transform: scale(.95); }
+
+/* animated success check (SVG stroke draw) */
+.m-check-c { stroke-dasharray: 166; stroke-dashoffset: 166; animation: mDraw .5s cubic-bezier(.6,0,.4,1) forwards; }
+.m-check-p { stroke-dasharray: 48; stroke-dashoffset: 48; animation: mDraw .35s .35s cubic-bezier(.6,0,.4,1) forwards; }
+@keyframes mDraw { to { stroke-dashoffset: 0; } }
+.m-pop { animation: mPop .4s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes mPop { from { transform: scale(0); } to { transform: scale(1); } }
+
+/* sparkline bars grow */
+.m-spark-bar { transform-origin: bottom; animation: mGrow .7s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes mGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* entrance for individual cards (transform-only, safe when frozen) */
+.m-enter { animation: mEnterUp .45s cubic-bezier(.2,.75,.3,1) both; }
+
+/* quick-action bounce on press */
+.m-qa { transition: transform .14s cubic-bezier(.34,1.56,.64,1); }
+.m-qa:active { transform: scale(.93); }
+
+/* hero entrance */
+.m-hero-in { animation: mHeroIn .55s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes mHeroIn { from { transform: translateY(-10px); } to { transform: none; } }
+
+/* scanline */
+.m-scanline { box-shadow: 0 0 14px 3px var(--c-accent); }
+
+/* empty state */
+.m-empty { text-align: center; padding: 56px 20px; color: var(--c-faint); }
+.m-empty .ic { color: var(--c-faint); }
+
+/* spinner block for loading screens */
+.m-loading { display: flex; align-items: center; justify-content: center; flex: 1; color: var(--c-faint); }
+
+/* root tab screen fills the tabview column; pushed screen overlays the content area (tab bar stays) */
+.m-screen-root { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.m-screen { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; background: var(--c-bg); }

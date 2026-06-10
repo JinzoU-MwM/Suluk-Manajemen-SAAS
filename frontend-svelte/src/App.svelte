@@ -236,6 +236,7 @@
 
   // Lazy-loaded page components (reduces initial bundle for mobile/Landing)
   let DashboardPage = $state(null);
+  let MobileApp = $state(null);
   let ProfilePage = $state(null);
   let SuperAdminDashboardPage = $state(null);
   let InventoryPage = $state(null);
@@ -267,6 +268,8 @@
   async function ensurePage(page) {
     if (page === "dashboard" && !DashboardPage) {
       DashboardPage = (await import("./lib/pages/Dashboard.svelte")).default;
+    } else if (page === "mobile" && !MobileApp) {
+      MobileApp = (await import("./lib/mobile/MobileApp.svelte")).default;
     } else if (page === "profile" && !ProfilePage) {
       ProfilePage = (await import("./lib/pages/ProfilePage.svelte")).default;
     } else if (page === "super-admin" && !SuperAdminDashboardPage) {
@@ -339,6 +342,9 @@
     }
     if (superAdminMatch) {
       return { page: "super-admin", sharedToken: "", registrationToken: "", packageSlug: "", contractToken: "" };
+    }
+    if (hash === "#/app") {
+      return { page: "mobile", sharedToken: "", registrationToken: "", packageSlug: "", contractToken: "" };
     }
     if (manifestMatch) {
       return { page: "mutawwif", sharedToken: manifestMatch[1], registrationToken: "", packageSlug: "", contractToken: "" };
@@ -532,6 +538,10 @@
       if (h === "#/super-admin") {
         currentPage = "super-admin";
         checkSuperAdminAuth(); // Check auth when navigating to super-admin
+      }
+      if (h === "#/app") {
+        ensurePage("mobile");
+        currentPage = "mobile";
       }
       if (m) {
         sharedToken = m[1];
@@ -749,6 +759,23 @@
       onLoginSuccess={handleLoginSuccess}
       onBack={() => (currentPage = "landing")}
     />
+  {:else if currentPage === "mobile"}
+    {#if user}
+      {#if MobileApp}
+        <MobileApp
+          {user}
+          onExit={() => {
+            window.location.hash = "#/dashboard";
+            currentPage = "dashboard";
+          }}
+          onLogout={handleLogout}
+        />
+      {:else}
+        <div class="min-h-screen flex items-center justify-center text-slate-500">Memuat aplikasi…</div>
+      {/if}
+    {:else}
+      <Login initialMode="login" onLoginSuccess={handleLoginSuccess} onBack={() => (currentPage = "landing")} />
+    {/if}
   {:else if showSidebar}
     <!-- Layout with Sidebar (matches Claude design app shell) -->
     <div class="suluk-shell">

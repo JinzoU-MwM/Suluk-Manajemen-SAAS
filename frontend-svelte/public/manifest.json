@@ -1,11 +1,11 @@
 {
-  "name": "Jamaah.in",
-  "short_name": "Jamaah",
-  "description": "Kelola data jamaah Umroh & Haji dengan mudah",
-  "start_url": "/",
+  "name": "Suluk — ERP for Travel",
+  "short_name": "Suluk",
+  "description": "Kelola travel Umroh & Haji: jamaah, paket, keuangan, AI Scanner — di mana saja.",
+  "start_url": "/#/app",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#10b981",
+  "background_color": "#0F3D2E",
+  "theme_color": "#0F3D2E",
   "orientation": "portrait-primary",
   "icons": [
     {
