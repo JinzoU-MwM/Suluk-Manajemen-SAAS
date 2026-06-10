@@ -12,6 +12,7 @@
     Plus,
     Receipt,
     ScanLine,
+    Smartphone,
     TrendingUp,
     UserPlus,
     Users,
@@ -27,7 +28,7 @@
   import Button from "../components/ui/Button.svelte";
   import ProgressBar from "../components/ui/ProgressBar.svelte";
 
-  let { user = null, subscription = null, onNavigate = null } = $props();
+  let { user = null, subscription = null, onNavigate = null, onUpgrade = null } = $props();
 
   let stats = $state(null);
   let ownerDash = $state(null);
@@ -215,6 +216,23 @@
       </div>
     {/if}
 
+    <!-- Mobile app banner -->
+    <div class="dash-appbar" style="margin-bottom:var(--gap)">
+      <div class="dash-appbar-ic"><Smartphone class="h-6 w-6" /></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          Aplikasi Mobile Suluk
+          <span style="font-size:10.5px;font-weight:800;letter-spacing:.06em;background:var(--c-accent-soft);color:var(--c-accent);padding:2px 8px;border-radius:999px">PRO</span>
+        </div>
+        <div style="font-size:13px;color:var(--c-muted);margin-top:2px">Kelola jamaah, pembayaran & AI Scanner langsung dari ponsel.</div>
+      </div>
+      {#if isPro}
+        <a class="dash-app-btn" href="#/unduh">Unduh Aplikasi</a>
+      {:else}
+        <button type="button" class="dash-app-btn" onclick={() => onUpgrade?.()}>Upgrade ke Pro</button>
+      {/if}
+    </div>
+
     <!-- Stat cards -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--gap);margin-bottom:var(--gap)">
       {#each statCards as card}
@@ -378,5 +396,24 @@
   }
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+  .dash-appbar {
+    display: flex; align-items: center; gap: 14px;
+    background: linear-gradient(120deg, var(--c-primary-deep), var(--c-primary));
+    color: #fff; border-radius: var(--radius-lg, 16px); padding: 16px 18px;
+  }
+  .dash-appbar-ic {
+    flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px;
+    background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center;
+  }
+  .dash-app-btn {
+    flex-shrink: 0; background: #fff; color: var(--c-primary-deep); font-weight: 700; font-size: 13.5px;
+    padding: 10px 18px; border-radius: 11px; border: none; cursor: pointer; text-decoration: none; white-space: nowrap;
+    transition: transform .12s;
+  }
+  .dash-app-btn:hover { transform: translateY(-1px); }
+  @media (max-width: 640px) {
+    .dash-appbar { flex-wrap: wrap; }
+    .dash-app-btn { width: 100%; text-align: center; }
   }
 </style>

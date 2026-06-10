@@ -11,6 +11,7 @@
     { slug: "software", label: "Software" },
     { slug: "fitur-invoice", label: "Invoice" },
     { slug: "fitur-crm", label: "CRM" },
+    { slug: "unduh", label: "Aplikasi" },
     { slug: "about", label: "Tentang" },
     { slug: "contact", label: "Kontak" },
   ];
@@ -62,6 +63,7 @@
           <ul>
             <li><button type="button" class="foot-link" onclick={() => onHome()}>Beranda</button></li>
             <li><button type="button" class="foot-link" onclick={() => onNav("software")}>Software</button></li>
+            <li><button type="button" class="foot-link" onclick={() => onNav("unduh")}>Aplikasi Mobile</button></li>
             <li><button type="button" class="foot-link" onclick={() => onGoToApp()}>Demo</button></li>
           </ul>
         </div>

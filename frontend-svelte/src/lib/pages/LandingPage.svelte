@@ -82,6 +82,7 @@
         <a href="#cara" onclick={(e) => scrollToSection(e, "cara")}>Cara Kerja</a>
         <a href="#harga" onclick={(e) => scrollToSection(e, "harga")}>Harga</a>
         <a href="#testimoni" onclick={(e) => scrollToSection(e, "testimoni")}>Testimoni</a>
+        <a href="#/unduh">Aplikasi</a>
       </div>
       <div class="lp-nav-actions">
         <button class="lp-login" onclick={() => onGoToLogin()}>Masuk</button>
@@ -97,6 +98,7 @@
       <a href="#cara" onclick={(e) => scrollToSection(e, "cara")}>Cara Kerja</a>
       <a href="#harga" onclick={(e) => scrollToSection(e, "harga")}>Harga</a>
       <a href="#testimoni" onclick={(e) => scrollToSection(e, "testimoni")}>Testimoni</a>
+      <a href="#/unduh">Aplikasi</a>
       <button class="lp-btn lp-btn-primary" onclick={() => onGoToRegister()}>Coba Gratis 14 Hari</button>
     </div>
   </nav>
@@ -351,6 +353,33 @@
     </div>
   </section>
 
+  <!-- APLIKASI MOBILE -->
+  <section class="lp-sec" id="aplikasi">
+    <div class="lp-container">
+      <div class="lp-app-band">
+        <div class="lp-app-copy">
+          <span class="lp-app-tag">APLIKASI MOBILE · FITUR PRO</span>
+          <h2>Kelola travel dari genggaman</h2>
+          <p>Scan KTP/paspor pakai kamera, catat pembayaran, setujui refund &amp; diskon, dan pantau jamaah — langsung dari ponsel, di mana saja. Tersedia untuk paket Pro ke atas.</p>
+          <div class="lp-app-actions">
+            <a class="lp-btn lp-btn-white lp-btn-lg" href="#/unduh">⬇ Unduh Aplikasi</a>
+            <a class="lp-btn lp-btn-lg lp-app-ghost" href="#/app">Buka Web App →</a>
+          </div>
+        </div>
+        <div class="lp-app-art" aria-hidden="true">
+          <div class="lp-phone">
+            <div class="lp-phone-notch"></div>
+            <div class="lp-phone-screen">
+              <img src="/brand/suluk-mark-white.png" alt="" />
+              <div class="lp-phone-name">Suluk</div>
+              <div class="lp-phone-tag">ERP FOR TRAVEL</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA -->
   <section class="lp-cta-sec">
     <div class="lp-container">
@@ -376,7 +405,7 @@
           </a>
           <p>Sistem manajemen all-in-one untuk bisnis travel umrah &amp; haji di Indonesia. Otomatis, terintegrasi, dan dibuat untuk pertumbuhan.</p>
         </div>
-        <div><h4>Fitur</h4><ul><li><button class="lp-foot-link" onclick={() => onNavigate("software")}>Software Travel</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-invoice")}>Invoice</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-crm")}>CRM Jamaah</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-keuangan")}>Laporan Keuangan</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-kontrak")}>E-Kontrak</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-payroll")}>Payroll</button></li></ul></div>
+        <div><h4>Fitur</h4><ul><li><button class="lp-foot-link" onclick={() => onNavigate("software")}>Software Travel</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-invoice")}>Invoice</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-crm")}>CRM Jamaah</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-keuangan")}>Laporan Keuangan</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-kontrak")}>E-Kontrak</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("fitur-payroll")}>Payroll</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("unduh")}>Aplikasi Mobile</button></li></ul></div>
         <div><h4>Perusahaan</h4><ul><li><button class="lp-foot-link" onclick={() => onNavigate("about")}>Tentang</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("contact")}>Kontak</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("privacy")}>Kebijakan Privasi</button></li><li><button class="lp-foot-link" onclick={() => onNavigate("terms")}>Syarat &amp; Ketentuan</button></li></ul></div>
         <div><h4>Akun</h4><ul><li><button class="lp-foot-link" onclick={() => onGoToLogin()}>Masuk</button></li><li><button class="lp-foot-link" onclick={() => onGoToRegister()}>Daftar Gratis</button></li></ul></div>
       </div>
@@ -586,5 +615,33 @@
     .lp-cta-actions .lp-btn { width: 100%; }
     .lp-footer-grid { grid-template-columns: 1fr; gap: 30px; }
     .lp-footer-bottom { flex-direction: column; align-items: flex-start; }
+    .lp-app-band { grid-template-columns: 1fr; padding: 32px 24px; text-align: center; }
+    .lp-app-actions { justify-content: center; }
+    .lp-app-art { display: none; }
   }
+
+  /* Aplikasi Mobile section */
+  a.lp-btn { text-decoration: none; }
+  .lp-app-band {
+    display: grid; grid-template-columns: 1.2fr .8fr; gap: 28px; align-items: center;
+    background: linear-gradient(135deg, var(--c-primary-deep), var(--c-primary));
+    border-radius: 28px; padding: 44px 48px; color: #fff; overflow: hidden;
+  }
+  .lp-app-tag { font-size: 12px; font-weight: 800; letter-spacing: .14em; color: var(--c-accent); }
+  .lp-app-band h2 { font-family: var(--font-display, Georgia, serif); font-size: 30px; font-weight: 800; margin: 12px 0 10px; letter-spacing: -.02em; }
+  .lp-app-band p { font-size: 15.5px; line-height: 1.65; opacity: .92; max-width: 460px; }
+  .lp-app-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+  .lp-app-ghost { background: rgba(255,255,255,.14); color: #fff; }
+  .lp-app-ghost:hover { background: rgba(255,255,255,.22); }
+  .lp-app-art { display: flex; justify-content: center; }
+  .lp-phone {
+    width: 168px; height: 320px; border-radius: 30px; background: #0a2a1f;
+    border: 6px solid rgba(255,255,255,.16); position: relative; box-shadow: 0 24px 60px -20px rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lp-phone-notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 54px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.25); }
+  .lp-phone-screen { text-align: center; }
+  .lp-phone-screen img { height: 60px; width: auto; }
+  .lp-phone-name { font-family: var(--font-display, Georgia, serif); font-size: 22px; font-weight: 800; color: #fff; margin-top: 12px; }
+  .lp-phone-tag { font-size: 9px; font-weight: 700; letter-spacing: .18em; color: var(--c-accent); margin-top: 3px; }
 </style>

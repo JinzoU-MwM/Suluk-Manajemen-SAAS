@@ -12,6 +12,7 @@
   import GuideKeuangan from "./GuideKeuangan.svelte";
   import GuideKontrak from "./GuideKontrak.svelte";
   import GuidePayroll from "./GuidePayroll.svelte";
+  import Unduh from "./Unduh.svelte";
 
   let { slug = "", onNav = () => {}, onGoToApp = () => {}, onHome = () => {} } = $props();
 
@@ -26,6 +27,7 @@
     "fitur-keuangan": GuideKeuangan,
     "fitur-kontrak": GuideKontrak,
     "fitur-payroll": GuidePayroll,
+    unduh: Unduh,
   };
   let Comp = $derived(MAP[slug] || NotFound);
 </script>

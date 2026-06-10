@@ -18,6 +18,7 @@
     "#/fitur/laporan-keuangan": "fitur-keuangan",
     "#/fitur/e-kontrak": "fitur-kontrak",
     "#/fitur/penggajian": "fitur-payroll",
+    "#/unduh": "unduh",
   };
   const SLUG_TO_HASH = {
     about: "#/tentang",
@@ -30,6 +31,7 @@
     "fitur-keuangan": "#/fitur/laporan-keuangan",
     "fitur-kontrak": "#/fitur/e-kontrak",
     "fitur-payroll": "#/fitur/penggajian",
+    unduh: "#/unduh",
   };
   function marketingSlugForHash(h) {
     if (MARKETING_HASHES[h]) return MARKETING_HASHES[h];
@@ -238,6 +240,7 @@
   let DashboardPage = $state(null);
   let MobileApp = $state(null);
   let MobileLogin = $state(null);
+  let MobileProGate = $state(null);
   let ProfilePage = $state(null);
   let SuperAdminDashboardPage = $state(null);
   let InventoryPage = $state(null);
@@ -271,6 +274,7 @@
       DashboardPage = (await import("./lib/pages/Dashboard.svelte")).default;
     } else if (page === "mobile") {
       if (!MobileLogin) MobileLogin = (await import("./lib/mobile/screens/MobileLogin.svelte")).default;
+      if (!MobileProGate) MobileProGate = (await import("./lib/mobile/screens/MobileProGate.svelte")).default;
       if (!MobileApp) MobileApp = (await import("./lib/mobile/MobileApp.svelte")).default;
     } else if (page === "profile" && !ProfilePage) {
       ProfilePage = (await import("./lib/pages/ProfilePage.svelte")).default;
@@ -394,6 +398,7 @@
   let currentPage = $state(initial.page);
   let user = $state(null);
   let subscription = $state(null);
+  let subLoaded = $state(false); // true once a subscription fetch has resolved (for the mobile Pro-gate)
   let sidebarCollapsed = $state(false);
   let sidebarOpen = $state(false); // mobile drawer
   let marketingSlug = $state(initial.marketingSlug || "");
@@ -517,6 +522,7 @@
         ApiService.getTrialStatus().catch(() => null),
       ]);
       subscription = sub;
+      subLoaded = true;
       groups = groupsData.groups || [];
       trialAvailable = trial?.trial_available ?? false;
     } catch (err) {
@@ -611,6 +617,7 @@
         ApiService.getTrialStatus().catch(() => null),
       ]);
       subscription = sub;
+      subLoaded = true;
       groups = groupsData?.groups || [];
       trialAvailable = trial?.trial_available ?? false;
       currentPage = currentPage === "super-admin" ? "super-admin" : homePage();
@@ -661,6 +668,7 @@
         ApiService.getTrialStatus().catch(() => null),
       ]);
       subscription = sub;
+      subLoaded = true;
       groups = groupsData.groups || [];
       trialAvailable = trial?.trial_available ?? false;
     } catch (e) {
@@ -800,7 +808,26 @@
     />
   {:else if currentPage === "mobile"}
     {#if user}
-      {#if MobileApp}
+      {#if !subLoaded}
+        <div class="min-h-screen flex items-center justify-center text-slate-500" style="background:#0F3D2E;color:#fff">Memuat…</div>
+      {:else if !isPro}
+        {#if MobileProGate}
+          <MobileProGate
+            {user}
+            plan={subscription?.plan ?? ""}
+            onUpgrade={() => (showGlobalUpgradeModal = true)}
+            onExit={() => {
+              setMobileMode(false);
+              window.location.hash = "#/dashboard";
+              currentPage = "dashboard";
+              ensurePage("dashboard");
+            }}
+            onLogout={handleLogout}
+          />
+        {:else}
+          <div class="min-h-screen flex items-center justify-center text-slate-500">Memuat…</div>
+        {/if}
+      {:else if MobileApp}
         <MobileApp
           {user}
           onExit={() => {
@@ -851,6 +878,7 @@
               onLogout={handleLogout}
               onSubscriptionChange={loadUserData}
               onNavigate={handlePageChange}
+              onUpgrade={() => (showGlobalUpgradeModal = true)}
             />
           {:else}
             <div class="p-6 text-slate-500">Loading dashboard...</div>
@@ -1133,20 +1161,19 @@
   {/if}
 
   <!-- Desktop-only global overlays — never render over the mobile shell -->
-  {#if currentPage !== "mobile"}
-    <!-- Global Upgrade Modal -->
-    <UpgradeModal
-      show={showGlobalUpgradeModal}
-      onClose={() => (showGlobalUpgradeModal = false)}
-      onSuccess={async (newSub) => {
-        subscription = newSub;
-        showGlobalUpgradeModal = false;
-        await loadUserData();
-      }}
-    />
-    {#if showSupportChat}
-      <SupportChatBubble />
-    {/if}
+  <!-- Global Upgrade Modal (also used by the mobile Pro-gate) -->
+  <UpgradeModal
+    show={showGlobalUpgradeModal}
+    onClose={() => (showGlobalUpgradeModal = false)}
+    onSuccess={async (newSub) => {
+      subscription = newSub;
+      showGlobalUpgradeModal = false;
+      await loadUserData();
+    }}
+  />
+  <!-- Desktop-only overlays — never on the mobile shell (it has its own MToast) -->
+  {#if showSupportChat}
+    <SupportChatBubble />
   {/if}
 </main>
 {#if currentPage !== "mobile"}
