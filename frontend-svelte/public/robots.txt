@@ -1,9 +1,10 @@
 User-agent: *
 Allow: /
-Allow: /software-travel-umrah.html
-Allow: /fitur-ocr-siskopatuh.html
-Allow: /fitur-rooming-jamaah.html
-Allow: /manifest-mutawwif-digital.html
 Disallow: /api/
+Disallow: /app
+Disallow: /super-admin
+Disallow: /m/
+Disallow: /reg/
+Disallow: /kontrak/
 
 Sitemap: https://suluk.site/sitemap.xml

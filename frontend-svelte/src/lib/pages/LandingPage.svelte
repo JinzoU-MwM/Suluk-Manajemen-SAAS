@@ -1,27 +1,11 @@
 <script>
   import { PLANS } from "../config/pricing.js";
+  import LandingNav from "../components/LandingNav.svelte";
 
   let { onGoToLogin = () => {}, onGoToRegister = () => {}, onNavigate = () => {} } = $props();
 
-  let mobileMenuOpen = $state(false);
-
-  function closeMenu() {
-    mobileMenuOpen = false;
-  }
-
-  // Smooth-scroll to an on-page section. Uses scrollIntoView (reliable across
-  // scroll containers) and preventDefault so the hash router is never triggered
-  // and the URL stays clean.
-  function scrollToSection(e, id) {
-    e?.preventDefault();
-    closeMenu();
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   function scrollTop(e) {
     e?.preventDefault();
-    closeMenu();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -67,41 +51,7 @@
 
 <div class="lp">
   <!-- NAV -->
-  <nav class="lp-nav">
-    <div class="lp-container lp-nav-inner">
-      <a class="lp-brand" href="#top" onclick={(e) => scrollTop(e)}>
-        <span class="lp-brand-mark"><img src="/brand/suluk-mark.png" alt="Suluk" style="height:42px;width:auto;display:block" /></span>
-        <span>
-          <span class="lp-brand-name">Suluk</span>
-          <div class="lp-brand-sub">ERP FOR TRAVEL</div>
-        </span>
-      </a>
-      <div class="lp-nav-links">
-        <a href="#fitur" onclick={(e) => scrollToSection(e, "fitur")}>Fitur</a>
-        <a href="#modul" onclick={(e) => scrollToSection(e, "modul")}>Modul</a>
-        <a href="#cara" onclick={(e) => scrollToSection(e, "cara")}>Cara Kerja</a>
-        <a href="#harga" onclick={(e) => scrollToSection(e, "harga")}>Harga</a>
-        <a href="#testimoni" onclick={(e) => scrollToSection(e, "testimoni")}>Testimoni</a>
-        <a href="#/unduh">Aplikasi</a>
-      </div>
-      <div class="lp-nav-actions">
-        <button class="lp-login" onclick={() => onGoToLogin()}>Masuk</button>
-        <button class="lp-btn lp-btn-primary lp-cta-nav" onclick={() => onGoToRegister()}>Coba Gratis</button>
-        <button class="lp-burger" aria-label="Menu" onclick={() => (mobileMenuOpen = !mobileMenuOpen)}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="lp-mobile-menu" class:open={mobileMenuOpen}>
-      <a href="#fitur" onclick={(e) => scrollToSection(e, "fitur")}>Fitur</a>
-      <a href="#modul" onclick={(e) => scrollToSection(e, "modul")}>Modul</a>
-      <a href="#cara" onclick={(e) => scrollToSection(e, "cara")}>Cara Kerja</a>
-      <a href="#harga" onclick={(e) => scrollToSection(e, "harga")}>Harga</a>
-      <a href="#testimoni" onclick={(e) => scrollToSection(e, "testimoni")}>Testimoni</a>
-      <a href="#/unduh">Aplikasi</a>
-      <button class="lp-btn lp-btn-primary" onclick={() => onGoToRegister()}>Coba Gratis 14 Hari</button>
-    </div>
-  </nav>
+  <LandingNav />
 
   <!-- HERO -->
   <header class="lp-hero" id="top">
@@ -362,8 +312,8 @@
           <h2>Kelola travel dari genggaman</h2>
           <p>Scan KTP/paspor pakai kamera, catat pembayaran, setujui refund &amp; diskon, dan pantau jamaah — langsung dari ponsel, di mana saja. Tersedia untuk paket Pro ke atas.</p>
           <div class="lp-app-actions">
-            <a class="lp-btn lp-btn-white lp-btn-lg" href="#/unduh">⬇ Unduh Aplikasi</a>
-            <a class="lp-btn lp-btn-lg lp-app-ghost" href="#/app">Buka Web App →</a>
+            <a class="lp-btn lp-btn-white lp-btn-lg" href="/unduh">⬇ Unduh Aplikasi</a>
+            <a class="lp-btn lp-btn-lg lp-app-ghost" href="/mobile">Buka Web App →</a>
           </div>
         </div>
         <div class="lp-app-art" aria-hidden="true">
@@ -433,20 +383,12 @@
   .lp-btn-white:hover { transform: translateY(-2px); }
   .lp-btn-lg { padding: 16px 30px; font-size: 16px; }
 
-  .lp-nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.82); backdrop-filter: saturate(180%) blur(14px); border-bottom: 1px solid var(--c-line); }
-  .lp-nav-inner { display: flex; align-items: center; gap: 32px; height: 70px; }
+  /* Brand mark styles — reused by the footer brand link. (The top navbar now
+     lives in the shared LandingNav component.) */
   .lp-brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
   .lp-brand-mark { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .lp-brand-name { font-family: var(--font-display); font-size: 23px; font-weight: 800; line-height: 1; }
   .lp-brand-sub { font-size: 9.5px; font-weight: 700; letter-spacing: .17em; color: var(--c-accent); margin-top: 4px; }
-  .lp-nav-links { display: flex; gap: 30px; flex: 1; }
-  .lp-nav-links a { font-size: 14.5px; font-weight: 600; color: var(--c-ink-soft); transition: color .15s; }
-  .lp-nav-links a:hover { color: var(--c-primary); }
-  .lp-nav-actions { display: flex; align-items: center; gap: 12px; }
-  .lp-nav-actions .lp-login { font-size: 14.5px; font-weight: 700; color: var(--c-ink); padding: 10px 8px; background: none; border: none; cursor: pointer; }
-  .lp-burger { display: none; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 10px; color: var(--c-ink); background: none; border: none; cursor: pointer; }
-  .lp-burger:hover { background: var(--c-bg); }
-  .lp-mobile-menu { display: none; }
 
   .lp-hero { padding: 80px 0 90px; background: radial-gradient(1200px 500px at 80% -10%, var(--c-primary-tint), transparent 60%), radial-gradient(900px 500px at 0% 0%, var(--c-accent-soft), transparent 55%); }
   .lp-hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
@@ -581,14 +523,6 @@
 
   @media (max-width: 760px) {
     .lp-container { padding: 0 18px; }
-    .lp-nav-links { display: none; }
-    .lp-nav-actions .lp-login, .lp-nav-actions .lp-cta-nav { display: none; }
-    .lp-burger { display: flex; }
-    .lp-nav-inner { justify-content: space-between; gap: 12px; }
-    .lp-mobile-menu { position: fixed; inset: 70px 0 auto; background: var(--c-surface); border-bottom: 1px solid var(--c-line); box-shadow: var(--shadow-lg); padding: 16px 18px 22px; z-index: 99; }
-    .lp-mobile-menu.open { display: block; }
-    .lp-mobile-menu a { display: block; padding: 13px 8px; font-size: 16px; font-weight: 600; color: var(--c-ink); border-bottom: 1px solid var(--c-line-soft); }
-    .lp-mobile-menu .lp-btn { width: 100%; margin-top: 16px; }
     .lp-hero { padding: 48px 0 56px; }
     .lp-hero-grid { grid-template-columns: 1fr; gap: 54px; }
     .lp-h1 { font-size: 36px; }

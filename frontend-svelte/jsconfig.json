@@ -1,4 +1,5 @@
 {
+  "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     "moduleResolution": "bundler",
     "target": "ESNext",
@@ -17,17 +18,17 @@
      */
     "sourceMap": true,
     "esModuleInterop": true,
-    "types": ["vite/client"],
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
     /**
      * Typecheck JS in `.svelte` and `.js` files by default.
      * Disable this if you'd like to use dynamic types.
      */
     "checkJs": true
-  },
+  }
   /**
-   * Use global.d.ts instead of compilerOptions.types
-   * to avoid limiting type declarations.
+   * Path aliases ($lib, $app/*) and the file include/exclude list are inherited
+   * from .svelte-kit/tsconfig.json — do not redefine `include` here or the
+   * generated ambient SvelteKit types ($app/navigation, etc.) drop out.
    */
-  "include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.svelte"]
 }

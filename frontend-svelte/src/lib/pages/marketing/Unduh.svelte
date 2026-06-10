@@ -44,7 +44,7 @@
         <ol class="dl-steps">
           {#each iosSteps as s, i}<li><span>{i + 1}</span>{s}</li>{/each}
         </ol>
-        <a class="dl-btn dl-btn-soft" href="#/app">Buka Aplikasi Web →</a>
+        <a class="dl-btn dl-btn-soft" href="/mobile">Buka Aplikasi Web →</a>
       </div>
 
       <!-- Stores -->
