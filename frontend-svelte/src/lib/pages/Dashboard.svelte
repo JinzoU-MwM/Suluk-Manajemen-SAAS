@@ -227,7 +227,7 @@
         <div style="font-size:13px;color:var(--c-muted);margin-top:2px">Kelola jamaah, pembayaran & AI Scanner langsung dari ponsel.</div>
       </div>
       {#if isPro}
-        <a class="dash-app-btn" href="#/unduh">Unduh Aplikasi</a>
+        <a class="dash-app-btn" href="/unduh">Unduh Aplikasi</a>
       {:else}
         <button type="button" class="dash-app-btn" onclick={() => onUpgrade?.()}>Upgrade ke Pro</button>
       {/if}

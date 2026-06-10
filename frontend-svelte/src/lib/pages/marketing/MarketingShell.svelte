@@ -5,16 +5,9 @@
 -->
 <script>
   import "../../styles/marketing.css";
+  import LandingNav from "$lib/components/LandingNav.svelte";
   let { onNav = () => {}, onGoToApp = () => {}, onHome = () => {}, children } = $props();
 
-  const NAV = [
-    { slug: "software", label: "Software" },
-    { slug: "fitur-invoice", label: "Invoice" },
-    { slug: "fitur-crm", label: "CRM" },
-    { slug: "unduh", label: "Aplikasi" },
-    { slug: "about", label: "Tentang" },
-    { slug: "contact", label: "Kontak" },
-  ];
   const FOOT_FITUR = [
     { slug: "fitur-invoice", label: "Invoice" },
     { slug: "fitur-crm", label: "CRM" },
@@ -31,20 +24,7 @@
 </script>
 
 <div class="gp">
-  <header class="gp-header">
-    <nav class="gp-nav">
-      <button class="gp-brand" style="background:none;border:none;cursor:pointer;padding:0" onclick={() => onHome()}>
-        <span class="gp-brand-mark"><img src="/brand/suluk-mark.png" alt="Suluk" style="height:34px;width:auto;display:block" /></span>
-        <span class="gp-brand-name">Suluk</span>
-      </button>
-      <div class="gp-nav-links">
-        {#each NAV as n}
-          <button type="button" style="background:none;border:none;cursor:pointer;padding:0;font-size:14px;font-weight:600;color:var(--c-ink-soft)" onclick={() => onNav(n.slug)}>{n.label}</button>
-        {/each}
-      </div>
-      <button class="gp-nav-cta" onclick={() => onGoToApp()}>Coba Gratis</button>
-    </nav>
-  </header>
+  <LandingNav />
 
   {@render children?.()}
 

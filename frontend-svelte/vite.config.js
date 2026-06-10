@@ -1,9 +1,9 @@
-import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "vitest/config";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [sveltekit()],
   test: {
     environment: "node",
     include: ["src/**/*.test.js"],
@@ -14,10 +14,6 @@ export default defineConfig({
   },
   server: {
     host: true,
-    hmr: {
-      protocol: "ws",
-      host: "localhost",
-    },
     proxy: {
       "/api/packages": {
         target: "http://127.0.0.1:8080",

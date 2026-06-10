@@ -3,7 +3,7 @@
   "appName": "Suluk",
   "webDir": "dist",
   "server": {
-    "url": "https://suluk.site/#/app",
+    "url": "https://suluk.site/mobile",
     "allowNavigation": ["suluk.site", "*.suluk.site", "app.pakasir.com"],
     "androidScheme": "https"
   },
