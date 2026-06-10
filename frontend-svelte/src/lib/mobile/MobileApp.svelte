@@ -14,6 +14,21 @@
   import Approval from "./screens/Approval.svelte";
   import Notifikasi from "./screens/Notifikasi.svelte";
   import Lainnya from "./screens/Lainnya.svelte";
+  // Phase 2 module screens
+  import Paket from "./screens/Paket.svelte";
+  import PaketDetail from "./screens/PaketDetail.svelte";
+  import Grup from "./screens/Grup.svelte";
+  import Invoice from "./screens/Invoice.svelte";
+  import Keuangan from "./screens/Keuangan.svelte";
+  import Rooming from "./screens/Rooming.svelte";
+  import Kontrak from "./screens/Kontrak.svelte";
+  import Itinerary from "./screens/Itinerary.svelte";
+  import Vendor from "./screens/Vendor.svelte";
+  import Agen from "./screens/Agen.svelte";
+  import Payroll from "./screens/Payroll.svelte";
+  import Inventaris from "./screens/Inventaris.svelte";
+  import Pembatalan from "./screens/Pembatalan.svelte";
+  import Profil from "./screens/Profil.svelte";
 
   let { user = null, onExit = () => {}, onLogout = () => {} } = $props();
 
@@ -24,6 +39,21 @@
     bayar: Bayar,
     approval: Approval,
     notifikasi: Notifikasi,
+    // Phase 2 modules (opened from the Lainnya hub)
+    paket: Paket,
+    "paket-detail": PaketDetail,
+    grup: Grup,
+    invoice: Invoice,
+    keuangan: Keuangan,
+    rooming: Rooming,
+    kontrak: Kontrak,
+    itinerary: Itinerary,
+    vendor: Vendor,
+    agen: Agen,
+    payroll: Payroll,
+    inventaris: Inventaris,
+    pembatalan: Pembatalan,
+    profil: Profil,
   };
 
   const TABS = [

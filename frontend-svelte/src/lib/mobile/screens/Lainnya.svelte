@@ -9,21 +9,19 @@
 
   let { nav } = $props();
 
-  // Phase-2 modules — surfaced now as a hub; open on desktop until the mobile
-  // screens land.
   const modules = [
-    { ic: Package, label: "Paket", c: "#1B7F5A" },
-    { ic: Users2, label: "Grup", c: "#2563a8" },
-    { ic: FileText, label: "Invoice", c: "#C99A2E" },
-    { ic: Wallet, label: "Keuangan", c: "#15564a" },
-    { ic: BedDouble, label: "Rooming", c: "#7a5ae0" },
-    { ic: FileSignature, label: "Kontrak", c: "#b8860b" },
-    { ic: Map, label: "Itinerary", c: "#2563a8" },
-    { ic: Truck, label: "Vendor", c: "#0f7a5a" },
-    { ic: Handshake, label: "Agen", c: "#a9842f" },
-    { ic: Banknote, label: "Payroll", c: "#1B7F5A" },
-    { ic: Boxes, label: "Inventaris", c: "#b8860b" },
-    { ic: Ban, label: "Pembatalan", c: "#c0392b" },
+    { ic: Package, label: "Paket", c: "#1B7F5A", id: "paket" },
+    { ic: Users2, label: "Grup", c: "#2563a8", id: "grup" },
+    { ic: FileText, label: "Invoice", c: "#C99A2E", id: "invoice" },
+    { ic: Wallet, label: "Keuangan", c: "#15564a", id: "keuangan" },
+    { ic: BedDouble, label: "Rooming", c: "#7a5ae0", id: "rooming" },
+    { ic: FileSignature, label: "Kontrak", c: "#b8860b", id: "kontrak" },
+    { ic: Map, label: "Itinerary", c: "#2563a8", id: "itinerary" },
+    { ic: Truck, label: "Vendor", c: "#0f7a5a", id: "vendor" },
+    { ic: Handshake, label: "Agen", c: "#a9842f", id: "agen" },
+    { ic: Banknote, label: "Payroll", c: "#1B7F5A", id: "payroll" },
+    { ic: Boxes, label: "Inventaris", c: "#b8860b", id: "inventaris" },
+    { ic: Ban, label: "Pembatalan", c: "#c0392b", id: "pembatalan" },
   ];
   const name = nav.user?.name || "Admin";
 </script>
@@ -47,7 +45,7 @@
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
         {#each modules as m}
           {@const Icon = m.ic}
-          <button type="button" class="m-qa" onclick={() => nav.toast(m.label + " — segera hadir di mobile")}
+          <button type="button" class="m-qa" onclick={() => nav.go(m.id)}
             style="background:var(--c-surface);border:1px solid var(--c-line);border-radius:16px;padding:14px 4px;display:flex;flex-direction:column;align-items:center;gap:8px">
             <div style="width:42px;height:42px;border-radius:12px;background:{m.c}1c;color:{m.c};display:flex;align-items:center;justify-content:center"><Icon size={20} /></div>
             <span style="font-size:11px;font-weight:600;color:var(--c-ink);text-align:center">{m.label}</span>
@@ -58,7 +56,7 @@
 
     <MSection label="Akun" style="padding-top:24px">
       <MGroup>
-        <button type="button" class="m-row" onclick={() => nav.toast("Profil — segera hadir di mobile")}>
+        <button type="button" class="m-row" onclick={() => nav.go("profil")}>
           <div class="m-row-ic" style="background:var(--c-primary-soft);color:var(--c-primary)"><User size={19} /></div>
           <div class="m-row-main"><div class="m-row-title">Profil Saya</div></div>
         </button>
