@@ -50,6 +50,54 @@ export const PANDUAN = [
     date: "2026-06-10",
     readMinutes: 6,
   },
+  {
+    slug: "syarat-pendirian-ppiu-travel-umrah",
+    title: "Syarat dan Cara Mendirikan PPIU (Travel Umrah Resmi)",
+    description:
+      "Gambaran syarat dan tahapan mendirikan PPIU (Penyelenggara Perjalanan Ibadah Umrah) resmi berizin Kemenag, dari badan usaha hingga sistem operasional.",
+    date: "2026-06-10",
+    readMinutes: 8,
+  },
+  {
+    slug: "cara-mendapatkan-jamaah-umrah",
+    title: "Cara Mendapatkan Jamaah Umrah: Strategi Marketing Travel",
+    description:
+      "Strategi mendapatkan jamaah umrah secara konsisten: referral alumni, media sosial, komunitas, jaringan agen, dan pipeline CRM agar tidak ada prospek terlewat.",
+    date: "2026-06-10",
+    readMinutes: 7,
+  },
+  {
+    slug: "mengelola-cicilan-pembayaran-jamaah",
+    title: "Cara Mengelola Pembayaran Cicilan Jamaah Umrah",
+    description:
+      "Atur DP dan cicilan jamaah umrah dengan rapi: skema pembayaran, pencatatan, pengingat jatuh tempo, dan pemantauan tunggakan otomatis.",
+    date: "2026-06-10",
+    readMinutes: 6,
+  },
+  {
+    slug: "dokumen-persyaratan-umrah",
+    title: "Dokumen Persyaratan Umrah yang Wajib Disiapkan Jamaah",
+    description:
+      "Daftar dokumen persyaratan umrah: paspor, KTP, KK, pasfoto, sertifikat vaksin meningitis, bukti mahram, dan cara mengelolanya agar tidak ada yang tertinggal.",
+    date: "2026-06-10",
+    readMinutes: 6,
+  },
+  {
+    slug: "cara-membuat-paket-umrah",
+    title: "Cara Membuat Paket Umrah yang Menarik dan Menguntungkan",
+    description:
+      "Panduan menyusun paket umrah: komponen layanan, tipe kamar, hotel, maskapai, durasi, penetapan harga berjenjang, dan publikasi paket ke calon jamaah.",
+    date: "2026-06-10",
+    readMinutes: 7,
+  },
+  {
+    slug: "refund-pembatalan-jamaah-umrah",
+    title: "Cara Mengelola Refund dan Pembatalan Jamaah Umrah",
+    description:
+      "Kelola pembatalan jamaah umrah secara adil dan transparan: kebijakan pembatalan, perhitungan potongan biaya riil, proses refund, dan pencatatannya.",
+    date: "2026-06-10",
+    readMinutes: 6,
+  },
 ];
 
 export function getPanduan(slug) {
