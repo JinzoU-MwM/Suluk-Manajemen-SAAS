@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import {
     KeyRound,
     User,
@@ -658,7 +658,7 @@
 
     <!-- Footer -->
     <p class="text-center text-xs text-slate-400 mt-6">
-      © 2026 Jamaah.in · Otomatisasi Siskopatuh
+      © 2026 Suluk · Otomatisasi Siskopatuh
     </p>
   </div>
 </div>

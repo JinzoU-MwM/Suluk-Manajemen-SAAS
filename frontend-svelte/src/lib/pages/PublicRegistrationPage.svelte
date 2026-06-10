@@ -1,6 +1,6 @@
-﻿<!--
+<!--
   PublicRegistrationPage.svelte — Self-service jamaah registration page
-  Accessible via jamaah.in/reg/{token}
+  Accessible via suluk.site/reg/{token}
 -->
 <script>
   import { onMount } from "svelte";

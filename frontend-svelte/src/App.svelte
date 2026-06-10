@@ -1,4 +1,4 @@
-﻿<script>
+<script>
   import { onMount } from "svelte";
   import LandingPage from "./lib/pages/LandingPage.svelte";
   import Login from "./lib/pages/Login.svelte";
@@ -58,9 +58,9 @@
   import { ApiService } from "./lib/services/api";
   import { isProOrHigher } from "./lib/config/pricing.js";
 
-  const BASE_URL = "https://jamaah.web.id";
+  const BASE_URL = "https://suluk.site";
   const DEFAULT_SEO = {
-    title: "Software Travel Umrah | Scan KTP/KK ke Siskopatuh - Jamaah.in",
+    title: "Software Travel Umrah | Scan KTP/KK ke Siskopatuh - Suluk",
     description:
       "Otomatisasi input data jamaah 10x lebih cepat. Scan KTP/KK langsung jadi Excel Siskopatuh 32 kolom, auto rooming hotel, manifest digital mutawwif.",
     robots: "index,follow",
@@ -70,115 +70,115 @@
   const PAGE_SEO = {
     landing: DEFAULT_SEO,
     login: {
-      title: "Login - Jamaah.in",
-      description: "Login ke dashboard Jamaah.in untuk kelola data jamaah dan operasional umrah.",
+      title: "Login - Suluk",
+      description: "Login ke dashboard Suluk untuk kelola data jamaah dan operasional umrah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     register: {
-      title: "Daftar - Jamaah.in",
-      description: "Daftar akun Jamaah.in untuk mulai otomatisasi data jamaah.",
+      title: "Daftar - Suluk",
+      description: "Daftar akun Suluk untuk mulai otomatisasi data jamaah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     mutawwif: {
-      title: "Manifest Mutawwif - Jamaah.in",
+      title: "Manifest Mutawwif - Suluk",
       description: "Manifest jamaah untuk operasional mutawwif.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     registration: {
-      title: "Form Pendaftaran Jamaah - Jamaah.in",
+      title: "Form Pendaftaran Jamaah - Suluk",
       description: "Form pendaftaran jamaah online.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     package: {
-      title: "Paket Umrah - Jamaah.in",
+      title: "Paket Umrah - Suluk",
       description: "Lihat detail paket umrah, harga per tipe kamar, dan sisa kursi.",
       robots: "index,follow",
       canonical: `${BASE_URL}/`,
     },
     dashboard: {
-      title: "Dashboard - Jamaah.in",
+      title: "Dashboard - Suluk",
       description: "Dashboard operasional jamaah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     scanner: {
-      title: "Scanner Dokumen - Jamaah.in",
+      title: "Scanner Dokumen - Suluk",
       description: "Scan KTP/KK, paspor, dan visa untuk ekstraksi data otomatis.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     jamaah: {
-      title: "Data Jamaah - Jamaah.in",
+      title: "Data Jamaah - Suluk",
       description: "Kelola data jamaah per grup keberangkatan.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     grup: {
-      title: "Grup & Hotel - Jamaah.in",
+      title: "Grup & Hotel - Suluk",
       description: "Kelola grup keberangkatan dan persiapan hotel.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     manifest: {
-      title: "Manifest Digital - Jamaah.in",
+      title: "Manifest Digital - Suluk",
       description: "Bagikan manifest digital ber-PIN untuk mutawwif.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     analytics: {
-      title: "Analytics - Jamaah.in",
+      title: "Analytics - Suluk",
       description: "Statistik operasional jamaah dan grup.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     profile: {
-      title: "Profil - Jamaah.in",
-      description: "Pengaturan akun Jamaah.in.",
+      title: "Profil - Suluk",
+      description: "Pengaturan akun Suluk.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     inventory: {
-      title: "Inventory - Jamaah.in",
+      title: "Inventory - Suluk",
       description: "Manajemen inventory perlengkapan jamaah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     rooming: {
-      title: "Rooming - Jamaah.in",
+      title: "Rooming - Suluk",
       description: "Pengaturan rooming jamaah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     team: {
-      title: "Tim - Jamaah.in",
+      title: "Tim - Suluk",
       description: "Manajemen tim operasional.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     itinerary: {
-      title: "Itinerary - Jamaah.in",
+      title: "Itinerary - Suluk",
       description: "Jadwal perjalanan jamaah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     contracts: {
-      title: "E-Kontrak - Jamaah.in",
+      title: "E-Kontrak - Suluk",
       description: "Kelola template kontrak digital untuk jamaah.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     "contract-sign": {
-      title: "Tanda Tangan Kontrak - Jamaah.in",
+      title: "Tanda Tangan Kontrak - Suluk",
       description: "Baca dan tanda tangani kontrak perjalanan secara digital dari HP.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,
     },
     "super-admin": {
-      title: "Super Admin - Jamaah.in",
+      title: "Super Admin - Suluk",
       description: "Panel super admin.",
       robots: "noindex,nofollow",
       canonical: `${BASE_URL}/`,

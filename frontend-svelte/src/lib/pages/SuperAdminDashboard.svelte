@@ -1,4 +1,4 @@
-﻿<script>
+<script>
     import { onMount } from 'svelte';
     import { SuperAdminApi } from '../services/superAdminApi.js';
     import { ApiService } from '../services/api.js';
@@ -233,7 +233,7 @@
         <div class="px-4 sm:px-6 lg:px-8">
             <div class="flex h-[72px] items-center justify-between">
                 <div class="flex items-center">
-                    <h1 class="text-xl font-extrabold text-slate-900">Jamaah.in</h1>
+                    <h1 class="text-xl font-extrabold text-slate-900">Suluk</h1>
                     <span class="ml-3 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
                         SUPER ADMIN
                     </span>

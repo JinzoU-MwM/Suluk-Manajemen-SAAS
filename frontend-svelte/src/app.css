@@ -1,4 +1,4 @@
-﻿/* Import Google Fonts - must be first. Suluk brand: Inter (UI) + Playfair Display (headings) */
+/* Import Google Fonts - must be first. Suluk brand: Inter (UI) + Playfair Display (headings) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap');
 
 @tailwind base;
@@ -6,7 +6,7 @@
 @tailwind utilities;
 
 /* =============================================================================
-   JAMAAH.IN DESIGN SYSTEM - Professional Travel Agency Dashboard
+   SULUK DESIGN SYSTEM - Professional Travel Agency Dashboard
    ============================================================================= */
 
 :root {

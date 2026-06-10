@@ -1,4 +1,4 @@
-﻿<script>
+<script>
     import { onMount } from "svelte";
     import { ApiService } from "../services/api.js";
 
@@ -227,7 +227,7 @@
 
                 <p class="text-xs text-slate-400 text-center mt-4">
                     Powered by <span class="font-semibold text-primary-600"
-                        >Jamaah.in</span
+                        >Suluk</span
                     >
                 </p>
             </div>

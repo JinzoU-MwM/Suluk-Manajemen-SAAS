@@ -69,7 +69,7 @@
     tipe_kamar: 'Quad',
     harga_paket: 'Rp 29.500.000',
     skema_bayar: 'DP Rp 8.000.000, pelunasan H-45',
-    nama_travel: 'Jamaah.in Travel',
+    nama_travel: 'Suluk Travel',
     tanggal_kontrak: '22 Mei 2026',
     ketentuan_refund: 'Pembatalan >45 hari: potongan 10%. Pembatalan <30 hari: mengikuti biaya vendor aktual.',
   };

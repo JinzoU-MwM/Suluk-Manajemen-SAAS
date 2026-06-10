@@ -1,4 +1,4 @@
-# Jamaah.in v2 API Reference
+# Suluk v2 API Reference
 
 **Base URL**: `http://localhost:8080/api/v1`
 **Auth**: Bearer JWT token in `Authorization` header

@@ -47,7 +47,7 @@
     } = $props();
 
     $effect(() => {
-        document.title = "Profil - Jamaah.in";
+        document.title = "Profil - Suluk";
     });
 
     // Profile state

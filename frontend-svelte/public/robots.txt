@@ -6,4 +6,4 @@ Allow: /fitur-rooming-jamaah.html
 Allow: /manifest-mutawwif-digital.html
 Disallow: /api/
 
-Sitemap: https://jamaah.web.id/sitemap.xml
+Sitemap: https://suluk.site/sitemap.xml

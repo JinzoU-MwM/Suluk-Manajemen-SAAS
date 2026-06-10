@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   WhatsAppBlast.svelte — Send template messages to jamaah via WhatsApp
   Uses wa.me deep links (zero cost, no API needed)
 -->
@@ -102,7 +102,7 @@
         msg = msg.replace(/{baju_size}/g, member.baju_size || "-");
         msg = msg.replace(/{tanggal}/g, "{tanggal}"); // User fills manually
         msg = msg.replace(/{pesan}/g, "{pesan}"); // User fills manually
-        msg = msg.replace(/{agency}/g, "Jamaah.in");
+        msg = msg.replace(/{agency}/g, "Suluk");
         return msg;
     }
 
