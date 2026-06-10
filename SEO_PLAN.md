@@ -58,7 +58,7 @@ The app uses **hash-based routing** (`suluk.site/#/software-travel-umrah`, `#/fi
 - [x] **P1** **Real 1200×630 OG/Twitter image** (`/og-suluk.png`, brand green + logo). Referenced by `Seo.svelte` (every page) + the homepage head.
 - [x] **P1** **Regenerate `sitemap.xml` + `robots.txt`** — clean paths, `lastmod 2026-06-10`, app/admin/token paths disallowed.
 - [x] **P1** **nginx compression + cache headers** — `gzip on`, immutable cache on `/_app/immutable/`, no-cache HTML, SPA fallback to `/200.html`.
-- [ ] **P2** **Fix soft-404s** — still HTTP 200 via the `200.html` SPA fallback (`+error.svelte` shows 404 visually). True 404 status needs SSR (adapter-node) — deferred.
+- [x] **P2** **Fix soft-404s** — nginx now scopes the `200.html` SPA fallback to the known noindex client routes (`/app`, `/mobile`, `/super-admin`, `/m/`, `/reg/`, `/paket/`, `/kontrak/`); any *other* unknown URL returns a **real HTTP 404** + branded `404.html`. Solved without SSR — `adapter-node` evaluated and rejected (poor cost/benefit on the resource-constrained VPS + Capacitor friction; the only SSR-only upside is server-rendering dynamic `/paket/[slug]`, revisit only if public package-page SEO becomes a priority).
 - [x] **P2** **Resolve duplication** — deleted the legacy `public/software-travel-umrah.html`; the prerendered `/software-travel-umrah` route now owns that URL.
 
 ## Phase 2 — Make content crawlable *(the big win — pick ONE approach)*
