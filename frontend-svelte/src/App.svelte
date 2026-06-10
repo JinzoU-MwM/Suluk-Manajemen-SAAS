@@ -362,7 +362,32 @@
   }
   const initial = getInitialPageAndTokens();
 
-  // Pages: 'landing' | 'login' | 'register' | 'dashboard' | 'profile' | 'jamaah' | 'grup' | 'scanner' | 'inventory' | 'rooming' | 'manifest' | 'analytics' | 'mutawwif' | 'super-admin'
+  // Mobile-app mode: when launched at #/app (the Capacitor wrapper / mobile PWA),
+  // ALL auth flows must return to the mobile shell ("mobile"), not the desktop
+  // "dashboard". Persisted so it survives the login round-trip and reloads; the
+  // "Buka Versi Desktop" action and logout clear it.
+  function readMobileMode() {
+    if (typeof window === "undefined") return false;
+    if (initial.page === "mobile") return true;
+    try {
+      return localStorage.getItem("suluk_mobile") === "1";
+    } catch {
+      return false;
+    }
+  }
+  let mobileMode = $state(readMobileMode());
+  function setMobileMode(on) {
+    mobileMode = on;
+    try {
+      if (on) localStorage.setItem("suluk_mobile", "1");
+      else localStorage.removeItem("suluk_mobile");
+    } catch {}
+  }
+  if (mobileMode) setMobileMode(true); // persist on first mobile launch
+  // Where to land an authenticated user, honoring mobile mode + super-admin.
+  const homePage = () => (mobileMode ? "mobile" : "dashboard");
+
+  // Pages: 'landing' | 'login' | 'register' | 'dashboard' | 'profile' | 'jamaah' | 'grup' | 'scanner' | 'inventory' | 'rooming' | 'manifest' | 'analytics' | 'mutawwif' | 'super-admin' | 'mobile'
   // v2 pages: 'packages' | 'crm' | 'invoices' | 'finance' | 'vendors' | 'agents' | 'documents' | 'contracts' | 'stock' | 'payroll'
   let currentPage = $state(initial.page);
   let user = $state(null);
@@ -540,6 +565,7 @@
         checkSuperAdminAuth(); // Check auth when navigating to super-admin
       }
       if (h === "#/app") {
+        setMobileMode(true);
         ensurePage("mobile");
         currentPage = "mobile";
       }
@@ -569,7 +595,7 @@
       } catch {
         user = { name: "User", email: "" };
       }
-      currentPage = "dashboard";
+      currentPage = homePage();
     }
 
     try {
@@ -585,13 +611,17 @@
       subscription = sub;
       groups = groupsData?.groups || [];
       trialAvailable = trial?.trial_available ?? false;
-      currentPage = currentPage === "super-admin" ? "super-admin" : "dashboard";
+      currentPage = currentPage === "super-admin" ? "super-admin" : homePage();
     } catch {
       if (savedUser) {
         user = null;
         localStorage.removeItem("user");
       }
-      if (currentPage !== "landing") {
+      // In mobile mode an unauthenticated launch should show the in-app login
+      // (the "mobile" branch renders <Login> when !user), not the marketing site.
+      if (mobileMode) {
+        currentPage = "mobile";
+      } else if (currentPage !== "landing") {
         currentPage = "landing";
       }
     }
@@ -599,7 +629,7 @@
     // Handle return from Pakasir payment redirect
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") === "success" && user) {
-      currentPage = "dashboard";
+      currentPage = homePage();
       // Re-fetch subscription — the Pakasir webhook may have just upgraded the
       // plan, so the status loaded above can be stale. Without this the user
       // returns to a dashboard still showing the old (free/expired) tier.
@@ -614,7 +644,7 @@
 
   function handleLoginSuccess(userData) {
     user = userData;
-    currentPage = "dashboard";
+    currentPage = homePage();
 
     // Fetch subscription and groups
     loadUserData();
@@ -648,7 +678,13 @@
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
-    currentPage = "landing";
+    // Stay in the mobile app (show its login) when in mobile mode.
+    if (mobileMode) {
+      window.location.hash = "#/app";
+      currentPage = "mobile";
+    } else {
+      currentPage = "landing";
+    }
   }
 
   function handlePageChange(page) {
@@ -765,8 +801,10 @@
         <MobileApp
           {user}
           onExit={() => {
+            setMobileMode(false);
             window.location.hash = "#/dashboard";
             currentPage = "dashboard";
+            ensurePage("dashboard");
           }}
           onLogout={handleLogout}
         />
@@ -774,7 +812,7 @@
         <div class="min-h-screen flex items-center justify-center text-slate-500">Memuat aplikasi…</div>
       {/if}
     {:else}
-      <Login initialMode="login" onLoginSuccess={handleLoginSuccess} onBack={() => (currentPage = "landing")} />
+      <Login initialMode="login" onLoginSuccess={handleLoginSuccess} onBack={() => { setMobileMode(false); currentPage = "landing"; }} />
     {/if}
   {:else if showSidebar}
     <!-- Layout with Sidebar (matches Claude design app shell) -->
