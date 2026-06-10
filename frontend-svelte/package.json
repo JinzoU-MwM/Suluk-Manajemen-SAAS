@@ -17,6 +17,7 @@
     "android:open": "cap open android"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.2.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@vitest/coverage-v8": "^4.0.18",

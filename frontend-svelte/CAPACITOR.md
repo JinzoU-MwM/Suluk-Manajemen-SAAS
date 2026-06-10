@@ -34,15 +34,20 @@ cd android
 ```
 Install on a connected device: `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
 
-## App icon & splash (recommended before release)
-The project still uses Capacitor's placeholder icon. Generate branded assets from
-the Suluk mark:
+## App icon & splash (done — branded)
+Branded launcher icon (white Suluk double-S on deep-green `#0F3D2E`, full-bleed
+adaptive background) and splash are generated. Source images live in
+`frontend-svelte/assets/` (`icon-foreground/background/only.png`, `splash[-dark].png`,
+built from `public/brand/suluk-mark-white.png` via PIL). To regenerate after a
+brand change:
 ```bash
-# put a 1024x1024 icon at frontend-svelte/assets/icon.png (and optional splash.png)
-npm i -D @capacitor/assets
-npx @capacitor/assets generate --android
+npx capacitor-assets generate --android \
+  --iconBackgroundColor "#0F3D2E" --iconBackgroundColorDark "#0F3D2E" \
+  --splashBackgroundColor "#0F3D2E" --splashBackgroundColorDark "#0F3D2E"
 ```
-(Source mark lives in `public/brand/suluk-icon.png` — upscale to 1024² first.)
+Note: the adaptive-icon XMLs (`res/mipmap-anydpi-v26/ic_launcher*.xml`) were
+hand-edited to use a full-bleed `@color/ic_launcher_background` (= `#0F3D2E`)
+instead of an inset background drawable — re-apply that if you regenerate.
 
 ## Releasing to Google Play
 1. Generate a keystore (once):
