@@ -1,30 +1,57 @@
 <script>
   import { onMount } from "svelte";
+  import { Plus } from "lucide-svelte";
   import { ApiService } from "../../services/api.js";
   import { fmtRp } from "../format.js";
   import MScreen from "../ui/MScreen.svelte";
   import MBadge from "../ui/MBadge.svelte";
+  import MFormSheet from "../ui/MFormSheet.svelte";
 
   let { nav } = $props();
   let refunds = $state([]);
+  let invoices = $state([]);
   let loading = $state(true);
+  let formOpen = $state(false);
 
   const LABEL = { pending: "Menunggu", approved: "Disetujui", processing: "Diproses", completed: "Dibayar", rejected: "Ditolak", partial: "Sebagian" };
   const label = (s) => LABEL[s] || s || "—";
 
-  onMount(async () => {
+  async function load() {
     try {
-      const res = await ApiService.listRefunds({ limit: 50 });
-      refunds = res?.data || res?.refunds || (Array.isArray(res) ? res : []) || [];
+      const [rf, inv] = await Promise.all([ApiService.listRefunds({ limit: 50 }), ApiService.listInvoices({ pageSize: 50 }).catch(() => null)]);
+      refunds = rf?.data || rf?.refunds || (Array.isArray(rf) ? rf : []) || [];
+      const list = inv?.invoices || inv?.data || (Array.isArray(inv) ? inv : []) || [];
+      // refundable = not cancelled, has some value
+      invoices = list.filter((i) => i.status !== "batal");
     } catch {
       refunds = [];
     } finally {
       loading = false;
     }
-  });
+  }
+  onMount(load);
+
+  let formFields = $derived([
+    { key: "invoice_id", label: "Invoice", type: "select", required: true, options: invoices.map((i) => ({ value: i.id, label: (i.jamaah_name || i.invoice_number || i.id) + " · " + fmtRp(i.total_amount ?? 0) })) },
+    { key: "reason", label: "Alasan Pembatalan", type: "textarea", required: true, placeholder: "Sakit / force majeure / kendala dokumen…" },
+    { key: "refund_pct", label: "Persentase Refund (%)", type: "number", placeholder: "100" },
+  ]);
+
+  async function submit(data) {
+    const { invoice_id, reason } = data;
+    const body = { reason };
+    if (data.refund_pct !== "" && data.refund_pct != null) body.refund_pct = Number(data.refund_pct);
+    await ApiService.initiateRefund(invoice_id, body);
+    nav.toast("Pengajuan refund dibuat");
+    await load();
+  }
 </script>
 
-<MScreen title="Pembatalan & Refund" onBack={nav.back}>
+{#snippet headerRight()}
+  <button type="button" class="m-nav-btn" onclick={() => (formOpen = true)} aria-label="Ajukan refund"><Plus size={22} /></button>
+{/snippet}
+
+<MScreen title="Pembatalan & Refund" onBack={nav.back} right={headerRight}>
   <div style="padding:16px 18px 0;display:flex;flex-direction:column;gap:12px">
     {#if loading}
       <div class="m-loading" style="padding:50px 0">Memuat…</div>
@@ -49,3 +76,5 @@
     {/if}
   </div>
 </MScreen>
+
+<MFormSheet open={formOpen} title="Ajukan Refund" fields={formFields} submitLabel="Ajukan" onClose={() => (formOpen = false)} onSubmit={submit} />

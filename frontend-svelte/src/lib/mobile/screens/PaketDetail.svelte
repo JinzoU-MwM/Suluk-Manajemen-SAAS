@@ -1,15 +1,18 @@
 <script>
   import { onMount } from "svelte";
-  import { Globe } from "lucide-svelte";
+  import { Globe, Pencil } from "lucide-svelte";
   import { ApiService } from "../../services/api.js";
   import { fmtRp, fmtRpShort } from "../format.js";
+  import { PACKAGE_FIELDS, packagePayload } from "../packageForm.js";
   import MScreen from "../ui/MScreen.svelte";
   import MSection from "../ui/MSection.svelte";
   import MGroup from "../ui/MGroup.svelte";
   import MKV from "../ui/MKV.svelte";
+  import MFormSheet from "../ui/MFormSheet.svelte";
 
   let { nav, params } = $props();
   let p = $state(params?.pkg || {});
+  let editOpen = $state(false);
 
   onMount(async () => {
     try {
@@ -17,6 +20,16 @@
       if (detail) p = { ...p, ...detail };
     } catch {}
   });
+
+  // date inputs want yyyy-mm-dd
+  let editInitial = $derived({ ...p, departure_date: (p.departure_date || "").slice(0, 10) });
+
+  async function saveEdit(data) {
+    const updated = await ApiService.updatePackage(p.id, packagePayload(data));
+    if (updated) p = { ...p, ...updated };
+    else p = { ...p, ...packagePayload(data) };
+    nav.toast("Paket diperbarui");
+  }
 
   const ptype = (x) => x.package_type || x.tipe || "Umrah";
   let tiers = $derived(
@@ -65,9 +78,12 @@
     </MSection>
   {/if}
 
-  <div style="padding:20px 18px 0">
+  <div style="padding:20px 18px 0;display:flex;flex-direction:column;gap:10px">
     <button type="button" class="m-btn m-btn-primary" onclick={() => { if (p.slug) { navigator.clipboard?.writeText(location.origin + "/#/paket/" + p.slug); nav.toast("Link publik disalin"); } else nav.toast("Slug paket belum tersedia"); }}>
       <Globe size={18} />Bagikan Link Publik
     </button>
+    <button type="button" class="m-btn m-btn-ghost" onclick={() => (editOpen = true)}><Pencil size={18} />Edit Paket</button>
   </div>
 </MScreen>
+
+<MFormSheet open={editOpen} title="Edit Paket" fields={PACKAGE_FIELDS} initial={editInitial} onClose={() => (editOpen = false)} onSubmit={saveEdit} />

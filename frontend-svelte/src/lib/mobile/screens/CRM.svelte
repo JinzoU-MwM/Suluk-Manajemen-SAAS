@@ -5,16 +5,31 @@
   import { fmtRpShort } from "../format.js";
   import MChips from "../ui/MChips.svelte";
   import MAvatar from "../ui/MAvatar.svelte";
+  import MFormSheet from "../ui/MFormSheet.svelte";
 
   let { nav } = $props();
 
   let items = $state([]);
   let loading = $state(true);
   let stage = $state("Semua");
+  let formOpen = $state(false);
+
+  const FIELDS = [
+    { key: "nama", label: "Nama Lead", required: true },
+    { key: "no_hp", label: "No. HP", type: "tel" },
+    { key: "lead_source", label: "Sumber", type: "select", options: [{ value: "instagram", label: "Instagram Ads" }, { value: "referral", label: "Referral" }, { value: "whatsapp", label: "WhatsApp" }, { value: "website", label: "Website" }, { value: "event", label: "Event/Pameran" }, { value: "lainnya", label: "Lainnya" }] },
+  ];
+
+  async function submitLead(data) {
+    const payload = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== "" && v != null));
+    await ApiService.createProfile(payload);
+    nav.toast("Lead ditambahkan");
+    await load();
+  }
 
   const STAGE_COLOR = { Prospek: "#2563a8", "Follow Up": "#C99A2E", Negosiasi: "#7a5ae0", Closing: "#1B7F5A", Semua: "#1B7F5A" };
 
-  onMount(async () => {
+  async function load() {
     try {
       const res = await ApiService.listCRM({ pageSize: 50 });
       items = (res?.data || []).map((x) => ({
@@ -32,7 +47,8 @@
     } finally {
       loading = false;
     }
-  });
+  }
+  onMount(load);
 
   let stages = $derived(["Semua", ...Array.from(new Set(items.map((i) => i.stage))).filter((s) => s && s !== "Semua")]);
   let chips = $derived(stages.map((s) => ({ value: s, label: s === "Semua" ? `Semua (${items.length})` : `${s} (${items.filter((i) => i.stage === s).length})` })));
@@ -47,7 +63,7 @@
         <div class="m-head-title">CRM</div>
         <div class="m-head-sub">Potensi pipeline {fmtRpShort(total)}</div>
       </div>
-      <button type="button" onclick={() => nav.toast("Form lead baru")} style="width:42px;height:42px;border-radius:13px;background:var(--c-primary);color:#fff;display:flex;align-items:center;justify-content:center">
+      <button type="button" onclick={() => (formOpen = true)} aria-label="Lead baru" style="width:42px;height:42px;border-radius:13px;background:var(--c-primary);color:#fff;display:flex;align-items:center;justify-content:center">
         <Plus size={22} />
       </button>
     </div>
@@ -84,3 +100,5 @@
     <div style="height:24px"></div>
   </div>
 </div>
+
+<MFormSheet open={formOpen} title="Lead Baru" fields={FIELDS} submitLabel="Tambah Lead" onClose={() => (formOpen = false)} onSubmit={submitLead} />

@@ -7,11 +7,36 @@
   import MSegmented from "../ui/MSegmented.svelte";
   import MKV from "../ui/MKV.svelte";
   import MGroup from "../ui/MGroup.svelte";
+  import MFormSheet from "../ui/MFormSheet.svelte";
 
   let { nav } = $props();
   let me = $state(nav.user || {});
   let org = $state(null);
   let tab = $state("profil");
+  let editProfile = $state(false);
+  let editCompany = $state(false);
+
+  const PROFILE_FIELDS = [
+    { key: "name", label: "Nama", required: true },
+    { key: "phone", label: "No. HP", type: "tel" },
+  ];
+  const COMPANY_FIELDS = [
+    { key: "name", label: "Nama Legal", required: true },
+    { key: "ppiu_number", label: "Izin PPIU" },
+    { key: "npwp", label: "NPWP" },
+    { key: "sk_number", label: "SK Kemenag" },
+  ];
+
+  async function saveProfile(data) {
+    const u = await ApiService.updateProfile(data);
+    me = { ...me, ...(u || data) };
+    nav.toast("Profil diperbarui");
+  }
+  async function saveCompany(data) {
+    const o = await ApiService.updateOrganization(data);
+    org = { ...(org || {}), ...(o || data) };
+    nav.toast("Data perusahaan diperbarui");
+  }
   const segs = [{ value: "profil", label: "Profil" }, { value: "perusahaan", label: "Perusahaan" }, { value: "notif", label: "Notifikasi" }];
 
   let prefs = $state({ bayar: true, jamaah: true, kontrak: true, wa: true, email: false });
@@ -60,10 +85,13 @@
   {#if tab === "profil"}
     <div style="padding:0 18px">
       <div class="m-card m-card-pad"><MKV items={profilKV} /></div>
-      <div style="margin-top:16px"><button type="button" class="m-btn m-btn-ghost" onclick={() => nav.toast("Mode edit profil")}><Pencil size={18} />Edit Profil</button></div>
+      <div style="margin-top:16px"><button type="button" class="m-btn m-btn-ghost" onclick={() => (editProfile = true)}><Pencil size={18} />Edit Profil</button></div>
     </div>
   {:else if tab === "perusahaan"}
-    <div style="padding:0 18px"><div class="m-card m-card-pad"><MKV items={orgKV} /></div></div>
+    <div style="padding:0 18px">
+      <div class="m-card m-card-pad"><MKV items={orgKV} /></div>
+      <div style="margin-top:16px"><button type="button" class="m-btn m-btn-ghost" onclick={() => (editCompany = true)}><Pencil size={18} />Edit Perusahaan</button></div>
+    </div>
   {:else}
     <div style="padding:0 18px">
       <MGroup>
@@ -86,3 +114,6 @@
     <button type="button" class="m-btn m-btn-danger" onclick={() => nav.onLogout?.()}><LogOut size={18} />Keluar</button>
   </div>
 </MScreen>
+
+<MFormSheet open={editProfile} title="Edit Profil" fields={PROFILE_FIELDS} initial={me} onClose={() => (editProfile = false)} onSubmit={saveProfile} />
+<MFormSheet open={editCompany} title="Edit Perusahaan" fields={COMPANY_FIELDS} initial={org || {}} onClose={() => (editCompany = false)} onSubmit={saveCompany} />

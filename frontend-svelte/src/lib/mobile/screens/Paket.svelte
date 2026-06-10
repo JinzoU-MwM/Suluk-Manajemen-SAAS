@@ -1,17 +1,20 @@
 <script>
   import { onMount } from "svelte";
-  import { Calendar, Clock, ChevronRight, Moon } from "lucide-svelte";
+  import { Calendar, Clock, ChevronRight, Moon, Plus } from "lucide-svelte";
   import { ApiService } from "../../services/api.js";
   import { fmtRp } from "../format.js";
+  import { PACKAGE_FIELDS, packagePayload } from "../packageForm.js";
   import MScreen from "../ui/MScreen.svelte";
   import MChips from "../ui/MChips.svelte";
   import MProgress from "../ui/MProgress.svelte";
   import MBadge from "../ui/MBadge.svelte";
+  import MFormSheet from "../ui/MFormSheet.svelte";
 
   let { nav } = $props();
   let all = $state([]);
   let loading = $state(true);
   let tab = $state("Semua");
+  let formOpen = $state(false);
 
   const COLORS = ["#1B7F5A", "#C99A2E", "#2563a8", "#a9842f", "#7a5ae0"];
   const minPrice = (p) => {
@@ -21,7 +24,7 @@
   };
   const ptype = (p) => p.package_type || p.tipe || "Umrah";
 
-  onMount(async () => {
+  async function load() {
     try {
       const res = await ApiService.listPackages({ pageSize: 50 });
       all = res?.packages || res?.data || (Array.isArray(res) ? res : []) || [];
@@ -30,12 +33,23 @@
     } finally {
       loading = false;
     }
-  });
+  }
+  onMount(load);
 
   let list = $derived(all.filter((p) => tab === "Semua" || ptype(p).toLowerCase().includes(tab.toLowerCase())));
+
+  async function submit(data) {
+    await ApiService.createPackage(packagePayload(data));
+    nav.toast("Paket dibuat");
+    await load();
+  }
 </script>
 
-<MScreen title="Paket Perjalanan" onBack={nav.back}>
+{#snippet headerRight()}
+  <button type="button" class="m-nav-btn" onclick={() => (formOpen = true)} aria-label="Tambah paket"><Plus size={22} /></button>
+{/snippet}
+
+<MScreen title="Paket Perjalanan" onBack={nav.back} right={headerRight}>
   <div style="padding:14px 0 10px"><MChips tabs={["Semua", "Umrah", "Haji"]} value={tab} onChange={(v) => (tab = v)} /></div>
 
   <div style="padding:0 18px;display:flex;flex-direction:column;gap:14px">
@@ -70,3 +84,5 @@
     <div style="height:8px"></div>
   </div>
 </MScreen>
+
+<MFormSheet open={formOpen} title="Paket Baru" fields={PACKAGE_FIELDS} submitLabel="Buat Paket" onClose={() => (formOpen = false)} onSubmit={submit} />

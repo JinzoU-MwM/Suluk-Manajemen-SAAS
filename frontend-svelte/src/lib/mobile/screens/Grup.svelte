@@ -1,15 +1,22 @@
 <script>
   import { onMount } from "svelte";
-  import { Users } from "lucide-svelte";
+  import { Users, Plus } from "lucide-svelte";
   import { ApiService } from "../../services/api.js";
   import MScreen from "../ui/MScreen.svelte";
+  import MFormSheet from "../ui/MFormSheet.svelte";
 
   let { nav } = $props();
   let groups = $state([]);
   let loading = $state(true);
+  let formOpen = $state(false);
   const COLORS = ["#a9842f", "#C99A2E", "#1B7F5A", "#2563a8", "#7a5ae0"];
 
-  onMount(async () => {
+  const FIELDS = [
+    { key: "name", label: "Nama Grup", required: true, placeholder: "Grup A — Madinah" },
+    { key: "description", label: "Deskripsi", type: "textarea", placeholder: "Catatan grup (opsional)" },
+  ];
+
+  async function load() {
     try {
       const res = await ApiService.listGroups();
       groups = res?.groups || res?.data || (Array.isArray(res) ? res : []) || [];
@@ -18,10 +25,21 @@
     } finally {
       loading = false;
     }
-  });
+  }
+  onMount(load);
+
+  async function submit(v) {
+    await ApiService.createGroup(v.name, v.description || "");
+    nav.toast("Grup dibuat");
+    await load();
+  }
 </script>
 
-<MScreen title="Grup Keberangkatan" onBack={nav.back}>
+{#snippet headerRight()}
+  <button type="button" class="m-nav-btn" onclick={() => (formOpen = true)} aria-label="Tambah grup"><Plus size={22} /></button>
+{/snippet}
+
+<MScreen title="Grup Keberangkatan" onBack={nav.back} right={headerRight}>
   <div style="padding:16px 18px 0;display:flex;flex-direction:column;gap:12px">
     {#if loading}
       <div class="m-loading" style="padding:50px 0">Memuat…</div>
@@ -51,3 +69,5 @@
     {/if}
   </div>
 </MScreen>
+
+<MFormSheet open={formOpen} title="Grup Baru" fields={FIELDS} submitLabel="Buat Grup" onClose={() => (formOpen = false)} onSubmit={submit} />
