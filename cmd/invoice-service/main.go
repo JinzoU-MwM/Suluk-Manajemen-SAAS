@@ -17,7 +17,9 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	"github.com/jamaah-in/v2/internal/shared/events"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
@@ -70,6 +72,17 @@ func main() {
 
 	refundSvc := service.NewRefundService(invoiceRepo)
 	refundHandler := handler.NewRefundHandler(refundSvc)
+
+	// Integration Bus: start the outbox relay so domain events reach accounting.
+	// If NATS is down we keep serving; events queue in the outbox until a relay
+	// (next start) drains them.
+	if bus, berr := events.Connect(cfg.NATS.Addr, logger); berr != nil {
+		logger.Errorf("event bus unavailable (outbox relay disabled): %v", berr)
+	} else {
+		defer bus.Close()
+		relay := outbox.NewRelay(outbox.NewStore(pool), bus, logger, "invoice")
+		go relay.Start(ctx, 2*time.Second)
+	}
 
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-invoice-service",

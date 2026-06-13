@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"os/signal"
 	"strconv"
@@ -11,6 +12,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
+	"github.com/jamaah-in/v2/internal/accounting/handler"
+	"github.com/jamaah-in/v2/internal/accounting/repository"
+	"github.com/jamaah-in/v2/internal/accounting/service"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
@@ -18,26 +22,24 @@ import (
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
-	"github.com/jamaah-in/v2/internal/shared/outbox"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
-
-	"github.com/jamaah-in/v2/internal/agent/handler"
-	"github.com/jamaah-in/v2/internal/agent/repository"
-	"github.com/jamaah-in/v2/internal/agent/service"
 )
 
 func main() {
+	backfill := flag.Bool("backfill", false, "run one-off accounting backfill of historical data, then exit")
+	flag.Parse()
+
 	cfg := sharedConfig.Load()
-	cfg.Database.DBName = "jamaah_agent"
-	cfg.Server.Port = 50061
-	if p := os.Getenv("AGENT_SERVICE_PORT"); p != "" {
+	cfg.Database.DBName = "jamaah_accounting"
+	cfg.Server.Port = 50062
+	if p := os.Getenv("ACCOUNTING_SERVICE_PORT"); p != "" {
 		cfg.Server.Port, _ = strconv.Atoi(p)
 	}
 
 	cfg.Validate()
 	logger := sharedLogger.New(cfg.App.Env)
 	sharedResponse.SetLogger(logger)
-	logger.Infof("starting agent service on :%d", cfg.Server.Port)
+	logger.Infof("starting accounting service on :%d", cfg.Server.Port)
 
 	ctx := context.Background()
 	pool, err := sharedDB.Connect(ctx, cfg.Database.DSN())
@@ -46,6 +48,17 @@ func main() {
 	}
 	defer sharedDB.Close(pool)
 	logger.Info("connected to database")
+
+	repo := repository.NewRepo(pool)
+	svc := service.NewService(repo, logger)
+
+	if *backfill {
+		if err := runBackfill(ctx, cfg, svc, logger); err != nil {
+			logger.Fatalf("backfill: %v", err)
+		}
+		logger.Info("backfill complete")
+		return
+	}
 
 	var jwtManager *sharedAuth.JWTManager
 	if _, err := os.Stat(cfg.JWT.PrivateKeyPath); err == nil {
@@ -62,55 +75,64 @@ func main() {
 		logger.Warn("JWT keys not found - running without auth (dev only)")
 	}
 
-	agentRepo := repository.NewAgentRepo(pool)
-	agentSvc := service.NewAgentService(agentRepo)
-
-	if bus, berr := events.Connect(cfg.NATS.Addr, logger); berr != nil {
-		logger.Errorf("event bus unavailable (outbox relay disabled): %v", berr)
+	// Connect the event bus and start the journal-posting consumer. If NATS is
+	// unreachable we keep serving the read API (reports), and log loudly.
+	var bus *events.Bus
+	bus, err = events.Connect(cfg.NATS.Addr, logger)
+	if err != nil {
+		logger.Errorf("event bus unavailable (consumer disabled): %v", err)
 	} else {
 		defer bus.Close()
-		go outbox.NewRelay(outbox.NewStore(pool), bus, logger, "agent").Start(ctx, 2*time.Second)
+		if serr := svc.StartConsumer(ctx, bus); serr != nil {
+			logger.Errorf("start consumer: %v", serr)
+		} else {
+			logger.Info("accounting event consumer started")
+		}
 	}
-	agentHandler := handler.NewAgentHandler(agentSvc)
+
+	h := handler.NewHandler(svc)
 
 	app := fiber.New(fiber.Config{
-		AppName:      "jamaah-agent-service",
+		AppName:      "jamaah-accounting-service",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	})
 	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))
 
-	app.Get("/health", sharedHealth.Handler("agent",
+	app.Get("/health", sharedHealth.Handler("accounting",
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
+	finRole := sharedMW.RequireRole("owner", "admin", "finance")
 
-	api := app.Group("/api/v1/agents", authMW)
-	api.Get("/", agentHandler.ListAgents)
-	api.Post("/", agentHandler.CreateAgent)
-	api.Get("/:id", agentHandler.GetAgent)
-	api.Put("/:id", agentHandler.UpdateAgent)
+	coa := app.Group("/api/v1/coa", authMW)
+	coa.Get("/", h.ListAccounts)
+	coa.Post("/", finRole, h.CreateAccount)
 
-	comm := app.Group("/api/v1/commissions", authMW)
-	comm.Get("/", agentHandler.ListCommissions)
-	comm.Post("/", agentHandler.CreateCommission)
-	comm.Put("/:id/pay", agentHandler.PayCommission)
-	comm.Get("/agent/:id", agentHandler.GetAgentCommissions)
+	journals := app.Group("/api/v1/journals", authMW)
+	journals.Get("/", h.ListJournals)
+	journals.Get("/:id", h.GetJournal)
+
+	reports := app.Group("/api/v1/reports", authMW)
+	reports.Get("/trial-balance", h.TrialBalance)
+	reports.Get("/neraca", h.BalanceSheet)
+	reports.Get("/laba-rugi", h.IncomeStatement)
+	reports.Get("/ledger/:accountId", h.GeneralLedger)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
-			logger.Fatalf("agent service listen: %v", err)
+			logger.Fatalf("accounting service listen: %v", err)
 		}
 	}()
-	logger.Infof("agent service listening on :%d", cfg.Server.Port)
+	logger.Infof("accounting service listening on :%d", cfg.Server.Port)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Info("shutting down agent service...")
+	logger.Info("shutting down accounting service...")
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
-		logger.Errorf("agent service shutdown: %v", err)
+		logger.Errorf("accounting service shutdown: %v", err)
 	}
 }

@@ -72,8 +72,9 @@ func main() {
 		"vendor":    getEnv("VENDOR_SERVICE_ADDR", "localhost:50057"),
 		"contract":  getEnv("CONTRACT_SERVICE_ADDR", "localhost:50058"),
 		"inventory": getEnv("INVENTORY_SERVICE_ADDR", "localhost:50059"),
-		"payroll":   getEnv("PAYROLL_SERVICE_ADDR", "localhost:50060"),
-		"agent":     getEnv("AGENT_SERVICE_ADDR", "localhost:50061"),
+		"payroll":    getEnv("PAYROLL_SERVICE_ADDR", "localhost:50060"),
+		"agent":      getEnv("AGENT_SERVICE_ADDR", "localhost:50061"),
+		"accounting": getEnv("ACCOUNTING_SERVICE_ADDR", "localhost:50062"),
 	}
 
 	api := app.Group("/api/v1")
@@ -118,6 +119,11 @@ func main() {
 	// Agent & Commission service
 	setupProxy(api, "/agents", services["agent"])
 	setupProxy(api, "/commissions", services["agent"])
+
+	// Accounting service: chart of accounts, journals, financial reports
+	setupProxy(api, "/coa", services["accounting"])
+	setupProxy(api, "/journals", services["accounting"])
+	setupProxy(api, "/reports", services["accounting"])
 
 	// AI/OCR service: scan jobs/results + export templates
 	setupProxy(api, "/scan", services["aiocr"])

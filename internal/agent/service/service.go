@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jamaah-in/v2/internal/agent/model"
 	"github.com/jamaah-in/v2/internal/agent/repository"
+	"github.com/jamaah-in/v2/internal/shared/events"
 )
 
 type AgentService struct {
@@ -112,7 +114,14 @@ func (s *AgentService) CreateCommission(ctx context.Context, orgID string, req m
 	if c.CommissionRate <= 0 {
 		c.CommissionRate = 5.0
 	}
-	if err := s.repo.CreateCommission(ctx, c); err != nil {
+	// commission.accrued → Dr Beban Komisi / Cr Hutang Komisi. Agent name is
+	// best-effort.
+	agentName := ""
+	if a, aerr := s.repo.GetAgent(ctx, req.AgentID, orgID); aerr == nil && a != nil {
+		agentName = a.Name
+	}
+	payload, _ := json.Marshal(map[string]any{"amount": c.CommissionAmount, "agent_name": agentName})
+	if err := s.repo.CreateCommissionTx(ctx, c, events.EventCommissionAccrued, payload); err != nil {
 		return nil, err
 	}
 	return c, nil

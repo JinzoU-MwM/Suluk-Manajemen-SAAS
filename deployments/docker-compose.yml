@@ -92,6 +92,7 @@ services:
       INVENTORY_SERVICE_ADDR: inventory-service:50059
       PAYROLL_SERVICE_ADDR: payroll-service:50060
       AGENT_SERVICE_ADDR: agent-service:50061
+      ACCOUNTING_SERVICE_ADDR: accounting-service:50062
       ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:8005,http://localhost:8007,https://test.jni.my.id"
       APP_ENV: production
     depends_on:
@@ -103,6 +104,7 @@ services:
       - ai-ocr-service
       - vendor-service
       - contract-service
+      - accounting-service
     networks:
       - suluk-network
 
@@ -230,6 +232,7 @@ services:
       POSTGRES_USER: jamaah
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
       POSTGRES_SSLMODE: require
+      NATS_ADDR: nats://nats:4222
       AUTH_SERVICE_ADDR: auth-service:50051
       # Public base URL of the app (used to build the Pakasir redirect-back link).
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
@@ -249,6 +252,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - suluk-network
 
@@ -328,6 +333,7 @@ services:
     environment:
       APP_ENV: production
       VENDOR_SERVICE_PORT: "50057"
+      NATS_ADDR: nats://nats:4222
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
@@ -410,6 +416,7 @@ services:
     environment:
       APP_ENV: production
       PAYROLL_SERVICE_PORT: "50060"
+      NATS_ADDR: nats://nats:4222
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
@@ -436,6 +443,7 @@ services:
     environment:
       APP_ENV: production
       AGENT_SERVICE_PORT: "50061"
+      NATS_ADDR: nats://nats:4222
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
@@ -448,6 +456,37 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - suluk-network
+
+  accounting-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: accounting-service
+    container_name: suluk-accounting-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      ACCOUNTING_SERVICE_PORT: "50062"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
+      POSTGRES_SSLMODE: require
+      NATS_ADDR: nats://nats:4222
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
     networks:
       - suluk-network
 

@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jamaah-in/v2/internal/payroll/model"
 	"github.com/jamaah-in/v2/internal/payroll/repository"
+	"github.com/jamaah-in/v2/internal/shared/events"
 )
 
 type PayrollService struct {
@@ -116,7 +118,12 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 	if req.PackageID != "" {
 		slip.PackageID = &req.PackageID
 	}
-	if err := s.repo.CreateSalarySlip(ctx, slip); err != nil {
+	// payroll.posted → Dr Beban Gaji (gross) / Cr Kas (net) / Cr Hutang Pajak
+	// (withheld). tax = gross - net lumps pph21+bpjs so the journal always
+	// balances regardless of deduction breakdown.
+	tax := gross - net
+	payload, _ := json.Marshal(map[string]any{"gross": gross, "tax": tax, "net": net})
+	if err := s.repo.CreateSalarySlipTx(ctx, slip, events.EventPayrollPosted, payload); err != nil {
 		return nil, err
 	}
 	return slip, nil

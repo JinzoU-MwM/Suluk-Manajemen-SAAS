@@ -5,7 +5,7 @@
   import {
     LayoutDashboard, Users, UserCheck, ScanLine, Package, Briefcase,
     Building2, Receipt, BedDouble, FileSignature, Map, ClipboardList,
-    Wallet, Truck, Banknote, Boxes, XCircle, Sparkles, X,
+    Wallet, Truck, Banknote, Boxes, XCircle, Sparkles, X, BookOpen,
   } from "lucide-svelte";
 
   let {
@@ -39,6 +39,7 @@
     ] },
     { group: "Keuangan", items: [
       { id: "finance", label: "Keuangan", icon: Wallet },
+      { id: "akuntansi", label: "Akuntansi", icon: BookOpen },
       { id: "vendors", label: "Vendor", icon: Truck },
       { id: "payroll", label: "Payroll", icon: Banknote },
       { id: "inventory", label: "Inventaris", icon: Boxes },

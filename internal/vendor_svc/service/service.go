@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/jamaah-in/v2/internal/shared/events"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 	"github.com/jamaah-in/v2/internal/vendor_svc/model"
 	"github.com/jamaah-in/v2/internal/vendor_svc/repository"
 )
@@ -139,7 +142,22 @@ func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req mod
 		Status:       "belum_bayar",
 	}
 
-	if err := s.repo.CreateBill(ctx, b); err != nil {
+	// vendor.bill.created → Dr Beban / Cr Hutang Vendor at the IDR-converted
+	// amount (GL is IDR). Vendor name is best-effort.
+	amountIDR := int64(float64(req.Amount) * req.ExchangeRate)
+	vendorName := ""
+	if v, verr := s.repo.GetVendorByID(ctx, req.VendorID, orgID); verr == nil && v != nil {
+		vendorName = v.Name
+	}
+	payload, _ := json.Marshal(map[string]any{"amount": amountIDR, "vendor_name": vendorName})
+	evt := outbox.Event{
+		OrgID:         orgID,
+		AggregateType: "vendor_bill",
+		AggregateID:   b.ID,
+		EventType:     events.EventVendorBillCreated,
+		Payload:       payload,
+	}
+	if err := s.repo.CreateBillTx(ctx, b, evt); err != nil {
 		return nil, err
 	}
 	return s.repo.GetBillByID(ctx, b.ID, orgID)

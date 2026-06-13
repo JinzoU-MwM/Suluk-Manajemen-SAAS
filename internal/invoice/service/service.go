@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
@@ -11,7 +12,9 @@ import (
 	"github.com/jamaah-in/v2/internal/invoice/model"
 	"github.com/jamaah-in/v2/internal/invoice/repository"
 	"github.com/jamaah-in/v2/internal/shared/config"
+	"github.com/jamaah-in/v2/internal/shared/events"
 	"github.com/jamaah-in/v2/internal/shared/httpclient"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 )
 
 type InvoiceService struct {
@@ -77,7 +80,22 @@ func (s *InvoiceService) CreateInvoice(ctx context.Context, orgID, userID uuid.U
 		inv.DueDate = t
 	}
 
-	if err := s.repo.CreateInvoice(ctx, inv); err != nil {
+	// Emit invoice.issued so the accounting engine recognizes
+	// Piutang Jemaah (D) / Pendapatan Paket (K). The outbox row is written in the
+	// same tx as the invoice insert — no lost events.
+	payload, _ := json.Marshal(map[string]any{
+		"total_amount":   inv.TotalAmount,
+		"invoice_number": inv.InvoiceNumber,
+	})
+	evt := outbox.Event{
+		OrgID:         orgID,
+		AggregateType: "invoice",
+		AggregateID:   inv.ID,
+		EventType:     events.EventInvoiceIssued,
+		Payload:       payload,
+		OccurredAt:    time.Now(),
+	}
+	if err := s.repo.CreateInvoiceTx(ctx, inv, evt); err != nil {
 		return nil, err
 	}
 	return inv, nil
@@ -254,10 +272,6 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 		PaidAt:          paidAt,
 	}
 
-	if err := s.repo.CreatePayment(ctx, payment); err != nil {
-		return nil, nil, err
-	}
-
 	inv.AmountPaid += req.Amount
 	inv.AmountRemaining = inv.TotalAmount - inv.AmountPaid
 	if inv.AmountRemaining <= 0 {
@@ -266,8 +280,23 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 	} else if inv.AmountPaid > 0 {
 		inv.Status = string(model.InvoiceStatusSebagian)
 	}
-	if err := s.repo.UpdateInvoice(ctx, inv); err != nil {
-		return payment, nil, fmt.Errorf("update invoice: %w", err)
+
+	// Persist payment + invoice update + payment.received outbox event in one tx.
+	payload, _ := json.Marshal(map[string]any{
+		"amount":         req.Amount,
+		"payment_method": req.PaymentMethod,
+		"invoice_number": inv.InvoiceNumber,
+	})
+	evt := outbox.Event{
+		OrgID:         orgID,
+		AggregateType: "invoice",
+		AggregateID:   invoiceID,
+		EventType:     events.EventPaymentReceived,
+		Payload:       payload,
+		OccurredAt:    paidAt,
+	}
+	if err := s.repo.RecordPaymentTx(ctx, payment, inv, evt); err != nil {
+		return nil, nil, fmt.Errorf("record payment: %w", err)
 	}
 
 	// Allocate the cumulative paid amount across the installment schedule in

@@ -160,6 +160,7 @@ const PAGE_PATHS = {
   crm: "/app/crm",
   invoices: "/app/invoices",
   finance: "/app/finance",
+  akuntansi: "/app/akuntansi",
   vendors: "/app/vendors",
   agents: "/app/agents",
   documents: "/app/documents",

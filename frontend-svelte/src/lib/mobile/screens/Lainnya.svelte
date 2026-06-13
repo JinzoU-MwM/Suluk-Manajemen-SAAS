@@ -1,7 +1,7 @@
 <script>
   import {
     Package, Users2, FileText, Wallet, BedDouble, FileSignature, Map, Truck,
-    Handshake, Banknote, Boxes, Ban, User, Monitor, LogOut,
+    Handshake, Banknote, Boxes, Ban, User, Monitor, LogOut, BookOpen,
   } from "lucide-svelte";
   import MSection from "../ui/MSection.svelte";
   import MGroup from "../ui/MGroup.svelte";
@@ -14,6 +14,7 @@
     { ic: Users2, label: "Grup", c: "#2563a8", id: "grup" },
     { ic: FileText, label: "Invoice", c: "#C99A2E", id: "invoice" },
     { ic: Wallet, label: "Keuangan", c: "#15564a", id: "keuangan" },
+    { ic: BookOpen, label: "Akuntansi", c: "#0d7334", id: "akuntansi" },
     { ic: BedDouble, label: "Rooming", c: "#7a5ae0", id: "rooming" },
     { ic: FileSignature, label: "Kontrak", c: "#b8860b", id: "kontrak" },
     { ic: Map, label: "Itinerary", c: "#2563a8", id: "itinerary" },

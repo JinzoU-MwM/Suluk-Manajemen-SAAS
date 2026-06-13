@@ -13,6 +13,7 @@ import { createJamaahApi } from './apiDomains/jamaahApi.js';
 import { createRefundApi } from './apiDomains/refundApi.js';
 import { createPayrollApi } from './apiDomains/payrollApi.js';
 import { createAgentApi } from './apiDomains/agentApi.js';
+import { createAccountingApi } from './apiDomains/accountingApi.js';
 import { exportLinks } from './apiDomains/exportApi.js';
 
 export { API_URL, authHeaders };
@@ -62,6 +63,7 @@ Object.assign(
     createRefundApi({ cacheInvalidate }),
     createPayrollApi({ cacheInvalidate }),
     createAgentApi({ cacheInvalidate }),
+    createAccountingApi({ cacheInvalidate, cacheGet, cacheSet }),
     exportLinks,
     contractApi,
     paymentApi,
