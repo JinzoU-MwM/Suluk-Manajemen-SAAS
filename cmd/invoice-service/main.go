@@ -94,6 +94,12 @@ func main() {
 	app.Get("/health", sharedHealth.Handler("invoice",
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
+	// Internal-only: apply a non-cash credit (tabungan conversion) to an invoice.
+	// Guarded by X-Internal-Key inside the handler (no JWT). MUST be registered
+	// BEFORE the authenticated /api/v1/invoices group, otherwise that group's
+	// AuthMiddleware (mounted on the prefix) intercepts it and returns 401.
+	app.Post("/api/v1/invoices/internal/settle", invoiceHandler.SettleInternal)
+
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 	// Money writes are restricted to owner/admin/finance; reads stay open to any
 	// authenticated role (cs needs to view invoices/balances).
@@ -131,6 +137,13 @@ func main() {
 	payment := app.Group("/api/v1/payment", authMW)
 	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)
 	payment.Get("/status/:id", invoiceHandler.CheckPaymentStatus)
+
+	// Kasir POS — cash drawer sessions (buka/tutup kas).
+	sessions := app.Group("/api/v1/cash-sessions", authMW)
+	sessions.Get("/", invoiceHandler.ListCashSessions)
+	sessions.Get("/active", invoiceHandler.GetActiveCashSession)
+	sessions.Post("/", finRole, invoiceHandler.OpenCashSession)
+	sessions.Post("/:id/close", finRole, invoiceHandler.CloseCashSession)
 
 	refunds := app.Group("/api/v1/refunds", authMW)
 	refunds.Get("/policies", refundHandler.ListPolicies)

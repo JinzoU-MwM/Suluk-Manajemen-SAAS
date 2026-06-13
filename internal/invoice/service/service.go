@@ -271,6 +271,10 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 		ReceivedBy:      userID,
 		PaidAt:          paidAt,
 	}
+	// Link cash payments to the cashier's open POS session (for tutup-kas recon).
+	if req.PaymentMethod == "tunai" || req.PaymentMethod == "cash" {
+		payment.CashSessionID = s.repo.ActiveSessionID(ctx, orgID, userID)
+	}
 
 	inv.AmountPaid += req.Amount
 	inv.AmountRemaining = inv.TotalAmount - inv.AmountPaid
@@ -332,6 +336,12 @@ func (s *InvoiceService) allocatePaymentsToSchedules(ctx context.Context, invoic
 	}
 }
 
+// SettleFromCredit applies a non-cash credit (savings conversion) to an invoice.
+// The GL journal is posted by the originating module, so no event is emitted here.
+func (s *InvoiceService) SettleFromCredit(ctx context.Context, invoiceID, orgID uuid.UUID, amount int64) (int64, error) {
+	return s.repo.SettleFromCredit(ctx, invoiceID, orgID, amount)
+}
+
 func (s *InvoiceService) GetPayments(ctx context.Context, orgID, invoiceID uuid.UUID) ([]model.Payment, error) {
 	_, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
 	if err != nil {
@@ -362,6 +372,27 @@ func (s *InvoiceService) GetBalances(ctx context.Context, orgID uuid.UUID) ([]mo
 
 func (s *InvoiceService) ListInvoicesByPackage(ctx context.Context, orgID, packageID uuid.UUID) ([]model.Invoice, error) {
 	return s.repo.ListInvoicesByPackage(ctx, orgID, packageID)
+}
+
+// ---- POS cash sessions ----
+
+func (s *InvoiceService) OpenCashSession(ctx context.Context, orgID, userID uuid.UUID, openingFloat int64, notes string) (*model.CashSession, error) {
+	return s.repo.OpenSession(ctx, orgID, userID, openingFloat, notes)
+}
+
+func (s *InvoiceService) GetActiveCashSession(ctx context.Context, orgID, userID uuid.UUID) (*model.CashSession, error) {
+	return s.repo.GetActiveSession(ctx, orgID, userID)
+}
+
+func (s *InvoiceService) ListCashSessions(ctx context.Context, orgID uuid.UUID, limit int) ([]model.CashSession, error) {
+	if limit < 1 || limit > 100 {
+		limit = 30
+	}
+	return s.repo.ListSessions(ctx, orgID, limit)
+}
+
+func (s *InvoiceService) CloseCashSession(ctx context.Context, orgID, sessionID uuid.UUID, counted int64) (*model.CashSession, error) {
+	return s.repo.CloseSessionTx(ctx, orgID, sessionID, counted, events.EventPosCashSessionClosed)
 }
 
 func parseDate(s string) (*time.Time, error) {

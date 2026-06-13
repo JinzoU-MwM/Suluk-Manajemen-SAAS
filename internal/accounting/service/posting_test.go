@@ -84,6 +84,30 @@ func TestBuildPostingBalanced(t *testing.T) {
 				AccHutangTabungan: {0, 750000},
 			},
 		},
+		{
+			name: "savings converted",
+			env:  mk(events.EventSavingsConverted, map[string]any{"amount": 500000}),
+			wantAcc: map[string][2]int64{
+				AccHutangTabungan: {500000, 0},
+				AccPiutangJemaah:  {0, 500000},
+			},
+		},
+		{
+			name: "cash session surplus",
+			env:  mk(events.EventPosCashSessionClosed, map[string]any{"difference": 25000}),
+			wantAcc: map[string][2]int64{
+				AccKas:            {25000, 0},
+				AccPendapatanLain: {0, 25000},
+			},
+		},
+		{
+			name: "cash session short",
+			env:  mk(events.EventPosCashSessionClosed, map[string]any{"difference": -25000}),
+			wantAcc: map[string][2]int64{
+				AccBebanSelisihKas: {25000, 0},
+				AccKas:             {0, 25000},
+			},
+		},
 	}
 
 	for _, tc := range cases {

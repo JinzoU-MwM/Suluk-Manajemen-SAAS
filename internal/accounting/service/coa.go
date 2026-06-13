@@ -17,10 +17,12 @@ const (
 	AccModal             = "3101" // Modal Disetor
 	AccSaldoAwal         = "3901" // Saldo Awal (opening balance equity)
 	AccPendapatanPaket   = "4101" // Pendapatan Paket
+	AccPendapatanLain    = "4901" // Pendapatan Lain-lain (mis. kas lebih)
 	AccBebanKomisi       = "5101" // Beban Komisi Agen
 	AccBebanGaji         = "5102" // Beban Gaji
 	AccBebanPerlengkapan = "5103" // Beban Perlengkapan
 	AccBebanOperasional  = "5901" // Beban Operasional Lain
+	AccBebanSelisihKas   = "5902" // Beban Selisih Kas (kas kurang)
 )
 
 // StandardCOA is the default chart of accounts seeded per org on first use.
@@ -45,9 +47,11 @@ func StandardCOA() []model.Account {
 		a(AccModal, "Modal Disetor", model.TypeEquity),
 		a(AccSaldoAwal, "Saldo Awal", model.TypeEquity),
 		a(AccPendapatanPaket, "Pendapatan Paket", model.TypeRevenue),
+		a(AccPendapatanLain, "Pendapatan Lain-lain", model.TypeRevenue),
 		a(AccBebanKomisi, "Beban Komisi Agen", model.TypeExpense),
 		a(AccBebanGaji, "Beban Gaji", model.TypeExpense),
 		a(AccBebanPerlengkapan, "Beban Perlengkapan", model.TypeExpense),
 		a(AccBebanOperasional, "Beban Operasional Lain", model.TypeExpense),
+		a(AccBebanSelisihKas, "Beban Selisih Kas", model.TypeExpense),
 	}
 }

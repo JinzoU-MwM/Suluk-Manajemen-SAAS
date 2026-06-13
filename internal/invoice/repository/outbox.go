@@ -46,10 +46,10 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 	}
 	defer tx.Rollback(ctx)
 
-	if err := tx.QueryRow(ctx, `INSERT INTO payments (id, org_id, invoice_id, amount, payment_method, bank_name, account_number, reference_number, proof_url, notes, received_by, paid_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING created_at`,
+	if err := tx.QueryRow(ctx, `INSERT INTO payments (id, org_id, invoice_id, amount, payment_method, bank_name, account_number, reference_number, proof_url, notes, received_by, paid_at, cash_session_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING created_at`,
 		p.ID, p.OrgID, p.InvoiceID, p.Amount, p.PaymentMethod, p.BankName, p.AccountNumber,
-		p.ReferenceNumber, p.ProofURL, p.Notes, p.ReceivedBy, p.PaidAt).Scan(&p.CreatedAt); err != nil {
+		p.ReferenceNumber, p.ProofURL, p.Notes, p.ReceivedBy, p.PaidAt, p.CashSessionID).Scan(&p.CreatedAt); err != nil {
 		return err
 	}
 

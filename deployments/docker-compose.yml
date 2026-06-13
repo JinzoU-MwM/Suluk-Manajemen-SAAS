@@ -93,6 +93,7 @@ services:
       PAYROLL_SERVICE_ADDR: payroll-service:50060
       AGENT_SERVICE_ADDR: agent-service:50061
       ACCOUNTING_SERVICE_ADDR: accounting-service:50062
+      TABUNGAN_SERVICE_ADDR: tabungan-service:50063
       ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:8005,http://localhost:8007,https://test.jni.my.id"
       APP_ENV: production
     depends_on:
@@ -105,6 +106,7 @@ services:
       - vendor-service
       - contract-service
       - accounting-service
+      - tabungan-service
     networks:
       - suluk-network
 
@@ -476,6 +478,39 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
       POSTGRES_SSLMODE: require
       NATS_ADDR: nats://nats:4222
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - suluk-network
+
+  tabungan-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: tabungan-service
+    container_name: suluk-tabungan-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      TABUNGAN_SERVICE_PORT: "50063"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
+      POSTGRES_SSLMODE: require
+      NATS_ADDR: nats://nats:4222
+      INVOICE_SERVICE_ADDR: invoice-service:50054
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m

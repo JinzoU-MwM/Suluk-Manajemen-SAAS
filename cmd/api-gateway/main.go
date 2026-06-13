@@ -75,6 +75,7 @@ func main() {
 		"payroll":    getEnv("PAYROLL_SERVICE_ADDR", "localhost:50060"),
 		"agent":      getEnv("AGENT_SERVICE_ADDR", "localhost:50061"),
 		"accounting": getEnv("ACCOUNTING_SERVICE_ADDR", "localhost:50062"),
+		"tabungan":   getEnv("TABUNGAN_SERVICE_ADDR", "localhost:50063"),
 	}
 
 	api := app.Group("/api/v1")
@@ -124,6 +125,12 @@ func main() {
 	setupProxy(api, "/coa", services["accounting"])
 	setupProxy(api, "/journals", services["accounting"])
 	setupProxy(api, "/reports", services["accounting"])
+
+	// Tabungan (savings) service
+	setupProxy(api, "/tabungan", services["tabungan"])
+
+	// Kasir POS — cash sessions live in the invoice service
+	setupProxy(api, "/cash-sessions", services["invoice"])
 
 	// AI/OCR service: scan jobs/results + export templates
 	setupProxy(api, "/scan", services["aiocr"])

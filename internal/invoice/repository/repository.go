@@ -221,7 +221,7 @@ func (r *InvoiceRepo) CreatePayment(ctx context.Context, p *model.Payment) error
 }
 
 func (r *InvoiceRepo) GetPayments(ctx context.Context, invoiceID uuid.UUID) ([]model.Payment, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, org_id, invoice_id, amount, payment_method, bank_name, account_number, reference_number, proof_url, notes, received_by, paid_at, created_at
+	rows, err := r.pool.Query(ctx, `SELECT id, org_id, invoice_id, amount, payment_method, bank_name, account_number, reference_number, proof_url, notes, received_by, paid_at, created_at, cash_session_id
 		FROM payments WHERE invoice_id = $1 ORDER BY paid_at DESC`, invoiceID)
 	if err != nil {
 		return nil, err
@@ -231,7 +231,7 @@ func (r *InvoiceRepo) GetPayments(ctx context.Context, invoiceID uuid.UUID) ([]m
 	for rows.Next() {
 		var p model.Payment
 		if err := rows.Scan(&p.ID, &p.OrgID, &p.InvoiceID, &p.Amount, &p.PaymentMethod, &p.BankName, &p.AccountNumber,
-			&p.ReferenceNumber, &p.ProofURL, &p.Notes, &p.ReceivedBy, &p.PaidAt, &p.CreatedAt); err != nil {
+			&p.ReferenceNumber, &p.ProofURL, &p.Notes, &p.ReceivedBy, &p.PaidAt, &p.CreatedAt, &p.CashSessionID); err != nil {
 			return nil, err
 		}
 		payments = append(payments, p)

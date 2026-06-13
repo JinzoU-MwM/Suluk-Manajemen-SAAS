@@ -51,6 +51,10 @@ type savingsPayload struct {
 	Amount int64 `json:"amount"`
 }
 
+type cashSessionPayload struct {
+	Difference int64 `json:"difference"` // counted - expected (signed)
+}
+
 // buildPosting maps an event envelope to a balanced journal. Returns
 // ErrNoTemplate for event types this engine does not (yet) handle.
 func buildPosting(env *events.Envelope) (*posting, error) {
@@ -186,6 +190,58 @@ func buildPosting(env *events.Envelope) (*posting, error) {
 			lines: []model.PostingLine{
 				{AccountCode: AccKas, Debit: p.Amount, Memo: memo},
 				{AccountCode: AccHutangTabungan, Credit: p.Amount, Memo: memo},
+			},
+		}, nil
+
+	case events.EventSavingsConverted:
+		var p savingsPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			return nil, fmt.Errorf("decode savings-converted payload: %w", err)
+		}
+		if p.Amount <= 0 {
+			return nil, fmt.Errorf("conversion amount must be > 0")
+		}
+		// Saldo tabungan dipakai melunasi piutang jemaah (reklas, tanpa kas):
+		// Dr Hutang Tabungan, Cr Piutang Jemaah.
+		memo := "Konversi tabungan ke pelunasan"
+		return &posting{
+			module:      "tabungan",
+			description: memo,
+			lines: []model.PostingLine{
+				{AccountCode: AccHutangTabungan, Debit: p.Amount, Memo: memo},
+				{AccountCode: AccPiutangJemaah, Credit: p.Amount, Memo: memo},
+			},
+		}, nil
+
+	case events.EventPosCashSessionClosed:
+		var p cashSessionPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			return nil, fmt.Errorf("decode cash-session payload: %w", err)
+		}
+		if p.Difference == 0 {
+			return nil, ErrNoTemplate // tidak ada selisih → tidak perlu jurnal
+		}
+		if p.Difference > 0 {
+			// Kas fisik lebih dari ekspektasi → Dr Kas, Cr Pendapatan Lain.
+			memo := "Selisih kas lebih (tutup kas)"
+			return &posting{
+				module:      "pos",
+				description: memo,
+				lines: []model.PostingLine{
+					{AccountCode: AccKas, Debit: p.Difference, Memo: memo},
+					{AccountCode: AccPendapatanLain, Credit: p.Difference, Memo: memo},
+				},
+			}, nil
+		}
+		// Kas fisik kurang → Dr Beban Selisih Kas, Cr Kas.
+		short := -p.Difference
+		memo := "Selisih kas kurang (tutup kas)"
+		return &posting{
+			module:      "pos",
+			description: memo,
+			lines: []model.PostingLine{
+				{AccountCode: AccBebanSelisihKas, Debit: short, Memo: memo},
+				{AccountCode: AccKas, Credit: short, Memo: memo},
 			},
 		}, nil
 	}

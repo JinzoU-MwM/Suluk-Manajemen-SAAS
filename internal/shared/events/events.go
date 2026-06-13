@@ -28,6 +28,8 @@ const (
 	EventPayrollPosted    = "payroll.posted"      // slip gaji (Dr Beban Gaji, Cr Kas/Hutang)
 	EventCommissionAccrued = "commission.accrued"  // komisi agen (Dr Beban Komisi, Cr Hutang Komisi)
 	EventSavingsDeposited = "savings.deposited"    // setoran tabungan (Dr Kas, Cr Hutang Tabungan)
+	EventSavingsConverted = "savings.converted"    // tabungan jadi pelunasan (Dr Hutang Tabungan, Cr Piutang)
+	EventPosCashSessionClosed = "pos.cash.session.closed" // tutup kas: selisih kas lebih/kurang
 )
 
 // Subject returns the fully-qualified NATS subject for an event type.
