@@ -20,6 +20,8 @@
   import Grup from "./screens/Grup.svelte";
   import Invoice from "./screens/Invoice.svelte";
   import Keuangan from "./screens/Keuangan.svelte";
+  import Kasir from "./screens/Kasir.svelte";
+  import Tabungan from "./screens/Tabungan.svelte";
   import Akuntansi from "./screens/Akuntansi.svelte";
   import Rooming from "./screens/Rooming.svelte";
   import Kontrak from "./screens/Kontrak.svelte";
@@ -46,6 +48,8 @@
     grup: Grup,
     invoice: Invoice,
     keuangan: Keuangan,
+    kasir: Kasir,
+    tabungan: Tabungan,
     akuntansi: Akuntansi,
     rooming: Rooming,
     kontrak: Kontrak,
