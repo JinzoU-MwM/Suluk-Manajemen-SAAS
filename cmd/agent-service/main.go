@@ -88,8 +88,13 @@ func main() {
 	api := app.Group("/api/v1/agents", authMW)
 	api.Get("/", agentHandler.ListAgents)
 	api.Post("/", agentHandler.CreateAgent)
+	// Tier config — registered before "/:id" so "tiers" isn't read as an id.
+	api.Get("/tiers", agentHandler.GetTiers)
+	api.Put("/tiers", sharedMW.RequireRole("owner", "admin"), agentHandler.SetTiers)
 	api.Get("/:id", agentHandler.GetAgent)
 	api.Put("/:id", agentHandler.UpdateAgent)
+	api.Get("/:id/downline", agentHandler.GetDownline)
+	api.Get("/:id/upline", agentHandler.GetUpline)
 
 	comm := app.Group("/api/v1/commissions", authMW)
 	comm.Get("/", agentHandler.ListCommissions)

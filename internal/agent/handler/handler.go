@@ -105,9 +105,10 @@ func (h *AgentHandler) ListCommissions(c *fiber.Ctx) error {
 	}
 	agentID := c.Query("agent_id", "")
 	status := c.Query("status", "all")
+	tierLevel := c.Query("tier_level", "")
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
-	resp, err := h.svc.ListCommissions(c.Context(), claims.OrgID.String(), agentID, status, page, limit)
+	resp, err := h.svc.ListCommissions(c.Context(), claims.OrgID.String(), agentID, status, tierLevel, page, limit)
 	if err != nil {
 		return response.Internal(c, err)
 	}
@@ -135,4 +136,55 @@ func (h *AgentHandler) GetAgentCommissions(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"commissions": comms})
+}
+
+func (h *AgentHandler) GetDownline(c *fiber.Ctx) error {
+	claims, ok := middleware.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	nodes, err := h.svc.GetDownline(c.Context(), c.Params("id"), claims.OrgID.String())
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"downline": nodes})
+}
+
+func (h *AgentHandler) GetUpline(c *fiber.Ctx) error {
+	claims, ok := middleware.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	nodes, err := h.svc.GetUpline(c.Context(), c.Params("id"), claims.OrgID.String())
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"upline": nodes})
+}
+
+func (h *AgentHandler) GetTiers(c *fiber.Ctx) error {
+	claims, ok := middleware.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	tiers, err := h.svc.GetTiers(c.Context(), claims.OrgID.String())
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"tiers": tiers})
+}
+
+func (h *AgentHandler) SetTiers(c *fiber.Ctx) error {
+	claims, ok := middleware.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	var req model.SetTiersRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if err := h.svc.SetTiers(c.Context(), claims.OrgID.String(), req.Tiers); err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.OK(c, fiber.Map{"message": "tiers updated"})
 }
