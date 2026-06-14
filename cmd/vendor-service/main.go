@@ -14,9 +14,11 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	"github.com/jamaah-in/v2/internal/shared/events"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 	"github.com/jamaah-in/v2/internal/vendor_svc/handler"
 	"github.com/jamaah-in/v2/internal/vendor_svc/repository"
@@ -62,6 +64,14 @@ func main() {
 	vendorRepo := repository.NewVendorRepo(pool)
 	vendorService := service.NewVendorService(vendorRepo)
 	vendorHandler := handler.NewVendorHandler(vendorService)
+
+	// Integration Bus: outbox relay for vendor.bill.created events.
+	if bus, berr := events.Connect(cfg.NATS.Addr, logger); berr != nil {
+		logger.Errorf("event bus unavailable (outbox relay disabled): %v", berr)
+	} else {
+		defer bus.Close()
+		go outbox.NewRelay(outbox.NewStore(pool), bus, logger, "vendor").Start(ctx, 2*time.Second)
+	}
 
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-vendor-service",

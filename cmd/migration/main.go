@@ -19,7 +19,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-var services = []string{"auth", "package", "jamaah", "invoice", "finance", "aiocr", "vendor", "contract", "inventory", "payroll", "agent"}
+var services = []string{"auth", "package", "jamaah", "invoice", "finance", "aiocr", "vendor", "contract", "inventory", "payroll", "agent", "accounting", "tabungan"}
 
 func main() {
 	service := flag.String("service", "all", "service name (auth, package, jamaah, invoice, finance, aiocr, vendor, contract, all)")

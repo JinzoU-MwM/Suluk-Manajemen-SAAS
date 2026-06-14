@@ -14,9 +14,11 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	"github.com/jamaah-in/v2/internal/shared/events"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 
 	"github.com/jamaah-in/v2/internal/payroll/handler"
@@ -62,6 +64,13 @@ func main() {
 
 	payrollRepo := repository.NewPayrollRepo(pool)
 	payrollSvc := service.NewPayrollService(payrollRepo)
+
+	if bus, berr := events.Connect(cfg.NATS.Addr, logger); berr != nil {
+		logger.Errorf("event bus unavailable (outbox relay disabled): %v", berr)
+	} else {
+		defer bus.Close()
+		go outbox.NewRelay(outbox.NewStore(pool), bus, logger, "payroll").Start(ctx, 2*time.Second)
+	}
 	payrollHandler := handler.NewPayrollHandler(payrollSvc)
 
 	app := fiber.New(fiber.Config{

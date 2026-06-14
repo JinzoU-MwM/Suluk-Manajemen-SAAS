@@ -17,7 +17,9 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	"github.com/jamaah-in/v2/internal/shared/events"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
@@ -71,6 +73,17 @@ func main() {
 	refundSvc := service.NewRefundService(invoiceRepo)
 	refundHandler := handler.NewRefundHandler(refundSvc)
 
+	// Integration Bus: start the outbox relay so domain events reach accounting.
+	// If NATS is down we keep serving; events queue in the outbox until a relay
+	// (next start) drains them.
+	if bus, berr := events.Connect(cfg.NATS.Addr, logger); berr != nil {
+		logger.Errorf("event bus unavailable (outbox relay disabled): %v", berr)
+	} else {
+		defer bus.Close()
+		relay := outbox.NewRelay(outbox.NewStore(pool), bus, logger, "invoice")
+		go relay.Start(ctx, 2*time.Second)
+	}
+
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-invoice-service",
 		ReadTimeout:  10 * time.Second,
@@ -80,6 +93,12 @@ func main() {
 
 	app.Get("/health", sharedHealth.Handler("invoice",
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
+
+	// Internal-only: apply a non-cash credit (tabungan conversion) to an invoice.
+	// Guarded by X-Internal-Key inside the handler (no JWT). MUST be registered
+	// BEFORE the authenticated /api/v1/invoices group, otherwise that group's
+	// AuthMiddleware (mounted on the prefix) intercepts it and returns 401.
+	app.Post("/api/v1/invoices/internal/settle", invoiceHandler.SettleInternal)
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 	// Money writes are restricted to owner/admin/finance; reads stay open to any
@@ -118,6 +137,13 @@ func main() {
 	payment := app.Group("/api/v1/payment", authMW)
 	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)
 	payment.Get("/status/:id", invoiceHandler.CheckPaymentStatus)
+
+	// Kasir POS — cash drawer sessions (buka/tutup kas).
+	sessions := app.Group("/api/v1/cash-sessions", authMW)
+	sessions.Get("/", invoiceHandler.ListCashSessions)
+	sessions.Get("/active", invoiceHandler.GetActiveCashSession)
+	sessions.Post("/", finRole, invoiceHandler.OpenCashSession)
+	sessions.Post("/:id/close", finRole, invoiceHandler.CloseCashSession)
 
 	refunds := app.Group("/api/v1/refunds", authMW)
 	refunds.Get("/policies", refundHandler.ListPolicies)

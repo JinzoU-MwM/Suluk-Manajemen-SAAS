@@ -9,3 +9,5 @@ CREATE DATABASE jamaah_contract;
 CREATE DATABASE jamaah_inventory;
 CREATE DATABASE jamaah_payroll;
 CREATE DATABASE jamaah_agent;
+CREATE DATABASE jamaah_accounting;
+CREATE DATABASE jamaah_tabungan;

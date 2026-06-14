@@ -96,9 +96,25 @@ type Payment struct {
 	ReferenceNumber *string   `json:"reference_number,omitempty" db:"reference_number"`
 	ProofURL        *string   `json:"proof_url,omitempty" db:"proof_url"`
 	Notes           string    `json:"notes,omitempty" db:"notes"`
-	ReceivedBy      uuid.UUID `json:"received_by" db:"received_by"`
-	PaidAt          time.Time `json:"paid_at" db:"paid_at"`
-	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	ReceivedBy      uuid.UUID  `json:"received_by" db:"received_by"`
+	PaidAt          time.Time  `json:"paid_at" db:"paid_at"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	CashSessionID   *uuid.UUID `json:"cash_session_id,omitempty" db:"cash_session_id"`
+}
+
+// CashSession is a kasir (POS) cash-drawer session.
+type CashSession struct {
+	ID           uuid.UUID  `json:"id"`
+	OrgID        uuid.UUID  `json:"org_id"`
+	UserID       uuid.UUID  `json:"user_id"`
+	OpeningFloat int64      `json:"opening_float"`
+	ExpectedCash *int64     `json:"expected_cash,omitempty"`
+	CountedCash  *int64     `json:"counted_cash,omitempty"`
+	Difference   *int64     `json:"difference,omitempty"`
+	Status       string     `json:"status"`
+	OpenedAt     time.Time  `json:"opened_at"`
+	ClosedAt     *time.Time `json:"closed_at,omitempty"`
+	Notes        string     `json:"notes"`
 }
 
 type CreateInvoiceRequest struct {
