@@ -17,6 +17,7 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	"github.com/jamaah-in/v2/internal/shared/events"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
@@ -62,8 +63,25 @@ func main() {
 
 	jamaahRepo := repository.NewJamaahRepo(pool)
 	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("PACKAGE_SERVICE_ADDR")).
-		WithNotify(sharedNotify.New(os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("INTERNAL_API_KEY")))
+		WithNotify(sharedNotify.New(os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("INTERNAL_API_KEY"))).
+		WithLogger(logger)
 	jamaahHandler := handler.NewJamaahHandler(jamaahService)
+
+	// Connect the event bus and start the lead-scoring consumer. If NATS is
+	// unreachable we keep serving the CRM API; scores still refresh on in-process
+	// mutations and the lazy refresh in ListCRM, just not on payment events.
+	var bus *events.Bus
+	bus, err = events.Connect(cfg.NATS.Addr, logger)
+	if err != nil {
+		logger.Errorf("event bus unavailable (scoring consumer disabled): %v", err)
+	} else {
+		defer bus.Close()
+		if serr := jamaahService.StartConsumer(ctx, bus); serr != nil {
+			logger.Errorf("start scoring consumer: %v", serr)
+		} else {
+			logger.Info("jamaah lead-scoring consumer started")
+		}
+	}
 
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-crm-service",
@@ -81,6 +99,10 @@ func main() {
 	jamaah.Post("/", jamaahHandler.CreateProfile)
 	jamaah.Get("/", jamaahHandler.ListProfiles)
 	jamaah.Get("/crm", jamaahHandler.ListCRM)
+	// CRM analytics + admin recompute — registered before the "/:id" param route
+	// so "pipeline"/"recompute-scores" aren't captured as a jamaah id.
+	jamaah.Get("/crm/pipeline", sharedMW.RequireRole("owner", "admin", "cs", "finance"), jamaahHandler.GetPipelineFunnel)
+	jamaah.Post("/crm/recompute-scores", sharedMW.RequireRole("owner", "admin"), jamaahHandler.RecomputeScores)
 	jamaah.Get("/search/nik/:nik", jamaahHandler.FindByNIK)
 	jamaah.Get("/search/paspor/:paspor", jamaahHandler.FindByPaspor)
 	jamaah.Get("/dashboard/alerts", jamaahHandler.DashboardAlerts)

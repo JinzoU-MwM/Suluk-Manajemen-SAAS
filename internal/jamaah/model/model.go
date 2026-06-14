@@ -285,10 +285,47 @@ type CRMJamaahRow struct {
 	TotalAmount    int64      `json:"total_amount"`
 	TotalPaid      int64      `json:"total_paid"`
 	TotalRemaining int64      `json:"total_remaining"`
+	LeadScore      *int       `json:"lead_score"`
+	LeadTemp       string     `json:"lead_temp"`
+	StageEnteredAt *time.Time `json:"stage_entered_at,omitempty"`
+	DaysInStage    int        `json:"days_in_stage"`
+	ScoreUpdatedAt *time.Time `json:"score_updated_at,omitempty"`
+}
+
+// CRMFilter holds the optional list filters/sort for the CRM pipeline view.
+type CRMFilter struct {
+	Search   string
+	Stage    string // pipeline_status filter
+	Temp     string // hot|warm|cold
+	MinScore int    // lead_score >= MinScore (0 = no floor)
+	Sort     string // "score" → highest score first; default → newest first
+}
+
+// FunnelStage is one stage row of the pipeline funnel analytics.
+type FunnelStage struct {
+	Stage          string  `json:"stage"`
+	Count          int     `json:"count"`
+	TotalValue     int64   `json:"total_value"`
+	AvgDaysInStage float64 `json:"avg_days_in_stage"`
+}
+
+// FunnelSource is the lead-count breakdown by acquisition source.
+type FunnelSource struct {
+	Source string `json:"source"`
+	Count  int    `json:"count"`
+}
+
+// PipelineFunnel is the CRM analytics payload (GET /jamaah/crm/pipeline).
+type PipelineFunnel struct {
+	Stages  []FunnelStage  `json:"stages"`
+	Sources []FunnelSource `json:"sources"`
+	Total   int            `json:"total"`
 }
 
 type UpdatePipelineStatusRequest struct {
 	PipelineStatus string `json:"pipeline_status" validate:"required,oneof=prospek survey booking dp cicilan lunas berangkat selesai batal"`
+	Reason         string `json:"reason,omitempty" validate:"max=255"`
+	LostReason     string `json:"lost_reason,omitempty" validate:"max=40"`
 }
 
 type AddNoteRequest struct {

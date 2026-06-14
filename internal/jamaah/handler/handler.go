@@ -190,7 +190,7 @@ func (h *JamaahHandler) UpdatePipelineStatus(c *fiber.Ctx) error {
 		return response.BadRequest(c, "invalid request body")
 	}
 
-	reg, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, jamaahID, packageID, req.PipelineStatus)
+	reg, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, claims.UserID, jamaahID, packageID, req.PipelineStatus, req.Reason, req.LostReason)
 	if err != nil {
 		if errors.Is(err, service.ErrGate) {
 			return response.BadRequest(c, err.Error())

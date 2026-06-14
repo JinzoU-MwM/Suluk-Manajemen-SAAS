@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/jamaah-in/v2/internal/jamaah/model"
 	"github.com/jamaah-in/v2/internal/jamaah/repository"
@@ -22,12 +23,20 @@ type JamaahService struct {
 	packageAddr string
 	httpc       *httpclient.Client
 	notifier    *notify.Client
+	log         *zap.SugaredLogger
 	limitCache  sync.Map // uuid.UUID -> limitCacheEntry (short-TTL plan limits)
 }
 
 // WithNotify attaches a best-effort in-app notification client.
 func (s *JamaahService) WithNotify(n *notify.Client) *JamaahService {
 	s.notifier = n
+	return s
+}
+
+// WithLogger attaches a logger used by the scoring recompute paths (best-effort
+// background work that logs rather than failing the originating mutation).
+func (s *JamaahService) WithLogger(log *zap.SugaredLogger) *JamaahService {
+	s.log = log
 	return s
 }
 
@@ -369,7 +378,7 @@ func (s *JamaahService) GetRegistration(ctx context.Context, orgID, jamaahID, pa
 	return s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 }
 
-func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, status string) (*model.JamaahPackageRegistration, error) {
+func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID, jamaahID, packageID uuid.UUID, status, reason, lostReason string) (*model.JamaahPackageRegistration, error) {
 	reg, err := s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 	if err != nil {
 		return nil, err
@@ -405,9 +414,23 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, jamaahI
 		berangkatDate = &now
 	}
 
-	if err := s.repo.UpdatePipelineStatus(ctx, orgID, jamaahID, packageID, status, dpDate, lunasDate, berangkatDate); err != nil {
+	// lost_reason is only meaningful when the lead is lost.
+	if status != string(model.StatusBatal) {
+		lostReason = ""
+	}
+	if err := s.repo.UpdatePipelineStatus(ctx, orgID, jamaahID, packageID, repository.PipelineUpdate{
+		Status:        status,
+		FromStatus:    reg.PipelineStatus,
+		DPDate:        dpDate,
+		LunasDate:     lunasDate,
+		BerangkatDate: berangkatDate,
+		LostReason:    lostReason,
+		Reason:        reason,
+		ChangedBy:     userID,
+	}); err != nil {
 		return nil, err
 	}
+	s.recompute(ctx, orgID, jamaahID, packageID) // stage change moves the score
 	return s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 }
 
@@ -442,6 +465,7 @@ func (s *JamaahService) AddNote(ctx context.Context, jamaahID, orgID, userID uui
 	if err := s.repo.CreateNote(ctx, note); err != nil {
 		return nil, err
 	}
+	s.recomputeJamaah(ctx, orgID, jamaahID) // a note is a touch → refresh recency
 	return note, nil
 }
 
@@ -484,6 +508,7 @@ func (s *JamaahService) AddFollowUp(ctx context.Context, orgID, userID uuid.UUID
 	if err := s.repo.CreateFollowUp(ctx, fu); err != nil {
 		return nil, err
 	}
+	s.recomputeJamaah(ctx, orgID, jamaahID) // a follow-up is a touch → refresh recency
 	return fu, nil
 }
 
@@ -499,7 +524,12 @@ func (s *JamaahService) ListFollowUps(ctx context.Context, orgID uuid.UUID, comp
 }
 
 func (s *JamaahService) CompleteFollowUp(ctx context.Context, id, orgID uuid.UUID) error {
-	return s.repo.CompleteFollowUp(ctx, id, orgID)
+	jamaahID, err := s.repo.CompleteFollowUp(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+	s.recomputeJamaah(ctx, orgID, jamaahID)
+	return nil
 }
 
 func (s *JamaahService) UploadDocument(ctx context.Context, orgID uuid.UUID, jamaahID uuid.UUID, req model.UploadDocumentRequest, fileURL, fileName *string, fileSize *int64) (*model.JamaahDocument, error) {
@@ -531,7 +561,12 @@ func (s *JamaahService) ListDocuments(ctx context.Context, orgID, jamaahID uuid.
 }
 
 func (s *JamaahService) UpdateDocumentStatus(ctx context.Context, orgID uuid.UUID, id uuid.UUID, status string, verifiedBy *uuid.UUID, notes string) error {
-	return s.repo.UpdateDocumentStatus(ctx, orgID, id, status, verifiedBy, notes)
+	jamaahID, err := s.repo.UpdateDocumentStatus(ctx, orgID, id, status, verifiedBy, notes)
+	if err != nil {
+		return err
+	}
+	s.recomputeJamaah(ctx, orgID, jamaahID) // document completeness is a scoring signal
+	return nil
 }
 
 func (s *JamaahService) GetDashboardAlerts(ctx context.Context, orgID uuid.UUID) (*model.DashboardAlerts, error) {

@@ -4,6 +4,7 @@
     Plus, Search, LayoutGrid, List,
     Phone, ChevronRight, UserCircle, Loader2,
     Users, CheckCircle, CreditCard, Clock, Package as PackageIcon,
+    Flame, BarChart3, ArrowDownUp, X,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
@@ -32,10 +33,45 @@
   let selectedJamaah = $state(null);
   let activeTab = $state('profil');
 
-  // Kanban drag-and-drop (local/optimistic — no server persistence endpoint yet)
+  // Kanban drag-and-drop (optimistic; persisted via PATCH .../status)
   let dragId = $state(null);
   let dragFrom = $state(null);
   let overCol = $state(null);
+
+  // Lead-temperature filter + score sort (server-side) and funnel analytics
+  let tempFilter = $state(''); // '' | 'hot' | 'warm' | 'cold'
+  let sortByScore = $state(false);
+  let showFunnel = $state(false);
+  let funnel = $state(null);
+  let funnelLoading = $state(false);
+
+  // "Mark as lost" flow (prompts a reason when dropping into Batal)
+  let showLostModal = $state(false);
+  let lostReason = $state('');
+  let pendingBatal = $state(null);
+
+  const TEMP_FILTERS = [
+    { id: '',     label: 'Semua' },
+    { id: 'hot',  label: '🔥 Hot' },
+    { id: 'warm', label: 'Warm' },
+    { id: 'cold', label: 'Cold' },
+  ];
+
+  const LOST_REASONS = [
+    { id: 'harga',      label: 'Harga terlalu mahal' },
+    { id: 'jadwal',     label: 'Jadwal tidak cocok' },
+    { id: 'kompetitor', label: 'Pilih travel lain' },
+    { id: 'dana',       label: 'Kendala dana' },
+    { id: 'tidak_jadi', label: 'Batal berangkat' },
+    { id: 'lainnya',    label: 'Lainnya' },
+  ];
+
+  function tempColor(t) {
+    return t === 'hot' ? 'var(--c-danger)' : t === 'warm' ? 'var(--c-warning)' : 'var(--c-muted)';
+  }
+  function tempBg(t) {
+    return t === 'hot' ? 'var(--c-danger-soft)' : t === 'warm' ? 'var(--c-warning-soft, #fef3c7)' : 'var(--c-bg-2)';
+  }
 
   // Pagination (server-side via /jamaah/crm meta)
   const PAGE_SIZE = 25;
@@ -98,7 +134,10 @@
     error = '';
     try {
       const [crm, pkgs] = await Promise.all([
-        ApiService.listCRM({ search: searchQuery, page, pageSize: PAGE_SIZE }),
+        ApiService.listCRM({
+          search: searchQuery, page, pageSize: PAGE_SIZE,
+          temp: tempFilter, sort: sortByScore ? 'score' : '',
+        }),
         ApiService.listPackages({ pageSize: 200 }).catch(() => ([])),
       ]);
       const pkgList = pkgs?.packages || pkgs?.data || pkgs || [];
@@ -112,12 +151,16 @@
         passport_no: r.no_paspor || '',
         email: r.email || '',
         gender: r.gender || '',
+        package_id: r.package_id || null,
         package_name: r.package_id ? (pkgMap.get(r.package_id) || 'Paket') : null,
         room_type: r.room_type || null,
         pipeline_status: r.pipeline_status || 'prospek',
         total_invoice: r.total_amount || 0,
         paid: r.total_paid || 0,
         sisa_tagihan: r.total_remaining || 0,
+        lead_score: r.lead_score ?? null,
+        lead_temp: r.lead_temp || 'cold',
+        days_in_stage: r.days_in_stage || 0,
       }));
     } catch (e) {
       error = e.message;
@@ -178,7 +221,45 @@
     return jamaah.filter(j => j.pipeline_status === colId);
   }
 
-  // ── Kanban drag-and-drop (local move; updates stage optimistically) ──
+  // ── Temperature filter / score sort / funnel ──
+  function setTempFilter(t) {
+    if (tempFilter === t) return;
+    tempFilter = t;
+    page = 1;
+    loadJamaah();
+  }
+
+  function toggleSort() {
+    sortByScore = !sortByScore;
+    page = 1;
+    loadJamaah();
+  }
+
+  async function toggleFunnel() {
+    showFunnel = !showFunnel;
+    if (showFunnel && !funnel) await loadFunnel();
+  }
+
+  async function loadFunnel() {
+    funnelLoading = true;
+    try {
+      funnel = await ApiService.getPipelineFunnel();
+    } catch (e) {
+      showToast(mapError(e.message), 'error');
+      showFunnel = false;
+    } finally {
+      funnelLoading = false;
+    }
+  }
+
+  function stageLabel(id) {
+    return PIPELINE_STATUSES.find(s => s.id === id)?.label || id;
+  }
+  function stageColor(id) {
+    return PIPELINE_STATUSES.find(s => s.id === id)?.color || 'var(--c-muted)';
+  }
+
+  // ── Kanban drag-and-drop (optimistic; persisted to server) ──
   function onDragStart(j) {
     dragId = j.id;
     dragFrom = j.pipeline_status;
@@ -191,14 +272,49 @@
   }
 
   function onDrop(toCol) {
-    if (!dragId || dragFrom === toCol) { onDragEnd(); return; }
-    const idx = jamaah.findIndex(j => j.id === dragId);
-    if (idx !== -1) {
-      jamaah[idx] = { ...jamaah[idx], pipeline_status: toCol };
-      const label = PIPELINE_STATUSES.find(s => s.id === toCol)?.label || toCol;
-      showToast(`Lead dipindahkan ke ${label}`, 'success');
-    }
+    const id = dragId, from = dragFrom;
     onDragEnd();
+    if (!id || from === toCol) return;
+    const idx = jamaah.findIndex(j => j.id === id);
+    if (idx === -1) return;
+    const j = jamaah[idx];
+    if (!j.package_id) {
+      showToast('Lead belum terdaftar di paket — daftarkan ke paket dulu sebelum memindah tahap.', 'warning');
+      return;
+    }
+    if (toCol === 'batal') {
+      // Capture why the lead was lost before committing the move.
+      pendingBatal = { id, idx, packageId: j.package_id, from };
+      lostReason = '';
+      showLostModal = true;
+      return;
+    }
+    persistStage(idx, j.package_id, toCol, '');
+  }
+
+  async function persistStage(idx, packageId, toCol, lost_reason) {
+    const prev = jamaah[idx];
+    jamaah[idx] = { ...prev, pipeline_status: toCol }; // optimistic
+    try {
+      await ApiService.updatePipelineStatus(prev.id, packageId, { pipeline_status: toCol, lost_reason });
+      showToast(`Lead dipindahkan ke ${stageLabel(toCol)}`, 'success');
+    } catch (e) {
+      jamaah[idx] = prev; // rollback
+      showToast(mapError(e.message), 'error');
+    }
+  }
+
+  function confirmBatal() {
+    if (!pendingBatal) return;
+    const { idx, packageId } = pendingBatal;
+    showLostModal = false;
+    persistStage(idx, packageId, 'batal', lostReason || '');
+    pendingBatal = null;
+  }
+
+  function cancelBatal() {
+    showLostModal = false;
+    pendingBatal = null;
   }
 </script>
 
@@ -261,6 +377,78 @@
         />
       </div>
     </div>
+
+    <!-- Lead-temperature filter + score sort + funnel toggle -->
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <div style="display:inline-flex;gap:4px;background:var(--c-bg-2);padding:4px;border-radius:var(--radius)">
+        {#each TEMP_FILTERS as t}
+          <button
+            type="button"
+            onclick={() => setTempFilter(t.id)}
+            class="crm-chip"
+            class:crm-chip-on={tempFilter === t.id}
+          >{t.label}</button>
+        {/each}
+      </div>
+      <button
+        type="button"
+        onclick={toggleSort}
+        class="crm-pillbtn"
+        class:crm-pillbtn-on={sortByScore}
+        title="Urutkan berdasarkan skor lead tertinggi"
+      >
+        <ArrowDownUp class="h-3.5 w-3.5" />
+        Skor tertinggi
+      </button>
+      <button
+        type="button"
+        onclick={toggleFunnel}
+        class="crm-pillbtn"
+        class:crm-pillbtn-on={showFunnel}
+        title="Analitik funnel pipeline"
+      >
+        <BarChart3 class="h-3.5 w-3.5" />
+        Funnel
+      </button>
+    </div>
+
+    {#if showFunnel}
+      <div class="mt-3 rounded-2xl p-4" style="background:var(--c-surface);border:1px solid var(--c-line);box-shadow:var(--shadow-sm)">
+        {#if funnelLoading}
+          <div class="flex items-center gap-2 text-sm" style="color:var(--c-faint)">
+            <Loader2 class="h-4 w-4 animate-spin" /> Memuat analitik…
+          </div>
+        {:else if funnel}
+          <div class="mb-3 flex items-center gap-2">
+            <BarChart3 class="h-4 w-4" style="color:var(--c-primary)" />
+            <h3 class="text-sm font-bold" style="color:var(--c-ink)">Funnel Pipeline</h3>
+            <span class="text-xs" style="color:var(--c-faint)">{funnel.total} registrasi</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
+            {#each funnel.stages as st}
+              <div class="rounded-xl p-3" style="background:var(--c-bg-2);border-left:3px solid {stageColor(st.stage)}">
+                <p class="text-[11px] font-bold uppercase tracking-wide" style="color:var(--c-faint)">{stageLabel(st.stage)}</p>
+                <p class="mt-0.5 text-lg font-extrabold" style="color:var(--c-ink)">{st.count}</p>
+                {#if st.total_value > 0}
+                  <p class="text-[11px] tabular" style="font-variant-numeric:tabular-nums;color:var(--c-muted)">{formatIDR(st.total_value)}</p>
+                {/if}
+                {#if st.count > 0}
+                  <p class="mt-1 text-[10px]" style="color:var(--c-faint)">⌀ {Math.round(st.avg_days_in_stage)} hari di tahap</p>
+                {/if}
+              </div>
+            {/each}
+          </div>
+          {#if funnel.sources?.length}
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <span class="text-[11px] font-bold uppercase tracking-wide" style="color:var(--c-faint)">Sumber:</span>
+              {#each funnel.sources as s}
+                <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style="background:var(--c-bg-2);color:var(--c-muted)">{s.source} · {s.count}</span>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <!-- Body -->
@@ -316,13 +504,18 @@
                       <p class="truncate text-[13px] font-bold" style="color:var(--c-ink)">{j.name}</p>
                       <p class="truncate text-[11px]" style="color:var(--c-faint)">{j.nik || j.phone || '—'}</p>
                     </div>
+                    {@render scoreBadge(j)}
                   </div>
 
                   {#if j.package_name}
-                    <div class="mb-2 flex items-center gap-1.5 text-[12px]" style="color:var(--c-muted)">
+                    <div class="mb-1 flex items-center gap-1.5 text-[12px]" style="color:var(--c-muted)">
                       <PackageIcon class="h-3 w-3 flex-shrink-0" />
                       <span class="truncate">{j.package_name}</span>
                     </div>
+                  {/if}
+
+                  {#if j.days_in_stage > 0}
+                    <p class="mb-1.5 text-[10px]" style="color:var(--c-faint)">{j.days_in_stage} hari di tahap</p>
                   {/if}
 
                   {#if j.total_invoice > 0}
@@ -370,6 +563,7 @@
                 <th class="px-6 py-3">Jamaah</th>
                 <th class="hidden px-4 py-3 md:table-cell">Paket</th>
                 <th class="hidden px-4 py-3 lg:table-cell">Pembayaran</th>
+                <th class="hidden px-4 py-3 sm:table-cell">Skor</th>
                 <th class="px-4 py-3">Status</th>
                 <th class="px-4 py-3 text-right">Sisa Tagihan</th>
                 <th class="px-4 py-3"></th>
@@ -405,6 +599,14 @@
                           color={j.sisa_tagihan <= 0 ? 'var(--c-success)' : 'var(--c-accent)'}
                         />
                       </div>
+                    {:else}
+                      <span class="text-xs" style="color:var(--c-faint)">—</span>
+                    {/if}
+                  </td>
+                  <td class="hidden px-4 py-3.5 sm:table-cell">
+                    {#if j.lead_score != null}
+                      {@render scoreBadge(j)}
+                      {#if j.days_in_stage > 0}<p class="mt-1 text-[10px]" style="color:var(--c-faint)">{j.days_in_stage} hr</p>{/if}
                     {:else}
                       <span class="text-xs" style="color:var(--c-faint)">—</span>
                     {/if}
@@ -606,6 +808,60 @@
   </div>
 {/snippet}
 
+{#snippet scoreBadge(j)}
+  {#if j.lead_score != null}
+    <span
+      class="inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold"
+      style="background:{tempBg(j.lead_temp)};color:{tempColor(j.lead_temp)}"
+      title="Skor lead: {j.lead_score}/100 ({j.lead_temp})"
+    >
+      {#if j.lead_temp === 'hot'}<Flame class="h-3 w-3" />{:else}<span class="h-1.5 w-1.5 rounded-full" style="background:{tempColor(j.lead_temp)}"></span>{/if}
+      {j.lead_score}
+    </span>
+  {/if}
+{/snippet}
+
+<!-- Mark-as-lost reason modal -->
+{#if showLostModal}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    style="background:rgba(0,0,0,0.4)"
+    role="button"
+    tabindex="-1"
+    onclick={cancelBatal}
+    onkeydown={(e) => { if (e.key === 'Escape') cancelBatal(); }}
+  >
+    <div
+      class="w-full max-w-sm rounded-2xl p-5"
+      style="background:var(--c-surface);box-shadow:var(--shadow-lg, 0 10px 40px rgba(0,0,0,0.2))"
+      role="dialog"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={() => {}}
+    >
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-sm font-bold" style="color:var(--c-ink)">Tandai lead sebagai Batal</h3>
+        <button type="button" onclick={cancelBatal} style="color:var(--c-faint)"><X class="h-4 w-4" /></button>
+      </div>
+      <p class="mb-3 text-xs" style="color:var(--c-muted)">Pilih alasan agar bisa dianalisis nanti.</p>
+      <div class="flex flex-col gap-1.5">
+        {#each LOST_REASONS as r}
+          <button
+            type="button"
+            onclick={() => (lostReason = r.label)}
+            class="rounded-xl px-3 py-2 text-left text-sm transition-colors"
+            style="border:1px solid {lostReason === r.label ? 'var(--c-primary)' : 'var(--c-line)'};background:{lostReason === r.label ? 'var(--c-primary-tint)' : 'transparent'};color:var(--c-ink)"
+          >{r.label}</button>
+        {/each}
+      </div>
+      <div class="mt-4 flex gap-2">
+        <button type="button" onclick={cancelBatal} class="flex-1 rounded-xl border py-2.5 text-sm font-semibold" style="border-color:var(--c-line);color:var(--c-muted)">Batal</button>
+        <button type="button" onclick={confirmBatal} class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--c-danger)">Tandai Batal</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .crm-toggle {
     display: flex;
@@ -640,4 +896,40 @@
     box-shadow: 0 0 0 3px var(--c-primary-soft);
   }
   tbody tr.group:hover { background: var(--c-primary-tint); }
+
+  .crm-chip {
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    color: var(--c-muted);
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .crm-chip:hover { color: var(--c-ink); }
+  .crm-chip-on {
+    background: var(--c-surface);
+    color: var(--c-primary);
+    box-shadow: var(--shadow-sm);
+  }
+  .crm-pillbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    border-radius: var(--radius);
+    border: 1px solid var(--c-line);
+    background: var(--c-surface);
+    color: var(--c-muted);
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .crm-pillbtn:hover { color: var(--c-ink); border-color: var(--c-primary); }
+  .crm-pillbtn-on {
+    background: var(--c-primary-tint);
+    color: var(--c-primary);
+    border-color: var(--c-primary);
+  }
 </style>
