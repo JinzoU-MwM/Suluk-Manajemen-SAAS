@@ -199,6 +199,8 @@ services:
       INVOICE_SERVICE_ADDR: invoice-service:50054
       AUTH_SERVICE_ADDR: auth-service:50051
       PACKAGE_SERVICE_ADDR: package-service:50052
+      AGENT_SERVICE_ADDR: agent-service:50061
+      NATS_ADDR: nats://nats:4222
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set in deployments/.env}
