@@ -30,6 +30,12 @@ const (
 	EventSavingsDeposited = "savings.deposited"    // setoran tabungan (Dr Kas, Cr Hutang Tabungan)
 	EventSavingsConverted = "savings.converted"    // tabungan jadi pelunasan (Dr Hutang Tabungan, Cr Piutang)
 	EventPosCashSessionClosed = "pos.cash.session.closed" // tutup kas: selisih kas lebih/kurang
+	// Visa lifecycle (Phase 4B). No GL template — emitted for audit/automation;
+	// the accounting consumer ACKs them as no-template.
+	EventVisaSubmitted = "visa.submitted"
+	EventVisaApproved  = "visa.approved"
+	EventVisaRejected  = "visa.rejected"
+	EventVisaExpired   = "visa.expired"
 )
 
 // Subject returns the fully-qualified NATS subject for an event type.

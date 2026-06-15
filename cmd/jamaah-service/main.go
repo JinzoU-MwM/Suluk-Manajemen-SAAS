@@ -22,6 +22,7 @@ import (
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	sharedNotify "github.com/jamaah-in/v2/internal/shared/notify"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 	sharedResponse "github.com/jamaah-in/v2/internal/shared/response"
 )
 
@@ -81,7 +82,12 @@ func main() {
 		} else {
 			logger.Info("jamaah lead-scoring consumer started")
 		}
+		// Relay visa.* events from the transactional outbox.
+		go outbox.NewRelay(outbox.NewStore(pool), bus, logger, "jamaah").Start(ctx, 2*time.Second)
 	}
+
+	// Daily passport/visa expiry reminders + auto-expire of lapsed visas.
+	jamaahService.StartLifecycleReminders(ctx, 24*time.Hour)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-crm-service",
@@ -103,6 +109,7 @@ func main() {
 	// so "pipeline"/"recompute-scores" aren't captured as a jamaah id.
 	jamaah.Get("/crm/pipeline", sharedMW.RequireRole("owner", "admin", "cs", "finance"), jamaahHandler.GetPipelineFunnel)
 	jamaah.Post("/crm/recompute-scores", sharedMW.RequireRole("owner", "admin"), jamaahHandler.RecomputeScores)
+	jamaah.Get("/visa", jamaahHandler.ListVisas) // visa board — before "/:id"
 	jamaah.Get("/search/nik/:nik", jamaahHandler.FindByNIK)
 	jamaah.Get("/search/paspor/:paspor", jamaahHandler.FindByPaspor)
 	jamaah.Get("/dashboard/alerts", jamaahHandler.DashboardAlerts)
@@ -126,6 +133,11 @@ func main() {
 	jamaah.Post("/:id/documents", jamaahHandler.UploadDocument)
 	jamaah.Get("/:id/documents", jamaahHandler.ListDocuments)
 	jamaah.Patch("/:id/documents/:docId/status", jamaahHandler.UpdateDocumentStatus)
+
+	jamaah.Get("/:id/visa", jamaahHandler.GetVisa)
+	jamaah.Post("/:id/visa", jamaahHandler.UpsertVisa)
+	jamaah.Patch("/:id/visa/status", jamaahHandler.TransitionVisa)
+	jamaah.Get("/:id/visa/history", jamaahHandler.GetVisaHistory)
 
 	jamaah.Get("/by-package/:pkgId", jamaahHandler.ListByPackage)
 

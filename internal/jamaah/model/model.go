@@ -362,8 +362,9 @@ type UpdateDocumentStatusRequest struct {
 }
 
 type DashboardAlerts struct {
-	PassportExpiring90 []JamaahProfile  `json:"passport_expiring_90"`
-	PassportExpiring30 []JamaahProfile  `json:"passport_expiring_30"`
-	OverdueFollowUps   []FollowUp       `json:"overdue_follow_ups"`
-	IncompleteDocs     []JamaahDocument `json:"incomplete_docs"`
+	PassportExpiring90 []JamaahProfile   `json:"passport_expiring_90"`
+	PassportExpiring30 []JamaahProfile   `json:"passport_expiring_30"`
+	VisaExpiring30     []VisaApplication `json:"visa_expiring_30"`
+	OverdueFollowUps   []FollowUp        `json:"overdue_follow_ups"`
+	IncompleteDocs     []JamaahDocument  `json:"incomplete_docs"`
 }
