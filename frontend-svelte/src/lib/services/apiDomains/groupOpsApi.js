@@ -121,6 +121,35 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             return unwrapData(await response.json());
         },
 
+        // ── QR handover (Phase 4C) ──
+        async getHandoverCheckpoints(packageId) {
+            const response = await apiFetch(`${API_URL}/inventory/checkpoints/${packageId}`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async scanHandover({ token, checkpoint, items }) {
+            const response = await apiFetch(`${API_URL}/inventory/scan`, {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ token, checkpoint, items: items || [] }),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        // QR PNG is auth-gated, so fetch it as a blob and hand back an object URL
+        // (an <img src> can't carry the Bearer token).
+        async getMemberQrUrl(memberId) {
+            const response = await apiFetch(`${API_URL}/inventory/members/${memberId}/qr`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return URL.createObjectURL(await response.blob());
+        },
+
         async updateMemberOperational(memberId, bajuSize, familyId) {
             const response = await apiFetch(`${API_URL}/inventory/members/${memberId}/operational`, {
                 method: 'PUT',
