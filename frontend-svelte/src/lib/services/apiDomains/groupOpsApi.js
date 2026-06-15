@@ -54,6 +54,33 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             return unwrapData(await response.json());
         },
 
+        // ── Kloter / departure ops (Phase 5A) ──
+        async setGroupDeparture(groupId, { package_id, departure_date }) {
+            const response = await apiFetch(`${API_URL}/groups/${groupId}/departure`, {
+                method: 'PATCH',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ package_id, departure_date }),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async transitionGroupDeparture(groupId, status) {
+            const response = await apiFetch(`${API_URL}/groups/${groupId}/departure/status`, {
+                method: 'PATCH',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ status }),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async getGroupManifest(groupId) {
+            const response = await apiFetch(`${API_URL}/groups/${groupId}/manifest`, { headers: authHeaders() });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
         async deleteGroup(groupId) {
             const response = await apiFetch(`${API_URL}/groups/${groupId}`, {
                 method: 'DELETE',

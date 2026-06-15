@@ -184,6 +184,10 @@ func main() {
 	groups.Post("/:groupId/members", jamaahHandler.AddGroupMembers)
 	groups.Put("/:groupId/members/:memberId", jamaahHandler.UpdateGroupMember)
 	groups.Delete("/:groupId/members/:memberId", jamaahHandler.DeleteGroupMember)
+	// Kloter / departure ops (Phase 5A)
+	groups.Patch("/:groupId/departure", jamaahHandler.SetDeparture)
+	groups.Patch("/:groupId/departure/status", jamaahHandler.TransitionDeparture)
+	groups.Get("/:groupId/manifest", jamaahHandler.GetDepartureManifest)
 
 	// Registration — public endpoints (no auth)
 	regPublic := app.Group("/api/v1/registration/public")

@@ -3,10 +3,13 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
 	"github.com/jamaah-in/v2/internal/jamaah/model"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 )
 
 func (r *JamaahRepo) CreateGroup(ctx context.Context, g *model.Group) error {
@@ -61,10 +64,19 @@ func (r *JamaahRepo) CountProfiles(ctx context.Context, orgID uuid.UUID) (int, e
 	return n, err
 }
 
+const groupCols = `id, org_id, name, description, member_count, is_active,
+	package_id, departure_date, departure_status, manifest_finalized_at, departed_at, created_at, updated_at`
+
+func scanGroup(row rowScanner) (*model.Group, error) {
+	var g model.Group
+	err := row.Scan(&g.ID, &g.OrgID, &g.Name, &g.Description, &g.MemberCount, &g.IsActive,
+		&g.PackageID, &g.DepartureDate, &g.DepartureStatus, &g.ManifestFinalizedAt, &g.DepartedAt,
+		&g.CreatedAt, &g.UpdatedAt)
+	return &g, err
+}
+
 func (r *JamaahRepo) ListGroups(ctx context.Context, orgID uuid.UUID) ([]model.Group, error) {
-	query := `SELECT id, org_id, name, description, member_count, is_active, created_at, updated_at
-		FROM groups WHERE org_id = $1 ORDER BY created_at DESC`
-	rows, err := r.pool.Query(ctx, query, orgID)
+	rows, err := r.pool.Query(ctx, `SELECT `+groupCols+` FROM groups WHERE org_id = $1 ORDER BY created_at DESC`, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,27 +84,76 @@ func (r *JamaahRepo) ListGroups(ctx context.Context, orgID uuid.UUID) ([]model.G
 
 	var groups []model.Group
 	for rows.Next() {
-		var g model.Group
-		if err := rows.Scan(&g.ID, &g.OrgID, &g.Name, &g.Description, &g.MemberCount, &g.IsActive, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		g, err := scanGroup(rows)
+		if err != nil {
 			return nil, err
 		}
-		groups = append(groups, g)
+		groups = append(groups, *g)
 	}
 	return groups, nil
 }
 
 func (r *JamaahRepo) GetGroup(ctx context.Context, groupID, orgID uuid.UUID) (*model.Group, error) {
-	query := `SELECT id, org_id, name, description, member_count, is_active, created_at, updated_at
-		FROM groups WHERE id = $1 AND org_id = $2`
-	var g model.Group
-	err := r.pool.QueryRow(ctx, query, groupID, orgID).Scan(&g.ID, &g.OrgID, &g.Name, &g.Description, &g.MemberCount, &g.IsActive, &g.CreatedAt, &g.UpdatedAt)
+	g, err := scanGroup(r.pool.QueryRow(ctx, `SELECT `+groupCols+` FROM groups WHERE id = $1 AND org_id = $2`, groupID, orgID))
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return &g, nil
+	return g, nil
+}
+
+// SetDeparture links a group to its package + departure date (editable only
+// while the kloter is still in draft).
+func (r *JamaahRepo) SetDeparture(ctx context.Context, groupID, orgID uuid.UUID, packageID *uuid.UUID, departureDate *time.Time) error {
+	ct, err := r.pool.Exec(ctx, `UPDATE groups
+		SET package_id = $3, departure_date = $4, updated_at = NOW()
+		WHERE id = $1 AND org_id = $2 AND departure_status = 'draft'`,
+		groupID, orgID, packageID, departureDate)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("group not found or not in draft")
+	}
+	return nil
+}
+
+// TransitionDeparture moves the kloter to a new status, stamping the relevant
+// timestamps and enqueueing the outbox event, in one transaction.
+func (r *JamaahRepo) TransitionDeparture(ctx context.Context, groupID, orgID uuid.UUID, to string, manifestFinalizedAt, departedAt *time.Time, eventType string, payload []byte) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	ct, err := tx.Exec(ctx, `UPDATE groups
+		SET departure_status = $3,
+		    manifest_finalized_at = COALESCE($4, manifest_finalized_at),
+		    departed_at = COALESCE($5, departed_at),
+		    updated_at = NOW()
+		WHERE id = $1 AND org_id = $2`, groupID, orgID, to, manifestFinalizedAt, departedAt)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("group not found")
+	}
+
+	if eventType != "" {
+		if err := outbox.Insert(ctx, tx, outbox.Event{
+			OrgID:         orgID,
+			AggregateType: "group_departure",
+			AggregateID:   groupID,
+			EventType:     eventType,
+			Payload:       payload,
+		}); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *JamaahRepo) UpdateGroup(ctx context.Context, g *model.Group) error {
