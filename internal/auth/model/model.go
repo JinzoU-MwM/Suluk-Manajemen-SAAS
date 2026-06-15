@@ -14,12 +14,16 @@ const (
 	RoleFinance Role = "finance"
 	RoleCS      Role = "cs"
 	RoleViewer  Role = "viewer"
+	// RoleAgent is an external B2B agent: they sign in to the agency portal and
+	// see only their own subtree. Provisioned via agent-credentials, not normal
+	// team invites.
+	RoleAgent Role = "agent"
 )
 
 func (r Role) String() string { return string(r) }
 
 func ValidRoles() []string {
-	return []string{"owner", "admin", "finance", "cs", "viewer"}
+	return []string{"owner", "admin", "finance", "cs", "viewer", "agent"}
 }
 
 type MemberStatus string
@@ -38,11 +42,12 @@ type User struct {
 	EmailVerified bool      `json:"email_verified" db:"email_verified"`
 	Phone         *string   `json:"phone,omitempty" db:"phone"`
 	PhoneVerified bool      `json:"phone_verified" db:"phone_verified"`
-	Role          string    `json:"role" db:"role"`
-	IsActive      bool      `json:"is_active" db:"is_active"`
-	IsSuperAdmin  bool      `json:"is_super_admin" db:"is_super_admin"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
+	Role          string     `json:"role" db:"role"`
+	IsActive      bool       `json:"is_active" db:"is_active"`
+	IsSuperAdmin  bool       `json:"is_super_admin" db:"is_super_admin"`
+	AgentID       *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type Organization struct {
@@ -260,6 +265,14 @@ type AddTeamMemberRequest struct {
 type InviteMemberRequest struct {
 	Email string `json:"email" validate:"required,email"`
 	Role  string `json:"role" validate:"required,oneof=owner admin finance cs viewer"`
+}
+
+// ProvisionAgentRequest creates a B2B portal login bound to an agent record.
+type ProvisionAgentRequest struct {
+	AgentID  string `json:"agent_id" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Name     string `json:"name"`
+	Password string `json:"password" validate:"required,min=6"`
 }
 
 type AcceptInviteRequest struct {

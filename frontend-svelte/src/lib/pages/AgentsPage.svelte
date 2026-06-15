@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Users, DollarSign, CheckCheck, Plus, Pencil, Search, UserCheck, TrendingUp, Wallet, Network, X } from 'lucide-svelte';
+  import { Users, DollarSign, CheckCheck, Plus, Pencil, Search, UserCheck, TrendingUp, Wallet, Network, X, KeyRound } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import PageHeader from '../components/PageHeader.svelte';
@@ -43,6 +43,23 @@
   let showTierDrawer = $state(false);
   let tiers = $state([]);
   let savingTiers = $state(false);
+
+  // Portal credential provisioning
+  let showPortalDrawer = $state(false);
+  let portalAgent = $state(null);
+  let portalForm = $state({ email: '', name: '', password: '' });
+  let savingPortal = $state(false);
+
+  function openPortal(a) { portalAgent = a; portalForm = { email: a.email || '', name: a.name, password: '' }; showPortalDrawer = true; }
+  async function savePortal() {
+    if (!portalForm.email || !portalForm.password) { showToast('Email dan password wajib diisi', 'warning'); return; }
+    savingPortal = true;
+    try {
+      await ApiService.provisionAgentPortal({ agent_id: portalAgent.id, email: portalForm.email, name: portalForm.name, password: portalForm.password });
+      showToast('Akun portal agen dibuat');
+      showPortalDrawer = false;
+    } catch (e) { showToast(e.message, 'error'); } finally { savingPortal = false; }
+  }
 
   function formatIDR(n) { return n ? `Rp ${Number(n).toLocaleString('id-ID')}` : 'Rp 0'; }
 
@@ -257,6 +274,7 @@
                       <div class="flex justify-end gap-2">
                         <button type="button" onclick={() => editAgent(a)} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="border:1px solid var(--c-line);color:var(--c-ink-soft)"><Pencil class="h-3 w-3" />Edit</button>
                         <button type="button" onclick={() => viewAgentCommissions(a)} class="rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="background:var(--c-primary-soft);color:var(--c-primary-deep)">Komisi</button>
+                        <button type="button" onclick={() => openPortal(a)} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="border:1px solid var(--c-line);color:var(--c-ink-soft)" title="Buat akun login portal agen"><KeyRound class="h-3 w-3" />Portal</button>
                       </div>
                     </td>
                   </tr>
@@ -452,6 +470,21 @@
     <div class="flex gap-2 pt-2">
       <button type="button" onclick={() => showTierDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
       <button type="button" onclick={saveTiers} disabled={savingTiers} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingTiers ? '...' : 'Simpan'}</button>
+    </div>
+  </div>
+</SlideDrawer>
+
+<!-- Portal credential drawer -->
+<SlideDrawer open={showPortalDrawer} onClose={() => showPortalDrawer = false} title={portalAgent ? `Akun Portal: ${portalAgent.name}` : 'Akun Portal'} width="440px">
+  <div class="flex flex-col gap-4 p-4">
+    <p class="text-sm text-slate-500">Buat akun login agar agen ini bisa masuk ke portal dan melihat komisi & jaringannya sendiri.</p>
+    <div class="flex flex-col gap-1"><label for="p-email" class="text-xs font-medium text-slate-700">Email Login <span class="text-red-500">*</span></label><input id="p-email" type="email" bind:value={portalForm.email} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <div class="flex flex-col gap-1"><label for="p-name" class="text-xs font-medium text-slate-700">Nama Tampilan</label><input id="p-name" type="text" bind:value={portalForm.name} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <div class="flex flex-col gap-1"><label for="p-pass" class="text-xs font-medium text-slate-700">Password <span class="text-red-500">*</span></label><input id="p-pass" type="text" bind:value={portalForm.password} placeholder="min. 6 karakter" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <p class="text-xs text-slate-400">Bagikan email & password ini ke agen. Mereka login di halaman login yang sama dan otomatis diarahkan ke portal agen.</p>
+    <div class="flex gap-2 pt-2">
+      <button type="button" onclick={() => showPortalDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
+      <button type="button" onclick={savePortal} disabled={savingPortal} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingPortal ? '...' : 'Buat Akun'}</button>
     </div>
   </div>
 </SlideDrawer>

@@ -2,11 +2,11 @@
   import Seo from "$lib/components/Seo.svelte";
   import Login from "$lib/pages/Login.svelte";
   import { goto } from "$app/navigation";
-  import { session, homePath } from "$lib/stores/session.svelte.js";
+  import { session, homePathForUser } from "$lib/stores/session.svelte.js";
 
   function handleLoginSuccess(userData) {
     session.setUserAndLoad(userData);
-    goto(homePath());
+    goto(homePathForUser(userData));
   }
 </script>
 

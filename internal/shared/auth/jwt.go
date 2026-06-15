@@ -15,6 +15,9 @@ type Claims struct {
 	OrgID  uuid.UUID `json:"org_id"`
 	Role   string    `json:"role"`
 	Email  string    `json:"email"`
+	// AgentID links the user to an agent record for the B2B portal (role
+	// "agent"). nil/omitted for ordinary staff accounts — backward compatible.
+	AgentID *uuid.UUID `json:"agent_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -58,15 +61,16 @@ func NewJWTManager(privateKeyPath, publicKeyKeyPath string, accessTTL, refreshTT
 	}, nil
 }
 
-func (m *JWTManager) GenerateTokenPair(userID, orgID uuid.UUID, role, email string) (*TokenPair, error) {
+func (m *JWTManager) GenerateTokenPair(userID, orgID uuid.UUID, role, email string, agentID *uuid.UUID) (*TokenPair, error) {
 	now := time.Now()
 	accessExp := now.Add(m.accessTTL)
 
 	accessClaims := &Claims{
-		UserID: userID,
-		OrgID:  orgID,
-		Role:   role,
-		Email:  email,
+		UserID:  userID,
+		OrgID:   orgID,
+		Role:    role,
+		Email:   email,
+		AgentID: agentID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.New().String(),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -83,10 +87,11 @@ func (m *JWTManager) GenerateTokenPair(userID, orgID uuid.UUID, role, email stri
 
 	refreshExp := now.Add(m.refreshTTL)
 	refreshClaims := &Claims{
-		UserID: userID,
-		OrgID:  orgID,
-		Role:   role,
-		Email:  email,
+		UserID:  userID,
+		OrgID:   orgID,
+		Role:    role,
+		Email:   email,
+		AgentID: agentID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.New().String(),
 			IssuedAt:  jwt.NewNumericDate(now),

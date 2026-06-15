@@ -135,6 +135,13 @@ export function homePath() {
   return session.mobileMode ? "/mobile" : "/app";
 }
 
+// Role-aware landing: external agents go to the B2B portal, everyone else to the
+// normal app/mobile shell.
+export function homePathForUser(user) {
+  if (user?.role === "agent") return "/agency";
+  return homePath();
+}
+
 // Logout then send the user back to the right entry point.
 export async function logoutAndRedirect() {
   const mobile = session.mobileMode;

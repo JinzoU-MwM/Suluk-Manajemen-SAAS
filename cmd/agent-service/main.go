@@ -102,6 +102,14 @@ func main() {
 	comm.Put("/:id/pay", agentHandler.PayCommission)
 	comm.Get("/agent/:id", agentHandler.GetAgentCommissions)
 
+	// B2B external-agent portal: every route is scoped to the signed-in agent's
+	// own subtree (RequireAgentScope guarantees a linked agent id).
+	b2b := app.Group("/api/v1/b2b", authMW, sharedMW.RequireAgentScope)
+	b2b.Get("/me", agentHandler.B2BMe)
+	b2b.Get("/dashboard", agentHandler.B2BDashboard)
+	b2b.Get("/downline", agentHandler.B2BDownline)
+	b2b.Get("/commissions", agentHandler.B2BCommissions)
+
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
 			logger.Fatalf("agent service listen: %v", err)

@@ -188,6 +188,25 @@ func (s *AgentService) GetDownline(ctx context.Context, agentID, orgID string) (
 	return s.repo.Downline(ctx, agentID, orgID)
 }
 
+// GetAgentDashboard is the B2B portal summary for the signed-in agent.
+func (s *AgentService) GetAgentDashboard(ctx context.Context, agentID, orgID string) (*model.B2BDashboard, error) {
+	agent, err := s.repo.GetAgent(ctx, agentID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	down, err := s.repo.Downline(ctx, agentID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	direct := 0
+	for _, d := range down {
+		if d.Depth == 1 {
+			direct++
+		}
+	}
+	return &model.B2BDashboard{Agent: agent, DownlineCount: len(down), DirectCount: direct}, nil
+}
+
 // GetUpline returns the agent's ancestor chain (nearest-first).
 func (s *AgentService) GetUpline(ctx context.Context, agentID, orgID string) ([]model.DownlineNode, error) {
 	return s.repo.Upline(ctx, agentID, orgID)

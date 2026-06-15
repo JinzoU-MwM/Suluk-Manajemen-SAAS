@@ -50,6 +50,13 @@ export function createAgentApi({ cacheInvalidate } = /** @type {{cacheInvalidate
             return unwrapData(await res.json());
         },
 
+        // Provision a B2B portal login for an agent (owner/admin only).
+        async provisionAgentPortal(data) {
+            const res = await apiFetch(`${API_URL}/orgs/agent-credentials`, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data) });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+
         async getTiers() {
             const res = await apiFetch(`${AGENTS}/tiers`, { headers: authHeaders() });
             if (!res.ok) throw new Error(await parseError(res));

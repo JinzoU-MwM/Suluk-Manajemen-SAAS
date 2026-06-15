@@ -128,3 +128,10 @@ type CommissionListResponse struct {
 type SetTiersRequest struct {
 	Tiers []CommissionTier `json:"tiers"`
 }
+
+// B2BDashboard is the agent-portal landing summary for the signed-in agent.
+type B2BDashboard struct {
+	Agent         *Agent `json:"agent"`
+	DownlineCount int    `json:"downline_count"`
+	DirectCount   int    `json:"direct_count"`
+}

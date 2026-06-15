@@ -82,7 +82,7 @@ func (s *AuthService) GetConsolidatedStats(ctx context.Context, parentOrgID stri
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			tp, err := s.jwt.GenerateTokenPair(uuid.Nil, orgID, "owner", "consolidated@internal")
+			tp, err := s.jwt.GenerateTokenPair(uuid.Nil, orgID, "owner", "consolidated@internal", nil)
 			if err != nil {
 				mu.Lock()
 				partial = true

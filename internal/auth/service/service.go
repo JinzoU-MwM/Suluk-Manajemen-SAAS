@@ -98,7 +98,7 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 		return nil, nil, nil, err
 	}
 
-	tokens, err := s.jwt.GenerateTokenPair(userID, org.ID, "owner", user.Email)
+	tokens, err := s.jwt.GenerateTokenPair(userID, org.ID, "owner", user.Email, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -144,7 +144,7 @@ func (s *AuthService) Login(ctx context.Context, req model.LoginRequest) (*model
 		role = member.Role
 	}
 
-	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email)
+	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -185,7 +185,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*s
 
 	s.repo.DeleteRefreshToken(ctx, hash)
 
-	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email)
+	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -207,6 +207,59 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 
 func (s *AuthService) GetUser(ctx context.Context, userID uuid.UUID) (*model.User, error) {
 	return s.repo.GetUserByID(ctx, userID)
+}
+
+// ProvisionAgentCredential creates a B2B portal login for an existing agent: a
+// user with role "agent" linked to agentID, plus an "agent" team membership in
+// the admin's org. The agent record lives in agent-service, so agentID is taken
+// on trust from the caller (an org admin) — portal queries still scope by
+// org_id, keeping a wrong id within the same org's data.
+func (s *AuthService) ProvisionAgentCredential(ctx context.Context, orgID, invitedBy uuid.UUID, req model.ProvisionAgentRequest) (*model.User, error) {
+	if req.Email == "" || req.Password == "" || req.AgentID == "" {
+		return nil, fmt.Errorf("email, password, and agent_id are required")
+	}
+	agentID, err := uuid.Parse(req.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid agent_id")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+	name := req.Name
+	if name == "" {
+		name = req.Email
+	}
+	user := &model.User{
+		ID:           uuid.New(),
+		Email:        req.Email,
+		Name:         name,
+		PasswordHash: string(hashed),
+		Role:         string(model.RoleAgent),
+		IsActive:     true,
+		AgentID:      &agentID,
+	}
+	member := &model.TeamMember{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		UserID:    user.ID,
+		Role:      string(model.RoleAgent),
+		Status:    string(model.StatusActive),
+		InvitedBy: &invitedBy,
+	}
+	if err := s.repo.CreateAgentUserTx(ctx, user, member); err != nil {
+		return nil, err
+	}
+	s.repo.CreateAuditLog(ctx, &model.AuditLog{
+		ID:       uuid.New(),
+		OrgID:    &orgID,
+		UserID:   &invitedBy,
+		Action:   "agent.credential.provision",
+		Entity:   "user",
+		EntityID: &user.ID,
+		NewValue: map[string]string{"email": user.Email, "agent_id": agentID.String()},
+	})
+	return user, nil
 }
 
 func (s *AuthService) UpdateUser(ctx context.Context, userID uuid.UUID, name, phone string) (*model.User, error) {

@@ -120,6 +120,7 @@ func main() {
 	// Agent & Commission service
 	setupProxy(api, "/agents", services["agent"])
 	setupProxy(api, "/commissions", services["agent"])
+	setupProxy(api, "/b2b", services["agent"]) // external agent portal (scoped in agent-service)
 
 	// Accounting service: chart of accounts, journals, financial reports
 	setupProxy(api, "/coa", services["accounting"])

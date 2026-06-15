@@ -16,6 +16,7 @@ import { createAgentApi } from './apiDomains/agentApi.js';
 import { createAccountingApi } from './apiDomains/accountingApi.js';
 import { createTabunganApi } from './apiDomains/tabunganApi.js';
 import { createPosApi } from './apiDomains/posApi.js';
+import { createAgencyApi } from './apiDomains/agencyApi.js';
 import { exportLinks } from './apiDomains/exportApi.js';
 
 export { API_URL, authHeaders };
@@ -68,6 +69,7 @@ Object.assign(
     createAccountingApi({ cacheInvalidate, cacheGet, cacheSet }),
     createTabunganApi({ cacheInvalidate }),
     createPosApi({ cacheInvalidate }),
+    createAgencyApi(),
     exportLinks,
     contractApi,
     paymentApi,
