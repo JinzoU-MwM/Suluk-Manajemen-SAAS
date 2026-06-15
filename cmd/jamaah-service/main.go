@@ -62,7 +62,7 @@ func main() {
 	}
 
 	jamaahRepo := repository.NewJamaahRepo(pool)
-	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("PACKAGE_SERVICE_ADDR")).
+	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("PACKAGE_SERVICE_ADDR"), os.Getenv("AGENT_SERVICE_ADDR")).
 		WithNotify(sharedNotify.New(os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("INTERNAL_API_KEY"))).
 		WithLogger(logger)
 	jamaahHandler := handler.NewJamaahHandler(jamaahService)
@@ -128,6 +128,10 @@ func main() {
 	jamaah.Patch("/:id/documents/:docId/status", jamaahHandler.UpdateDocumentStatus)
 
 	jamaah.Get("/by-package/:pkgId", jamaahHandler.ListByPackage)
+
+	// B2B agent portal: an agent's own + downline leads (scoped to the token's agent).
+	b2b := app.Group("/api/v1/b2b", authMW, sharedMW.RequireAgentScope)
+	b2b.Get("/leads", jamaahHandler.B2BMyLeads)
 
 	analytics := app.Group("/api/v1/analytics", authMW)
 	analytics.Get("/dashboard", jamaahHandler.GetAnalyticsDashboard)

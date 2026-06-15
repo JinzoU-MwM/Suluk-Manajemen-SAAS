@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
-  import { LayoutDashboard, Wallet, Network, UserCircle, LogOut, Menu } from "lucide-svelte";
+  import { LayoutDashboard, Wallet, Network, UserCircle, LogOut, Menu, Users } from "lucide-svelte";
   import { session, logoutAndRedirect } from "$lib/stores/session.svelte.js";
 
   let { children } = $props();
@@ -14,6 +14,7 @@
 
   const NAV = [
     { href: "/agency", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/agency/leads", label: "Lead Saya", icon: Users },
     { href: "/agency/komisi", label: "Komisi Saya", icon: Wallet },
     { href: "/agency/jaringan", label: "Jaringan", icon: Network },
     { href: "/agency/profil", label: "Profil", icon: UserCircle },

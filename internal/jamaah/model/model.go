@@ -322,6 +322,18 @@ type PipelineFunnel struct {
 	Total   int            `json:"total"`
 }
 
+// AgentLeadRow is a jamaah referred by an agent (or their downline), for the
+// B2B portal's "my leads" view.
+type AgentLeadRow struct {
+	ID               uuid.UUID  `json:"id"`
+	Nama             string     `json:"nama"`
+	NoHP             string     `json:"no_hp"`
+	PipelineStatus   string     `json:"pipeline_status"`
+	LeadScore        *int       `json:"lead_score"`
+	LeadTemp         string     `json:"lead_temp"`
+	ReferringAgentID *uuid.UUID `json:"referring_agent_id,omitempty"`
+}
+
 type UpdatePipelineStatusRequest struct {
 	PipelineStatus string `json:"pipeline_status" validate:"required,oneof=prospek survey booking dp cicilan lunas berangkat selesai batal"`
 	Reason         string `json:"reason,omitempty" validate:"max=255"`

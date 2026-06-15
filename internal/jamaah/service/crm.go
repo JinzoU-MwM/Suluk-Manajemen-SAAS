@@ -59,6 +59,29 @@ func (s *JamaahService) ListCRM(ctx context.Context, orgID uuid.UUID, authToken 
 	return rows, total, nil
 }
 
+// GetMyLeads returns the jamaah referred by an agent and their entire downline,
+// for the B2B portal. The downline subtree is resolved from agent-service (the
+// agent's own bearer token, the already-scoped /b2b/downline endpoint), then
+// leads are read locally by referring_agent_id.
+func (s *JamaahService) GetMyLeads(ctx context.Context, orgID uuid.UUID, authToken string, selfAgentID uuid.UUID) ([]model.AgentLeadRow, error) {
+	agentIDs := []uuid.UUID{selfAgentID}
+	if s.agentAddr != "" && authToken != "" {
+		var dl struct {
+			Downline []struct {
+				ID uuid.UUID `json:"id"`
+			} `json:"downline"`
+		}
+		if err := s.httpc.GetJSON(ctx, s.agentAddr, "/api/v1/b2b/downline", authToken, &dl); err == nil {
+			for _, n := range dl.Downline {
+				agentIDs = append(agentIDs, n.ID)
+			}
+		}
+		// Downline fetch is best-effort: on failure we still return the agent's
+		// own direct leads rather than erroring the whole portal page.
+	}
+	return s.repo.ListLeadsByAgents(ctx, orgID, agentIDs)
+}
+
 // stageOrder is the canonical pipeline ordering for the funnel view.
 var stageOrder = []string{"prospek", "survey", "booking", "dp", "cicilan", "lunas", "berangkat", "selesai", "batal"}
 

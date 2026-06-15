@@ -120,6 +120,9 @@ func main() {
 	// Agent & Commission service
 	setupProxy(api, "/agents", services["agent"])
 	setupProxy(api, "/commissions", services["agent"])
+	// B2B portal: /b2b/leads lives in jamaah-service (referred jamaah); register it
+	// before the catch-all /b2b → agent-service so the more specific route wins.
+	api.Get("/b2b/leads", createProxyHandler(services["jamaah"]))
 	setupProxy(api, "/b2b", services["agent"]) // external agent portal (scoped in agent-service)
 
 	// Accounting service: chart of accounts, journals, financial reports

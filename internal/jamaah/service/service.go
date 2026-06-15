@@ -21,6 +21,7 @@ type JamaahService struct {
 	invoiceAddr string
 	authAddr    string
 	packageAddr string
+	agentAddr   string
 	httpc       *httpclient.Client
 	notifier    *notify.Client
 	log         *zap.SugaredLogger
@@ -40,12 +41,13 @@ func (s *JamaahService) WithLogger(log *zap.SugaredLogger) *JamaahService {
 	return s
 }
 
-func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr, authAddr, packageAddr string) *JamaahService {
+func NewJamaahService(repo *repository.JamaahRepo, invoiceAddr, authAddr, packageAddr, agentAddr string) *JamaahService {
 	return &JamaahService{
 		repo:        repo,
 		invoiceAddr: invoiceAddr,
 		authAddr:    authAddr,
 		packageAddr: packageAddr,
+		agentAddr:   agentAddr,
 		httpc:       httpclient.New(),
 	}
 }

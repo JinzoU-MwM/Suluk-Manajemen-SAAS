@@ -30,5 +30,10 @@ export function createAgencyApi() {
       if (!res.ok) throw new Error(await parseError(res));
       return unwrapData(await res.json());
     },
+    async myLeads() {
+      const res = await apiFetch(`${B2B}/leads`, { headers: authHeaders() });
+      if (!res.ok) throw new Error(await parseError(res));
+      return unwrapData(await res.json());
+    },
   };
 }
