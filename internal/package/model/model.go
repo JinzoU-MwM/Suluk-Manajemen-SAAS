@@ -105,6 +105,8 @@ type PricingTier struct {
 	IsEarlyBird        bool       `json:"is_early_bird" db:"is_early_bird"`
 	EarlyBirdExpiresAt *time.Time `json:"early_bird_expires_at,omitempty" db:"early_bird_expires_at"`
 	SortOrder          int        `json:"sort_order" db:"sort_order"`
+	QuotaSeats         int        `json:"quota_seats" db:"quota_seats"`       // 0 = no per-type cap
+	ReservedSeats      int        `json:"reserved_seats" db:"reserved_seats"` // booked against this room type
 	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
 }
@@ -123,9 +125,19 @@ type CostComponent struct {
 }
 
 type PackageQuota struct {
-	TotalSeats    int `json:"total_seats"`
-	ReservedSeats int `json:"reserved_seats"`
-	Available     int `json:"available"`
+	TotalSeats    int              `json:"total_seats"`
+	ReservedSeats int              `json:"reserved_seats"`
+	Available     int              `json:"available"`
+	RoomQuotas    []RoomTypeQuota  `json:"room_quotas"`
+}
+
+// RoomTypeQuota is the per-room-type capped availability (only tiers with
+// quota_seats > 0 appear).
+type RoomTypeQuota struct {
+	RoomType      string `json:"room_type"`
+	QuotaSeats    int    `json:"quota_seats"`
+	ReservedSeats int    `json:"reserved_seats"`
+	Available     int    `json:"available"`
 }
 
 type CreatePackageRequest struct {
@@ -158,6 +170,7 @@ type CreatePricingTierRequest struct {
 	IsEarlyBird        bool    `json:"is_early_bird"`
 	EarlyBirdExpiresAt *string `json:"early_bird_expires_at,omitempty"`
 	SortOrder          int     `json:"sort_order"`
+	QuotaSeats         int     `json:"quota_seats" validate:"min=0"`
 }
 
 type CreateCostComponentRequest struct {

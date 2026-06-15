@@ -56,24 +56,24 @@ func (s *JamaahService) fetchLimits(ctx context.Context, orgID uuid.UUID, authTo
 // reserveSeat asks package-service to reserve one seat (capacity-checked). It
 // returns a user-facing error when the package is full/unavailable so the
 // registration is aborted. If package-service isn't configured it no-ops (dev).
-func (s *JamaahService) reserveSeat(ctx context.Context, packageID uuid.UUID, authToken string) error {
+func (s *JamaahService) reserveSeat(ctx context.Context, packageID uuid.UUID, roomType, authToken string) error {
 	if s.packageAddr == "" || authToken == "" {
 		return nil
 	}
 	path := "/api/v1/packages/" + packageID.String() + "/reserve"
 	headers := map[string]string{"Authorization": authToken}
-	if err := s.httpc.PostJSON(ctx, s.packageAddr, path, headers, struct{}{}, nil); err != nil {
-		return fmt.Errorf("%w: kuota paket sudah penuh atau paket tidak tersedia", ErrPlanLimit)
+	if err := s.httpc.PostJSON(ctx, s.packageAddr, path, headers, map[string]string{"room_type": roomType}, nil); err != nil {
+		return fmt.Errorf("%w: kuota paket/tipe kamar sudah penuh atau paket tidak tersedia", ErrPlanLimit)
 	}
 	return nil
 }
 
-// releaseSeat frees one reserved seat (best-effort; errors are ignored).
-func (s *JamaahService) releaseSeat(ctx context.Context, packageID uuid.UUID, authToken string) {
+// releaseSeat frees one reserved seat + room-type seat (best-effort; ignored).
+func (s *JamaahService) releaseSeat(ctx context.Context, packageID uuid.UUID, roomType, authToken string) {
 	if s.packageAddr == "" || authToken == "" {
 		return
 	}
 	path := "/api/v1/packages/" + packageID.String() + "/release"
 	headers := map[string]string{"Authorization": authToken}
-	_ = s.httpc.PostJSON(ctx, s.packageAddr, path, headers, struct{}{}, nil)
+	_ = s.httpc.PostJSON(ctx, s.packageAddr, path, headers, map[string]string{"room_type": roomType}, nil)
 }

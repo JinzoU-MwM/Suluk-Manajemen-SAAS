@@ -17,14 +17,14 @@ func NewPackageService(repo *repository.PackageRepo) *PackageService {
 	return &PackageService{repo: repo}
 }
 
-// ReserveSeat reserves one seat on a package (capacity-checked, atomic).
-func (s *PackageService) ReserveSeat(ctx context.Context, id, orgID uuid.UUID) error {
-	return s.repo.ReserveSeat(ctx, id, orgID)
+// ReserveSeat reserves one seat (and the room-type seat, if capped) atomically.
+func (s *PackageService) ReserveSeat(ctx context.Context, id, orgID uuid.UUID, roomType string) error {
+	return s.repo.ReserveSeat(ctx, id, orgID, roomType)
 }
 
-// ReleaseSeat frees one previously-reserved seat.
-func (s *PackageService) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID) error {
-	return s.repo.ReleaseSeat(ctx, id, orgID)
+// ReleaseSeat frees one previously-reserved seat (and room-type seat).
+func (s *PackageService) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID, roomType string) error {
+	return s.repo.ReleaseSeat(ctx, id, orgID, roomType)
 }
 
 func (s *PackageService) CreatePackage(ctx context.Context, orgID uuid.UUID, req model.CreatePackageRequest) (*model.Package, error) {
@@ -243,11 +243,26 @@ func (s *PackageService) GetPackageQuota(ctx context.Context, id, orgID uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	return &model.PackageQuota{
+	q := &model.PackageQuota{
 		TotalSeats:    pkg.TotalSeats,
 		ReservedSeats: pkg.ReservedSeats,
 		Available:     pkg.TotalSeats - pkg.ReservedSeats,
-	}, nil
+		RoomQuotas:    []model.RoomTypeQuota{},
+	}
+	tiers, err := s.repo.GetPricingTiers(ctx, id)
+	if err == nil {
+		for _, t := range tiers {
+			if t.QuotaSeats > 0 {
+				q.RoomQuotas = append(q.RoomQuotas, model.RoomTypeQuota{
+					RoomType:      t.RoomType,
+					QuotaSeats:    t.QuotaSeats,
+					ReservedSeats: t.ReservedSeats,
+					Available:     t.QuotaSeats - t.ReservedSeats,
+				})
+			}
+		}
+	}
+	return q, nil
 }
 
 func (s *PackageService) GetProfitProjection(ctx context.Context, id, orgID uuid.UUID) (*model.PackageProfitProjection, error) {
@@ -266,6 +281,7 @@ func (s *PackageService) CreatePricingTier(ctx context.Context, packageID, orgID
 		Label:       req.Label,
 		IsEarlyBird: req.IsEarlyBird,
 		SortOrder:   req.SortOrder,
+		QuotaSeats:  req.QuotaSeats,
 	}
 	if req.EarlyBirdExpiresAt != nil {
 		t, err := repository.ParseDate(req.EarlyBirdExpiresAt)
@@ -291,6 +307,7 @@ func (s *PackageService) UpdatePricingTier(ctx context.Context, tierID uuid.UUID
 		Label:       req.Label,
 		IsEarlyBird: req.IsEarlyBird,
 		SortOrder:   req.SortOrder,
+		QuotaSeats:  req.QuotaSeats,
 	}
 	if req.EarlyBirdExpiresAt != nil {
 		t, err := repository.ParseDate(req.EarlyBirdExpiresAt)
