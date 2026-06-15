@@ -83,6 +83,11 @@ func main() {
 	api.Post("/fulfillment/:packageId/mark-received", inventoryHandler.MarkReceived)
 	api.Put("/members/:memberId/operational", inventoryHandler.UpdateOperational)
 
+	// QR handover (Phase 4C)
+	api.Get("/members/:memberId/qr", inventoryHandler.GetMemberQR)
+	api.Post("/scan", inventoryHandler.Scan)
+	api.Get("/checkpoints/:packageId", inventoryHandler.GetCheckpoints)
+
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
 			logger.Fatalf("inventory service listen: %v", err)

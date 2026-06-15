@@ -14,8 +14,27 @@ type MemberEquipment struct {
 	IsEquipmentReceived bool       `json:"is_equipment_received"`
 	ReceivedItems       []string   `json:"received_items"`
 	ReceivedAt          *time.Time `json:"received_at"`
+	HandoverToken       string     `json:"handover_token"`
+	IsLuggageChecked    bool       `json:"is_luggage_checked"`
+	LuggageCheckedAt    *time.Time `json:"luggage_checked_at"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+}
+
+// ScanRequest records a QR handover scan for a member (looked up by token).
+type ScanRequest struct {
+	Token      string   `json:"token"`
+	Checkpoint string   `json:"checkpoint"` // equipment|luggage
+	Items      []string `json:"items,omitempty"`
+}
+
+// CheckpointMember is a member's handover progress for the package view.
+type CheckpointMember struct {
+	MemberID            string `json:"member_id"`
+	Nama                string `json:"nama"`
+	HandoverToken       string `json:"handover_token"`
+	IsEquipmentReceived bool   `json:"is_equipment_received"`
+	IsLuggageChecked    bool   `json:"is_luggage_checked"`
 }
 
 type InventoryItem struct {

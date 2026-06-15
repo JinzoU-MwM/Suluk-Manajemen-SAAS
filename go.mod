@@ -13,6 +13,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.74
 	github.com/nats-io/nats.go v1.37.0
 	github.com/redis/go-redis/v9 v9.7.0
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/xuri/excelize/v2 v2.10.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.48.0

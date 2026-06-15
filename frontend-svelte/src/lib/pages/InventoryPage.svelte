@@ -39,6 +39,20 @@
   let selectedMembers = $state(new Set());
   let isMarking = $state(false);
 
+  // QR handover (Phase 4C)
+  let checkpoints = $state([]);
+  let scanToken = $state("");
+  let scanCheckpoint = $state("equipment");
+  let isScanning = $state(false);
+  let scanMsg = $state("");
+  let scanOk = $state(false);
+  let qrUrl = $state(null);
+  let qrMember = $state(null);
+
+  let handoverDone = $derived(
+    checkpoints.filter((m) => m.is_equipment_received && m.is_luggage_checked).length,
+  );
+
   // Derived values
   let selectedGroup = $derived(groups.find((g) => g.id === selectedGroupId));
   let canMarkSelected = $derived(selectedMembers.size > 0 && !isMarking);
@@ -69,11 +83,66 @@
       forecast = forecastData;
       fulfillment = fulfillmentData;
       selectedMembers = new Set();
+      await loadCheckpoints();
     } catch (e) {
       error = e.message;
     } finally {
       isLoading = false;
     }
+  }
+
+  async function loadCheckpoints() {
+    if (!selectedGroupId) {
+      checkpoints = [];
+      return;
+    }
+    try {
+      const r = await ApiService.getHandoverCheckpoints(selectedGroupId);
+      checkpoints = r.members || [];
+    } catch {
+      checkpoints = [];
+    }
+  }
+
+  async function submitScan() {
+    const token = scanToken.trim();
+    if (!token || isScanning) return;
+    isScanning = true;
+    scanMsg = "";
+    try {
+      const m = await ApiService.scanHandover({
+        token,
+        checkpoint: scanCheckpoint,
+        items: scanCheckpoint === "equipment" ? ["koper", "baju"] : [],
+      });
+      scanOk = true;
+      scanMsg = `✓ ${m.nama} — ${scanCheckpoint === "equipment" ? "perlengkapan" : "koper"} tercatat`;
+      scanToken = "";
+      await loadCheckpoints();
+    } catch (e) {
+      scanOk = false;
+      scanMsg = `✗ ${e.message}`;
+    } finally {
+      isScanning = false;
+    }
+  }
+
+  async function showQr(member) {
+    closeQr();
+    qrMember = member;
+    try {
+      qrUrl = await ApiService.getMemberQrUrl(member.member_id);
+    } catch (e) {
+      scanOk = false;
+      scanMsg = e.message;
+      qrMember = null;
+    }
+  }
+
+  function closeQr() {
+    if (qrUrl) URL.revokeObjectURL(qrUrl);
+    qrUrl = null;
+    qrMember = null;
   }
 
   // Mark selected members as received
@@ -413,10 +482,95 @@
         <EmptyState icon={Package} title="Tidak ada data" />
       {/if}
     </Card>
+
+    {#if selectedGroupId}
+      <Card style="margin-top:16px">
+        <div class="hand-head">
+          <div>
+            <h3 class="hand-title">Serah Terima (QR)</h3>
+            <p class="hand-sub">Pindai QR jamaah untuk mencatat penyerahan perlengkapan & koper. {handoverDone}/{checkpoints.length} lengkap.</p>
+          </div>
+        </div>
+
+        <div class="hand-scan">
+          <div class="hand-toggle">
+            <button type="button" class="hand-tog" class:hand-tog-on={scanCheckpoint === 'equipment'} onclick={() => (scanCheckpoint = 'equipment')}>Perlengkapan</button>
+            <button type="button" class="hand-tog" class:hand-tog-on={scanCheckpoint === 'luggage'} onclick={() => (scanCheckpoint = 'luggage')}>Koper</button>
+          </div>
+          <input
+            type="text"
+            bind:value={scanToken}
+            onkeydown={(e) => e.key === 'Enter' && submitScan()}
+            placeholder="Pindai / ketik kode QR lalu Enter…"
+            class="hand-input"
+          />
+          <button type="button" class="hand-btn" onclick={submitScan} disabled={isScanning}>Catat</button>
+        </div>
+        {#if scanMsg}
+          <p class="hand-msg" style="color:{scanOk ? 'var(--c-success)' : 'var(--c-danger)'}">{scanMsg}</p>
+        {/if}
+
+        {#if checkpoints.length}
+          <div class="inv-table-wrap" style="margin-top:12px">
+            <table class="inv-table">
+              <thead>
+                <tr><th>Jamaah</th><th>Perlengkapan</th><th>Koper</th><th>QR</th></tr>
+              </thead>
+              <tbody>
+                {#each checkpoints as m (m.member_id)}
+                  <tr>
+                    <td>{m.nama}</td>
+                    <td>{#if m.is_equipment_received}<span class="hand-ok">✓</span>{:else}<span class="hand-no">—</span>{/if}</td>
+                    <td>{#if m.is_luggage_checked}<span class="hand-ok">✓</span>{:else}<span class="hand-no">—</span>{/if}</td>
+                    <td><button type="button" class="hand-qrbtn" onclick={() => showQr(m)}>Lihat QR</button></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </Card>
+    {/if}
+  </div>
+{/if}
+
+{#if qrMember}
+  <div class="hand-modal" role="button" tabindex="-1" onclick={closeQr} onkeydown={(e) => e.key === 'Escape' && closeQr()}>
+    <div class="hand-modal-card" role="dialog" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+      <p class="hand-modal-name">{qrMember.nama}</p>
+      {#if qrUrl}
+        <img src={qrUrl} alt="QR {qrMember.nama}" width="240" height="240" />
+        <p class="hand-modal-tok">{qrMember.handover_token}</p>
+      {:else}
+        <p class="hand-sub">Memuat QR…</p>
+      {/if}
+      <button type="button" class="hand-btn" style="margin-top:12px" onclick={closeQr}>Tutup</button>
+    </div>
   </div>
 {/if}
 
 <style>
+  /* QR handover (Phase 4C) */
+  .hand-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .hand-title { font-size: 15px; font-weight: 800; color: var(--c-ink); }
+  .hand-sub { font-size: 12.5px; color: var(--c-faint); margin-top: 2px; }
+  .hand-scan { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .hand-toggle { display: inline-flex; gap: 4px; background: var(--c-bg-2); padding: 4px; border-radius: var(--radius); }
+  .hand-tog { padding: 7px 12px; font-size: 12.5px; font-weight: 700; border-radius: var(--radius-sm); color: var(--c-muted); }
+  .hand-tog-on { background: var(--c-surface); color: var(--c-primary); box-shadow: var(--shadow-sm); }
+  .hand-input { flex: 1; min-width: 200px; border: 1px solid var(--c-line); background: var(--c-surface); border-radius: var(--radius); padding: 9px 12px; font-size: 13.5px; color: var(--c-ink); outline: none; }
+  .hand-input:focus { border-color: var(--c-primary); box-shadow: 0 0 0 3px var(--c-primary-soft); }
+  .hand-btn { background: var(--c-primary); color: #fff; font-weight: 700; font-size: 13px; border-radius: var(--radius); padding: 9px 16px; }
+  .hand-btn:disabled { opacity: 0.5; }
+  .hand-msg { margin-top: 8px; font-size: 12.5px; font-weight: 600; }
+  .hand-ok { color: var(--c-success); font-weight: 800; }
+  .hand-no { color: var(--c-faint); }
+  .hand-qrbtn { font-size: 12px; font-weight: 700; color: var(--c-primary); }
+  .hand-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); }
+  .hand-modal-card { background: var(--c-surface); border-radius: var(--radius-lg, 16px); padding: 20px; text-align: center; box-shadow: var(--shadow-lg, 0 10px 40px rgba(0,0,0,0.2)); }
+  .hand-modal-name { font-size: 14px; font-weight: 800; color: var(--c-ink); margin-bottom: 12px; }
+  .hand-modal-tok { margin-top: 8px; font-family: monospace; font-size: 13px; letter-spacing: 1px; color: var(--c-muted); }
+
   .inv-page {
     min-height: 100vh;
     background: var(--c-bg);
