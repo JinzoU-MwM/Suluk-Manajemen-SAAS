@@ -101,7 +101,9 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	jamaah := app.Group("/api/v1/jamaah", authMW)
+	// Staff CRM surface — external agents are confined to /b2b, so block them here
+	// (jamaah PII must not be reachable by an agent token via the legacy routes).
+	jamaah := app.Group("/api/v1/jamaah", authMW, sharedMW.RequireStaff)
 	jamaah.Post("/", jamaahHandler.CreateProfile)
 	jamaah.Get("/", jamaahHandler.ListProfiles)
 	jamaah.Get("/crm", jamaahHandler.ListCRM)
@@ -113,6 +115,7 @@ func main() {
 	jamaah.Get("/search/nik/:nik", jamaahHandler.FindByNIK)
 	jamaah.Get("/search/paspor/:paspor", jamaahHandler.FindByPaspor)
 	jamaah.Get("/dashboard/alerts", jamaahHandler.DashboardAlerts)
+	jamaah.Get("/follow-ups", jamaahHandler.ListFollowUps) // literal — before "/:id"
 	jamaah.Get("/:id", jamaahHandler.GetProfile)
 	jamaah.Put("/:id", jamaahHandler.UpdateProfile)
 	jamaah.Delete("/:id", jamaahHandler.DeleteProfile)
@@ -127,7 +130,6 @@ func main() {
 	jamaah.Get("/:id/notes", jamaahHandler.ListNotes)
 
 	jamaah.Post("/:id/follow-ups", jamaahHandler.AddFollowUp)
-	jamaah.Get("/follow-ups", jamaahHandler.ListFollowUps)
 	jamaah.Patch("/follow-ups/:followUpId/complete", jamaahHandler.CompleteFollowUp)
 
 	jamaah.Post("/:id/documents", jamaahHandler.UploadDocument)

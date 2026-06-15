@@ -35,13 +35,15 @@ func (r *AgentRepo) CreateAgent(ctx context.Context, a *model.Agent) error {
 
 func (r *AgentRepo) ListAgents(ctx context.Context, orgID, search string, page, limit int) ([]model.Agent, int64, error) {
 	var total int64
-	baseWhere := "WHERE org_id = $1"
+	// Qualify with the "a" alias: the list query self-joins agents (parent), so
+	// bare org_id/name/etc would be ambiguous.
+	baseWhere := "WHERE a.org_id = $1"
 	args := []interface{}{orgID}
 	if search != "" {
-		baseWhere += " AND (name ILIKE $2 OR phone ILIKE $2 OR email ILIKE $2)"
+		baseWhere += " AND (a.name ILIKE $2 OR a.phone ILIKE $2 OR a.email ILIKE $2)"
 		args = append(args, "%"+search+"%")
 	}
-	r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agents %s", baseWhere), args...).Scan(&total)
+	r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agents a %s", baseWhere), args...).Scan(&total)
 
 	offset := (page - 1) * limit
 	baseArgCount := len(args)

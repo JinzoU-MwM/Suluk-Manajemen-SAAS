@@ -85,21 +85,25 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	api := app.Group("/api/v1/agents", authMW)
+	// Staff-only management surface — external agents (role "agent") are confined
+	// to /b2b. Writes are further restricted to owner/admin (they create GL
+	// liabilities via commission.accrued).
+	adminOnly := sharedMW.RequireRole("owner", "admin")
+	api := app.Group("/api/v1/agents", authMW, sharedMW.RequireStaff)
 	api.Get("/", agentHandler.ListAgents)
-	api.Post("/", agentHandler.CreateAgent)
+	api.Post("/", adminOnly, agentHandler.CreateAgent)
 	// Tier config — registered before "/:id" so "tiers" isn't read as an id.
 	api.Get("/tiers", agentHandler.GetTiers)
-	api.Put("/tiers", sharedMW.RequireRole("owner", "admin"), agentHandler.SetTiers)
+	api.Put("/tiers", adminOnly, agentHandler.SetTiers)
 	api.Get("/:id", agentHandler.GetAgent)
-	api.Put("/:id", agentHandler.UpdateAgent)
+	api.Put("/:id", adminOnly, agentHandler.UpdateAgent)
 	api.Get("/:id/downline", agentHandler.GetDownline)
 	api.Get("/:id/upline", agentHandler.GetUpline)
 
-	comm := app.Group("/api/v1/commissions", authMW)
+	comm := app.Group("/api/v1/commissions", authMW, sharedMW.RequireStaff)
 	comm.Get("/", agentHandler.ListCommissions)
-	comm.Post("/", agentHandler.CreateCommission)
-	comm.Put("/:id/pay", agentHandler.PayCommission)
+	comm.Post("/", adminOnly, agentHandler.CreateCommission)
+	comm.Put("/:id/pay", adminOnly, agentHandler.PayCommission)
 	comm.Get("/agent/:id", agentHandler.GetAgentCommissions)
 
 	// B2B external-agent portal: every route is scoped to the signed-in agent's

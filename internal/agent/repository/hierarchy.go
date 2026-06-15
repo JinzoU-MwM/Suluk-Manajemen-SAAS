@@ -14,9 +14,10 @@ import (
 func (r *AgentRepo) AncestorIDs(ctx context.Context, agentID, orgID string) ([]string, error) {
 	rows, err := r.pool.Query(ctx, `
 		WITH RECURSIVE ul AS (
-			SELECT id, parent_id FROM agents WHERE id = $1 AND org_id = $2
+			SELECT id, parent_id, 0 AS depth FROM agents WHERE id = $1 AND org_id = $2
 			UNION ALL
-			SELECT a.id, a.parent_id FROM agents a JOIN ul ON a.id = ul.parent_id WHERE a.org_id = $2
+			SELECT a.id, a.parent_id, ul.depth + 1 FROM agents a JOIN ul ON a.id = ul.parent_id
+			WHERE a.org_id = $2 AND ul.depth < 32
 		)
 		SELECT id FROM ul`, agentID, orgID)
 	if err != nil {
@@ -44,7 +45,7 @@ func (r *AgentRepo) UplineAgents(ctx context.Context, agentID, orgID string, max
 			FROM agents WHERE id = $1 AND org_id = $3
 			UNION ALL
 			SELECT a.id, a.parent_id, a.name, a.level, a.is_active, ul.depth + 1
-			FROM agents a JOIN ul ON a.id = ul.parent_id WHERE a.org_id = $3
+			FROM agents a JOIN ul ON a.id = ul.parent_id WHERE a.org_id = $3 AND ul.depth < $2
 		)
 		SELECT id, name, parent_id, level, depth, is_active
 		FROM ul WHERE depth > 0 AND depth <= $2 ORDER BY depth`, agentID, maxDepth, orgID)
@@ -64,7 +65,7 @@ func (r *AgentRepo) Upline(ctx context.Context, agentID, orgID string) ([]model.
 			FROM agents WHERE id = $1 AND org_id = $2
 			UNION ALL
 			SELECT a.id, a.parent_id, a.name, a.level, a.is_active, ul.depth + 1
-			FROM agents a JOIN ul ON a.id = ul.parent_id WHERE a.org_id = $2
+			FROM agents a JOIN ul ON a.id = ul.parent_id WHERE a.org_id = $2 AND ul.depth < 32
 		)
 		SELECT u.id, u.name, u.parent_id, u.level, u.depth, u.is_active,
 		       COALESCE(c.total_comm, 0), COALESCE(c.jamaah_count, 0)
@@ -90,7 +91,7 @@ func (r *AgentRepo) Downline(ctx context.Context, agentID, orgID string) ([]mode
 			FROM agents WHERE id = $1 AND org_id = $2
 			UNION ALL
 			SELECT a.id, a.parent_id, a.name, a.level, a.is_active, dl.depth + 1
-			FROM agents a JOIN dl ON a.parent_id = dl.id WHERE a.org_id = $2
+			FROM agents a JOIN dl ON a.parent_id = dl.id WHERE a.org_id = $2 AND dl.depth < 32
 		)
 		SELECT d.id, d.name, d.parent_id, d.level, d.depth, d.is_active,
 		       COALESCE(c.total_comm, 0), COALESCE(c.jamaah_count, 0)

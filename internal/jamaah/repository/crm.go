@@ -21,7 +21,7 @@ func (r *JamaahRepo) ListCRM(ctx context.Context, orgID uuid.UUID, f model.CRMFi
 			SELECT package_id, room_type, pipeline_status, price_snapshot, discount_amount,
 				lead_score, lead_temp, stage_entered_at, score_updated_at
 			FROM jamaah_package_registrations
-			WHERE jamaah_id = p.id
+			WHERE jamaah_id = p.id AND org_id = p.org_id
 			ORDER BY registered_at DESC
 			LIMIT 1
 		) r ON TRUE`
@@ -100,7 +100,7 @@ func (r *JamaahRepo) ListLeadsByAgents(ctx context.Context, orgID uuid.UUID, age
 		LEFT JOIN LATERAL (
 			SELECT pipeline_status, lead_score, lead_temp
 			FROM jamaah_package_registrations
-			WHERE jamaah_id = p.id
+			WHERE jamaah_id = p.id AND org_id = p.org_id
 			ORDER BY registered_at DESC
 			LIMIT 1
 		) r ON TRUE

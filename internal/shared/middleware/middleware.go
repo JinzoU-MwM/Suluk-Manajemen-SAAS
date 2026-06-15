@@ -71,6 +71,21 @@ func RequireRole(roles ...string) fiber.Handler {
 	}
 }
 
+// RequireStaff blocks external agents (role "agent") from staff/back-office
+// routes. External agents are confined to the /b2b portal; every other route
+// group should run this after AuthMiddleware so an agent token can't reach
+// org-wide staff data by calling the legacy endpoints directly.
+func RequireStaff(c *fiber.Ctx) error {
+	claims, ok := GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	if claims.Role == "agent" {
+		return response.Forbidden(c, "akses ditolak: gunakan portal agen")
+	}
+	return c.Next()
+}
+
 // RequireAgentScope gates the B2B portal: the caller must be an external agent
 // (role "agent") with a linked AgentID claim. Must run after AuthMiddleware.
 // Handlers downstream can rely on claims.AgentID being non-nil.

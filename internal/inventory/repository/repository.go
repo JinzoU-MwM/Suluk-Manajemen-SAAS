@@ -14,7 +14,7 @@ import (
 
 // newHandoverToken is a short opaque code encoded into a member's QR.
 func newHandoverToken() string {
-	return strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	return strings.ReplaceAll(uuid.NewString(), "-", "")[:16]
 }
 
 type InventoryRepo struct {
@@ -224,8 +224,13 @@ func (r *InventoryRepo) RecordScanTx(ctx context.Context, m *model.MemberEquipme
 	now := time.Now()
 	switch checkpoint {
 	case "equipment":
+		// Re-scan safe: don't wipe a prior item list with an empty one, and keep
+		// the original received_at.
 		if _, err := tx.Exec(ctx, `UPDATE member_equipment
-			SET is_equipment_received = TRUE, received_items = $1, received_at = $2, updated_at = $2
+			SET is_equipment_received = TRUE,
+			    received_items = CASE WHEN cardinality($1::text[]) > 0 THEN $1 ELSE received_items END,
+			    received_at = COALESCE(received_at, $2),
+			    updated_at = $2
 			WHERE id = $3`, items, now, m.ID); err != nil {
 			return err
 		}
