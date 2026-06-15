@@ -218,16 +218,55 @@ func (r *JamaahRepo) GetRegistration(ctx context.Context, orgID, jamaahID, packa
 	return reg, err
 }
 
-func (r *JamaahRepo) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, status string, dpDate, lunasDate, berangkatDate *time.Time) error {
-	query := `UPDATE jamaah_package_registrations SET pipeline_status = $4, dp_date = $5, lunas_date = $6, berangkat_date = $7, updated_at = NOW() WHERE org_id = $1 AND jamaah_id = $2 AND package_id = $3`
-	result, err := r.pool.Exec(ctx, query, orgID, jamaahID, packageID, status, dpDate, lunasDate, berangkatDate)
+// PipelineUpdate carries the audit context for a stage change.
+type PipelineUpdate struct {
+	Status        string
+	FromStatus    string
+	DPDate        *time.Time
+	LunasDate     *time.Time
+	BerangkatDate *time.Time
+	LostReason    string
+	Reason        string
+	ChangedBy     uuid.UUID
+}
+
+// UpdatePipelineStatus moves a registration to a new stage. When the stage
+// actually changes it also resets stage_entered_at (the time-in-stage / decay
+// clock) and writes a pipeline_history audit row, both in one transaction so the
+// history can never drift from the registration.
+func (r *JamaahRepo) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, u PipelineUpdate) error {
+	changed := u.Status != u.FromStatus
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	query := `UPDATE jamaah_package_registrations
+		SET pipeline_status = $4, dp_date = $5, lunas_date = $6, berangkat_date = $7,
+			lost_reason = NULLIF($8, ''), updated_at = NOW()`
+	if changed {
+		query += `, stage_entered_at = NOW()`
+	}
+	query += ` WHERE org_id = $1 AND jamaah_id = $2 AND package_id = $3`
+	result, err := tx.Exec(ctx, query, orgID, jamaahID, packageID, u.Status, u.DPDate, u.LunasDate, u.BerangkatDate, u.LostReason)
 	if err != nil {
 		return err
 	}
 	if result.RowsAffected() == 0 {
 		return ErrRegistrationNotFound
 	}
-	return nil
+
+	if changed {
+		if _, err := tx.Exec(ctx, `INSERT INTO pipeline_history
+			(org_id, jamaah_id, package_id, from_status, to_status, reason, changed_by)
+			VALUES ($1, $2, $3, NULLIF($4, ''), $5, NULLIF($6, ''), $7)`,
+			orgID, jamaahID, packageID, u.FromStatus, u.Status, u.Reason, u.ChangedBy); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *JamaahRepo) UpdateRegistrationMahram(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, mahramID *uuid.UUID) error {
@@ -350,15 +389,15 @@ func (r *JamaahRepo) ListFollowUps(ctx context.Context, orgID uuid.UUID, complet
 	return followups, nil
 }
 
-func (r *JamaahRepo) CompleteFollowUp(ctx context.Context, id, orgID uuid.UUID) error {
-	result, err := r.pool.Exec(ctx, `UPDATE follow_ups SET is_completed = true, completed_at = NOW() WHERE id = $1 AND org_id = $2`, id, orgID)
-	if err != nil {
-		return err
+// CompleteFollowUp marks a follow-up done and returns its jamaah_id so the
+// service can recompute that lead's score (completing a touch refreshes recency).
+func (r *JamaahRepo) CompleteFollowUp(ctx context.Context, id, orgID uuid.UUID) (uuid.UUID, error) {
+	var jamaahID uuid.UUID
+	err := r.pool.QueryRow(ctx, `UPDATE follow_ups SET is_completed = true, completed_at = NOW() WHERE id = $1 AND org_id = $2 RETURNING jamaah_id`, id, orgID).Scan(&jamaahID)
+	if err == pgx.ErrNoRows {
+		return uuid.Nil, ErrFollowUpNotFound
 	}
-	if result.RowsAffected() == 0 {
-		return ErrFollowUpNotFound
-	}
-	return nil
+	return jamaahID, err
 }
 
 func (r *JamaahRepo) CreateDocument(ctx context.Context, doc *model.JamaahDocument) error {
@@ -383,21 +422,22 @@ func (r *JamaahRepo) ListDocuments(ctx context.Context, orgID, jamaahID uuid.UUI
 	return docs, nil
 }
 
-func (r *JamaahRepo) UpdateDocumentStatus(ctx context.Context, orgID uuid.UUID, id uuid.UUID, status string, verifiedBy *uuid.UUID, notes string) error {
+// UpdateDocumentStatus updates a document's verification state and returns its
+// jamaah_id so the service can recompute that lead's score (document
+// completeness is a scoring signal).
+func (r *JamaahRepo) UpdateDocumentStatus(ctx context.Context, orgID uuid.UUID, id uuid.UUID, status string, verifiedBy *uuid.UUID, notes string) (uuid.UUID, error) {
 	var completedAt *time.Time
 	if status == "selesai" {
 		now := time.Now()
 		completedAt = &now
 	}
-	query := `UPDATE jamaah_documents SET status = $3, verified_by = $4, verified_at = $5, notes = $6, updated_at = NOW() WHERE org_id = $1 AND id = $2`
-	result, err := r.pool.Exec(ctx, query, orgID, id, status, verifiedBy, completedAt, notes)
-	if err != nil {
-		return err
+	var jamaahID uuid.UUID
+	query := `UPDATE jamaah_documents SET status = $3, verified_by = $4, verified_at = $5, notes = $6, updated_at = NOW() WHERE org_id = $1 AND id = $2 RETURNING jamaah_id`
+	err := r.pool.QueryRow(ctx, query, orgID, id, status, verifiedBy, completedAt, notes).Scan(&jamaahID)
+	if err == pgx.ErrNoRows {
+		return uuid.Nil, ErrDocumentNotFound
 	}
-	if result.RowsAffected() == 0 {
-		return ErrDocumentNotFound
-	}
-	return nil
+	return jamaahID, err
 }
 
 func (r *JamaahRepo) GetPassportExpiring(ctx context.Context, orgID uuid.UUID, withinDays int) ([]model.JamaahProfile, error) {

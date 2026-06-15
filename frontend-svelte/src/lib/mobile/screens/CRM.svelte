@@ -28,6 +28,8 @@
   }
 
   const STAGE_COLOR = { Prospek: "#2563a8", "Follow Up": "#C99A2E", Negosiasi: "#7a5ae0", Closing: "#1B7F5A", Semua: "#1B7F5A" };
+  const tempColor = (t) => (t === "hot" ? "var(--c-danger)" : t === "warm" ? "var(--c-warning)" : "var(--c-muted)");
+  const tempBg = (t) => (t === "hot" ? "var(--c-danger-soft)" : t === "warm" ? "var(--c-warning-soft, #fef3c7)" : "var(--c-bg-2)");
 
   async function load() {
     try {
@@ -40,6 +42,8 @@
         sumber: x.sumber || x.lead_source || "—",
         hp: x.no_hp || x.hp || "—",
         stage: x.pipeline_status || x.stage || "Semua",
+        lead_score: x.lead_score ?? null,
+        lead_temp: x.lead_temp || "cold",
         raw: x,
       }));
     } catch {
@@ -85,6 +89,9 @@
                 <div style="font-size:15px;font-weight:700">{c.nama}</div>
                 <div style="font-size:12.5px;color:var(--c-muted);margin-top:1px">{c.minat}</div>
               </div>
+              {#if c.lead_score != null}
+                <span class="tnum" style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:{tempBg(c.lead_temp)};color:{tempColor(c.lead_temp)}">{c.lead_score}</span>
+              {/if}
               <ChevronRight size={18} class="m-chev" />
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--c-line-soft)">

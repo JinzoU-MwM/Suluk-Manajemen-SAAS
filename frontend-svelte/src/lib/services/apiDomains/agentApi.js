@@ -38,10 +38,42 @@ export function createAgentApi({ cacheInvalidate } = /** @type {{cacheInvalidate
             return unwrapData(await res.json());
         },
 
+        async getDownline(id) {
+            const res = await apiFetch(`${AGENTS}/${id}/downline`, { headers: authHeaders() });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+
+        async getUpline(id) {
+            const res = await apiFetch(`${AGENTS}/${id}/upline`, { headers: authHeaders() });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+
+        // Provision a B2B portal login for an agent (owner/admin only).
+        async provisionAgentPortal(data) {
+            const res = await apiFetch(`${API_URL}/orgs/agent-credentials`, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data) });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+
+        async getTiers() {
+            const res = await apiFetch(`${AGENTS}/tiers`, { headers: authHeaders() });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+
+        async setTiers(tiers) {
+            const res = await apiFetch(`${AGENTS}/tiers`, { method: 'PUT', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ tiers }) });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+
         async listCommissions(params) {
             const q = new URLSearchParams();
             if (params?.agent_id) q.set('agent_id', params.agent_id);
             if (params?.status) q.set('status', params.status);
+            if (params?.tier_level) q.set('tier_level', String(params.tier_level));
             if (params?.page) q.set('page', String(params.page));
             if (params?.limit) q.set('limit', String(params.limit));
             const res = await apiFetch(`${COMM}/?${q}`, { headers: authHeaders() });

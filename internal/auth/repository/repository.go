@@ -22,12 +22,12 @@ func NewAuthRepo(pool *pgxpool.Pool) *AuthRepo {
 
 func (r *AuthRepo) CreateUser(ctx context.Context, user *model.User) error {
 	query := `
-		INSERT INTO users (id, email, name, password_hash, phone, role, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING created_at, updated_at`
 	err := r.pool.QueryRow(ctx, query,
 		user.ID, user.Email, user.Name, user.PasswordHash,
-		user.Phone, user.Role, user.IsActive,
+		user.Phone, user.Role, user.IsActive, user.AgentID,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
@@ -43,12 +43,51 @@ func (r *AuthRepo) CreateUser(ctx context.Context, user *model.User) error {
 	return nil
 }
 
+// CreateAgentUserTx provisions a B2B portal login: the user (role agent, linked
+// to agent_id) and its team_member row are written in one transaction so a
+// failed membership can't leave an orphan login.
+func (r *AuthRepo) CreateAgentUserTx(ctx context.Context, user *model.User, member *model.TeamMember) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING created_at, updated_at`,
+		user.ID, user.Email, user.Name, user.PasswordHash, user.Phone, user.Role, user.IsActive, user.AgentID,
+	).Scan(&user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			if strings.Contains(err.Error(), "email") {
+				return ErrEmailExists
+			}
+			if strings.Contains(err.Error(), "phone") {
+				return ErrPhoneExists
+			}
+		}
+		return fmt.Errorf("create agent user: %w", err)
+	}
+
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO team_members (id, org_id, user_id, role, status, invited_by, joined_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		RETURNING joined_at`,
+		member.ID, member.OrgID, member.UserID, member.Role, member.Status, member.InvitedBy,
+	).Scan(&member.JoinedAt); err != nil {
+		return fmt.Errorf("add agent team member: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, created_at, updated_at FROM users WHERE id = $1`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin,
+		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -62,10 +101,10 @@ func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, 
 
 func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, created_at, updated_at FROM users WHERE email = $1`
 	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin,
+		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {

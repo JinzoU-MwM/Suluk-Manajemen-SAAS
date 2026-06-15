@@ -18,15 +18,48 @@ export function createJamaahApi({ cacheInvalidate }) {
       return unwrapData(json);
     },
 
-    // CRM list: profiles + latest registration + outstanding balance.
+    // CRM list: profiles + latest registration + outstanding balance + lead score.
     // Returns { data: [...], meta: { total, page, page_size, pages } }.
-    async listCRM({ search = '', page = 1, pageSize = 25 } = {}) {
+    async listCRM({ search = '', page = 1, pageSize = 25, stage = '', temp = '', minScore = 0, sort = '' } = {}) {
       const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
       if (search) params.set('search', search);
+      if (stage) params.set('stage', stage);
+      if (temp) params.set('temp', temp);
+      if (minScore) params.set('min_score', String(minScore));
+      if (sort) params.set('sort', sort);
       const response = await apiFetch(`${API_URL}/jamaah/crm?${params.toString()}`, { headers: authHeaders() });
       if (!response.ok) throw new Error(await parseError(response));
       const json = await response.json();
       return { data: json.data || [], meta: json.meta || {} };
+    },
+
+    // Move a registration to a new pipeline stage. reason/lost_reason optional
+    // (lost_reason recorded when stage = 'batal').
+    async updatePipelineStatus(jamaahId, packageId, { pipeline_status, reason = '', lost_reason = '' }) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/registrations/${packageId}/status`, {
+        method: 'PATCH',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ pipeline_status, reason, lost_reason }),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
+    // CRM funnel analytics: per-stage counts/value/avg-time + lead-source breakdown.
+    async getPipelineFunnel() {
+      const response = await apiFetch(`${API_URL}/jamaah/crm/pipeline`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
+    // Admin: recompute every active lead's score for the org.
+    async recomputeScores() {
+      const response = await apiFetch(`${API_URL}/jamaah/crm/recompute-scores`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
     },
 
     async createProfile(data) {

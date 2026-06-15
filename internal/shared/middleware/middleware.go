@@ -71,6 +71,20 @@ func RequireRole(roles ...string) fiber.Handler {
 	}
 }
 
+// RequireAgentScope gates the B2B portal: the caller must be an external agent
+// (role "agent") with a linked AgentID claim. Must run after AuthMiddleware.
+// Handlers downstream can rely on claims.AgentID being non-nil.
+func RequireAgentScope(c *fiber.Ctx) error {
+	claims, ok := GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	if claims.Role != "agent" || claims.AgentID == nil {
+		return response.Forbidden(c, "portal agen hanya untuk akun agen")
+	}
+	return c.Next()
+}
+
 // RequireClaims returns the claims or writes a 401 and returns ok=false.
 func RequireClaims(c *fiber.Ctx) (*sharedAuth.Claims, error) {
 	claims, ok := GetClaims(c)

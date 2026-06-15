@@ -30,6 +30,11 @@
       goto("/login", { replaceState: true });
       return;
     }
+    // External agents belong in the B2B portal, not the staff app.
+    if (session.user?.role === "agent") {
+      goto("/agency", { replaceState: true });
+      return;
+    }
     // Return from a Pakasir payment redirect: re-fetch the (possibly upgraded)
     // subscription and clean the URL.
     const params = new URLSearchParams(window.location.search);

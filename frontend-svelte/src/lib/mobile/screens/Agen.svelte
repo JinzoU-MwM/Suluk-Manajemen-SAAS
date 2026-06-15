@@ -79,7 +79,7 @@
             <div class="m-row-ic" style="background:var(--c-primary-soft);color:var(--c-primary-deep)"><Building2 size={18} /></div>
             <div class="m-row-main">
               <div class="m-row-title">{a.name || a.nama}</div>
-              <div class="m-row-sub">{(a.pic_name || a.pic || a.phone || "—") + " · " + (a.total_jamaah ?? a.jamaah ?? 0) + " jamaah"}</div>
+              <div class="m-row-sub">{(a.parent_name ? "↳ " + a.parent_name : (a.pic_name || a.pic || a.phone || "—")) + " · " + (a.total_jamaah ?? a.jamaah ?? 0) + " jamaah"}</div>
             </div>
             <div style="text-align:right;flex-shrink:0">
               <div class="tnum" style="font-size:13px;font-weight:800;color:var(--c-success)">{fmtRpShort(outstanding(a))}</div>

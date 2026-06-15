@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Users, DollarSign, CheckCheck, Plus, Pencil, Search, UserCheck, TrendingUp, Wallet } from 'lucide-svelte';
+  import { Users, DollarSign, CheckCheck, Plus, Pencil, Search, UserCheck, TrendingUp, Wallet, Network, X, KeyRound } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
   import PageHeader from '../components/PageHeader.svelte';
@@ -21,9 +21,12 @@
   let searchQuery = $state('');
   let statusFilter = $state('all');
 
+  let tierFilter = $state('');
+
   let showAgentDrawer = $state(false);
   let editingAgent = $state(null);
-  let agentForm = $state({ name: '', phone: '', email: '', address: '', commission_rate: 5, bank_name: '', bank_account_number: '', bank_account_name: '', notes: '' });
+  const emptyAgentForm = { name: '', phone: '', email: '', address: '', commission_rate: 5, bank_name: '', bank_account_number: '', bank_account_name: '', notes: '', parent_id: '', type: 'agent' };
+  let agentForm = $state({ ...emptyAgentForm });
   let savingAgent = $state(false);
 
   let showCommDrawer = $state(false);
@@ -33,8 +36,45 @@
   let selectedAgent = $state(null);
   let showAgentCommissions = $state(false);
   let agentCommissions = $state([]);
+  let agentDownline = $state([]);
+  let agentUpline = $state([]);
+
+  // Tier configuration
+  let showTierDrawer = $state(false);
+  let tiers = $state([]);
+  let savingTiers = $state(false);
+
+  // Portal credential provisioning
+  let showPortalDrawer = $state(false);
+  let portalAgent = $state(null);
+  let portalForm = $state({ email: '', name: '', password: '' });
+  let savingPortal = $state(false);
+
+  function openPortal(a) { portalAgent = a; portalForm = { email: a.email || '', name: a.name, password: '' }; showPortalDrawer = true; }
+  async function savePortal() {
+    if (!portalForm.email || !portalForm.password) { showToast('Email dan password wajib diisi', 'warning'); return; }
+    savingPortal = true;
+    try {
+      await ApiService.provisionAgentPortal({ agent_id: portalAgent.id, email: portalForm.email, name: portalForm.name, password: portalForm.password });
+      showToast('Akun portal agen dibuat');
+      showPortalDrawer = false;
+    } catch (e) { showToast(e.message, 'error'); } finally { savingPortal = false; }
+  }
 
   function formatIDR(n) { return n ? `Rp ${Number(n).toLocaleString('id-ID')}` : 'Rp 0'; }
+
+  const AGENT_TYPES = [
+    { value: 'agent', label: 'Agen' },
+    { value: 'agency', label: 'Agency / Travel' },
+    { value: 'koordinator', label: 'Koordinator' },
+  ];
+
+  // Parent options for the agent form: every other agent except the one being
+  // edited (a self-parent is rejected server-side anyway).
+  let parentOptions = $derived(agents.filter((a) => !editingAgent || a.id !== editingAgent.id));
+
+  function tierLabel(t) { return t > 1 ? `Tier ${t}` : 'Langsung'; }
+  function tierColor(t) { return t > 1 ? 'var(--c-info)' : 'var(--c-primary)'; }
 
   // Summary stats (Suluk design) derived from existing data.
   let summaryStats = $derived({
@@ -49,7 +89,7 @@
     try {
       const [agentData, commData] = await Promise.all([
         ApiService.listAgents({ search: searchQuery }),
-        ApiService.listCommissions({ status: statusFilter }),
+        ApiService.listCommissions({ status: statusFilter, tier_level: tierFilter }),
       ]);
       agents = agentData.agents || [];
       commissions = commData.commissions || [];
@@ -57,8 +97,25 @@
   }
   onMount(() => { loadData(); });
 
-  function openNewAgent() { editingAgent = null; agentForm = { name: '', phone: '', email: '', address: '', commission_rate: 5, bank_name: '', bank_account_number: '', bank_account_name: '', notes: '' }; showAgentDrawer = true; }
-  function editAgent(a) { editingAgent = a; agentForm = { name: a.name, phone: a.phone, email: a.email, address: a.address, commission_rate: a.commission_rate, bank_name: a.bank_name, bank_account_number: a.bank_account_number, bank_account_name: a.bank_account_name, notes: a.notes }; showAgentDrawer = true; }
+  function openNewAgent() { editingAgent = null; agentForm = { ...emptyAgentForm }; showAgentDrawer = true; }
+  function editAgent(a) { editingAgent = a; agentForm = { name: a.name, phone: a.phone, email: a.email, address: a.address, commission_rate: a.commission_rate, bank_name: a.bank_name, bank_account_number: a.bank_account_number, bank_account_name: a.bank_account_name, notes: a.notes, parent_id: a.parent_id || '', type: a.type || 'agent' }; showAgentDrawer = true; }
+
+  async function openTierConfig() {
+    try { const data = await ApiService.getTiers(); tiers = (data.tiers || []).map((t) => ({ ...t })); }
+    catch (e) { tiers = []; showToast(e.message, 'error'); }
+    if (tiers.length === 0) tiers = [{ level: 2, rate_pct: 2 }, { level: 3, rate_pct: 1 }];
+    showTierDrawer = true;
+  }
+  function addTier() { const next = (tiers.at(-1)?.level || 1) + 1; tiers = [...tiers, { level: next, rate_pct: 0 }]; }
+  function removeTier(i) { tiers = tiers.filter((_, idx) => idx !== i); }
+  async function saveTiers() {
+    savingTiers = true;
+    try {
+      await ApiService.setTiers(tiers.map((t) => ({ level: Number(t.level), rate_pct: Number(t.rate_pct) })));
+      showToast('Pengaturan tier disimpan');
+      showTierDrawer = false;
+    } catch (e) { showToast(e.message, 'error'); } finally { savingTiers = false; }
+  }
 
   async function saveAgent() {
     savingAgent = true;
@@ -86,9 +143,18 @@
 
   async function viewAgentCommissions(a) {
     selectedAgent = a;
-    try { const data = await ApiService.getAgentCommissions(a.id); agentCommissions = data.commissions || []; }
-    catch (e) { agentCommissions = []; }
+    agentCommissions = []; agentDownline = []; agentUpline = [];
     showAgentCommissions = true;
+    try {
+      const [comm, down, up] = await Promise.all([
+        ApiService.getAgentCommissions(a.id),
+        ApiService.getDownline(a.id).catch(() => ({ downline: [] })),
+        ApiService.getUpline(a.id).catch(() => ({ upline: [] })),
+      ]);
+      agentCommissions = comm.commissions || [];
+      agentDownline = down.downline || [];
+      agentUpline = up.upline || [];
+    } catch (e) { /* best-effort */ }
   }
 </script>
 
@@ -96,6 +162,7 @@
   <PageHeader kicker="Komisi Agen" title="Agen &amp; Mitra" subtitle="Pantau performa agen penjualan dan komisi yang harus dibayarkan.">
     {#snippet actions()}
       {#if tab === 'agents'}
+        <Button variant="ghost" icon={Network} onclick={openTierConfig}>Tier Komisi</Button>
         <Button variant="primary" icon={Plus} onclick={openNewAgent}>Tambah Agen</Button>
       {:else}
         <Button variant="primary" icon={Plus} onclick={openNewCommission}>Catat Komisi</Button>
@@ -137,14 +204,24 @@
           />
         </div>
       {:else}
-        <select
-          bind:value={statusFilter}
-          onchange={loadData}
-          class="rounded-[var(--radius)] bg-white px-3 py-2 text-[13.5px] font-medium outline-none focus:border-primary-400"
-          style="border:1px solid var(--c-line);color:var(--c-ink)"
-        >
-          <option value="all">Semua</option><option value="pending">Pending</option><option value="paid">Dibayar</option>
-        </select>
+        <div class="flex items-center gap-2">
+          <select
+            bind:value={tierFilter}
+            onchange={loadData}
+            class="rounded-[var(--radius)] bg-white px-3 py-2 text-[13.5px] font-medium outline-none focus:border-primary-400"
+            style="border:1px solid var(--c-line);color:var(--c-ink)"
+          >
+            <option value="">Semua Tier</option><option value="1">Langsung</option><option value="2">Tier 2</option><option value="3">Tier 3</option>
+          </select>
+          <select
+            bind:value={statusFilter}
+            onchange={loadData}
+            class="rounded-[var(--radius)] bg-white px-3 py-2 text-[13.5px] font-medium outline-none focus:border-primary-400"
+            style="border:1px solid var(--c-line);color:var(--c-ink)"
+          >
+            <option value="all">Semua</option><option value="pending">Pending</option><option value="paid">Dibayar</option>
+          </select>
+        </div>
       {/if}
     </div>
 
@@ -174,8 +251,15 @@
                       <div class="flex items-center gap-3">
                         <Avatar name={a.name} size={40} />
                         <div class="min-w-0">
-                          <p class="truncate font-bold" style="color:var(--c-ink)">{a.name}</p>
-                          <p class="truncate" style="font-size:12px;color:var(--c-faint);margin-top:2px">{a.phone || '-'}</p>
+                          <div class="flex items-center gap-1.5">
+                            <p class="truncate font-bold" style="color:var(--c-ink)">{a.name}</p>
+                            {#if a.level > 1}
+                              <span class="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style="background:var(--c-info-soft, #e0f2fe);color:var(--c-info)" title="Kedalaman hierarki">L{a.level}</span>
+                            {/if}
+                          </div>
+                          <p class="truncate" style="font-size:12px;color:var(--c-faint);margin-top:2px">
+                            {#if a.parent_name}↳ {a.parent_name}{:else}{a.phone || '-'}{/if}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -190,6 +274,7 @@
                       <div class="flex justify-end gap-2">
                         <button type="button" onclick={() => editAgent(a)} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="border:1px solid var(--c-line);color:var(--c-ink-soft)"><Pencil class="h-3 w-3" />Edit</button>
                         <button type="button" onclick={() => viewAgentCommissions(a)} class="rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="background:var(--c-primary-soft);color:var(--c-primary-deep)">Komisi</button>
+                        <button type="button" onclick={() => openPortal(a)} class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold" style="border:1px solid var(--c-line);color:var(--c-ink-soft)" title="Buat akun login portal agen"><KeyRound class="h-3 w-3" />Portal</button>
                       </div>
                     </td>
                   </tr>
@@ -225,7 +310,12 @@
                     <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;white-space:nowrap">
                       <div class="flex items-center gap-3">
                         <Avatar name={c.agent_name} size={36} />
-                        <span class="font-bold" style="color:var(--c-ink)">{c.agent_name}</span>
+                        <div class="min-w-0">
+                          <span class="font-bold" style="color:var(--c-ink)">{c.agent_name}</span>
+                          {#if c.tier_level > 1}
+                            <span class="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold" style="background:var(--c-info-soft, #e0f2fe);color:var(--c-info)">{tierLabel(c.tier_level)}</span>
+                          {/if}
+                        </div>
                       </div>
                     </td>
                     <td style="padding:calc(var(--row-h) / 4.2) 16px;border-bottom:1px solid var(--c-line-soft);vertical-align:middle;color:var(--c-ink-soft);white-space:nowrap">{c.jamaah_name || '-'}</td>
@@ -251,6 +341,21 @@
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1"><label for="a-phone" class="text-xs font-medium text-slate-700">Telepon</label><input id="a-phone" type="text" bind:value={agentForm.phone} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
       <div class="flex flex-col gap-1"><label for="a-rate" class="text-xs font-medium text-slate-700">Komisi (%)</label><input id="a-rate" type="number" bind:value={agentForm.commission_rate} step="0.01" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1">
+        <label for="a-parent" class="text-xs font-medium text-slate-700">Upline (Atasan)</label>
+        <select id="a-parent" bind:value={agentForm.parent_id} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400">
+          <option value="">— Tanpa upline —</option>
+          {#each parentOptions as p}<option value={p.id}>{p.name}</option>{/each}
+        </select>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="a-type" class="text-xs font-medium text-slate-700">Tipe</label>
+        <select id="a-type" bind:value={agentForm.type} class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary-400">
+          {#each AGENT_TYPES as t}<option value={t.value}>{t.label}</option>{/each}
+        </select>
+      </div>
     </div>
     <div class="flex flex-col gap-1"><label for="a-email" class="text-xs font-medium text-slate-700">Email</label><input id="a-email" type="email" bind:value={agentForm.email} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
     <div class="flex flex-col gap-1"><label for="a-address" class="text-xs font-medium text-slate-700">Alamat</label><textarea id="a-address" bind:value={agentForm.address} rows="2" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400"></textarea></div>
@@ -295,18 +400,92 @@
         <div class="rounded-xl bg-amber-50 p-3 text-center"><p class="text-lg font-bold text-amber-600">{formatIDR(selectedAgent.total_outstanding)}</p><p class="text-xs text-slate-500">Outstanding</p></div>
       </div>
     {/if}
+    {#if agentUpline.length}
+      <div class="mb-4">
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Upline</p>
+        <div class="flex flex-wrap items-center gap-1.5">
+          {#each agentUpline as u, i}
+            {#if i > 0}<span class="text-slate-300">›</span>{/if}
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{u.name}</span>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if agentDownline.length}
+      <div class="mb-4">
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Downline ({agentDownline.length})</p>
+        <div class="space-y-1">
+          {#each agentDownline as d}
+            <div class="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2" style="margin-left:{(d.depth - 1) * 16}px">
+              <div class="flex items-center gap-2">
+                <span class="text-slate-300">↳</span>
+                <span class="text-sm font-medium text-slate-700">{d.name}</span>
+                {#if !d.is_active}<span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">nonaktif</span>{/if}
+              </div>
+              <span class="text-xs font-semibold text-slate-500">{d.total_jamaah} jamaah · {formatIDR(d.total_commissions)}</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Komisi</p>
     {#if agentCommissions.length === 0}
       <p class="text-sm text-slate-400 text-center py-8">Belum ada komisi</p>
     {:else}
       <div class="space-y-2">
         {#each agentCommissions as c}
           <div class="rounded-xl border border-slate-100 p-3 flex items-center justify-between">
-            <div><p class="text-sm font-semibold text-slate-800">{c.jamaah_name || '-'}</p><p class="text-xs text-slate-500">{c.package_name || '-'}</p></div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <p class="text-sm font-semibold text-slate-800">{c.jamaah_name || '-'}</p>
+                {#if c.tier_level > 1}<span class="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style="background:var(--c-info-soft, #e0f2fe);color:var(--c-info)">{tierLabel(c.tier_level)}</span>{/if}
+              </div>
+              <p class="text-xs text-slate-500">{c.package_name || '-'}</p>
+            </div>
             <div class="text-right"><p class="text-sm font-bold text-slate-800">{formatIDR(c.commission_amount)}</p><StatusBadge status={c.status} size="xs" /></div>
           </div>
         {/each}
       </div>
     {/if}
+  </div>
+</SlideDrawer>
+
+<!-- Tier configuration drawer -->
+<SlideDrawer open={showTierDrawer} onClose={() => showTierDrawer = false} title="Pengaturan Tier Komisi" width="460px">
+  <div class="flex flex-col gap-4 p-4">
+    <p class="text-sm text-slate-500">Rate komisi berjenjang untuk upline penjual. Tier 1 (penjual langsung) memakai komisi yang dicatat; tier 2+ dihitung dari nilai penjualan yang sama.</p>
+    <div class="space-y-2">
+      {#each tiers as t, i}
+        <div class="flex items-center gap-2">
+          <span class="w-16 text-sm font-semibold text-slate-600">Tier {t.level}</span>
+          <input type="number" bind:value={t.rate_pct} step="0.01" min="0" max="100" class="w-24 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" />
+          <span class="text-sm text-slate-400">%</span>
+          <button type="button" onclick={() => removeTier(i)} class="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-slate-50 hover:text-red-500"><X class="h-4 w-4" /></button>
+        </div>
+      {/each}
+    </div>
+    <button type="button" onclick={addTier} class="self-start rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:border-primary-400 hover:text-primary-600">+ Tambah Tier</button>
+    <div class="flex gap-2 pt-2">
+      <button type="button" onclick={() => showTierDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
+      <button type="button" onclick={saveTiers} disabled={savingTiers} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingTiers ? '...' : 'Simpan'}</button>
+    </div>
+  </div>
+</SlideDrawer>
+
+<!-- Portal credential drawer -->
+<SlideDrawer open={showPortalDrawer} onClose={() => showPortalDrawer = false} title={portalAgent ? `Akun Portal: ${portalAgent.name}` : 'Akun Portal'} width="440px">
+  <div class="flex flex-col gap-4 p-4">
+    <p class="text-sm text-slate-500">Buat akun login agar agen ini bisa masuk ke portal dan melihat komisi & jaringannya sendiri.</p>
+    <div class="flex flex-col gap-1"><label for="p-email" class="text-xs font-medium text-slate-700">Email Login <span class="text-red-500">*</span></label><input id="p-email" type="email" bind:value={portalForm.email} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <div class="flex flex-col gap-1"><label for="p-name" class="text-xs font-medium text-slate-700">Nama Tampilan</label><input id="p-name" type="text" bind:value={portalForm.name} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <div class="flex flex-col gap-1"><label for="p-pass" class="text-xs font-medium text-slate-700">Password <span class="text-red-500">*</span></label><input id="p-pass" type="text" bind:value={portalForm.password} placeholder="min. 6 karakter" class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" /></div>
+    <p class="text-xs text-slate-400">Bagikan email & password ini ke agen. Mereka login di halaman login yang sama dan otomatis diarahkan ke portal agen.</p>
+    <div class="flex gap-2 pt-2">
+      <button type="button" onclick={() => showPortalDrawer = false} class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">Batal</button>
+      <button type="button" onclick={savePortal} disabled={savingPortal} class="flex-1 rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">{savingPortal ? '...' : 'Buat Akun'}</button>
+    </div>
   </div>
 </SlideDrawer>
 

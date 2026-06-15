@@ -19,11 +19,17 @@ func NewAgentRepo(pool *pgxpool.Pool) *AgentRepo {
 }
 
 func (r *AgentRepo) CreateAgent(ctx context.Context, a *model.Agent) error {
+	if a.Type == "" {
+		a.Type = "agent"
+	}
+	if a.Level <= 0 {
+		a.Level = 1
+	}
 	return r.pool.QueryRow(ctx, `
-		INSERT INTO agents (org_id, name, phone, email, address, commission_rate, bank_name, bank_account_number, bank_account_name, notes)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		INSERT INTO agents (org_id, name, phone, email, address, commission_rate, bank_name, bank_account_number, bank_account_name, notes, parent_id, level, type)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, created_at, updated_at
-	`, a.OrgID, a.Name, a.Phone, a.Email, a.Address, a.CommissionRate, a.BankName, a.BankAccountNumber, a.BankAccountName, a.Notes).
+	`, a.OrgID, a.Name, a.Phone, a.Email, a.Address, a.CommissionRate, a.BankName, a.BankAccountNumber, a.BankAccountName, a.Notes, a.ParentID, a.Level, a.Type).
 		Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 }
 
@@ -41,9 +47,11 @@ func (r *AgentRepo) ListAgents(ctx context.Context, orgID, search string, page, 
 	baseArgCount := len(args)
 	query := fmt.Sprintf(`
 		SELECT a.id, a.org_id, a.name, a.phone, a.email, a.address, a.commission_rate,
-		       a.bank_name, a.bank_account_number, a.bank_account_name, a.notes, a.is_active, a.created_at, a.updated_at,
+		       a.bank_name, a.bank_account_number, a.bank_account_name, a.notes, a.is_active,
+		       a.parent_id, a.level, a.type, p.name, a.created_at, a.updated_at,
 		       COALESCE(c.total_comm, 0), COALESCE(c.total_paid, 0), COALESCE(c.total_comm - c.total_paid, 0), COALESCE(c.jamaah_count, 0)
 		FROM agents a
+		LEFT JOIN agents p ON p.id = a.parent_id
 		LEFT JOIN (
 			SELECT agent_id,
 			       SUM(commission_amount) as total_comm,
@@ -64,12 +72,17 @@ func (r *AgentRepo) ListAgents(ctx context.Context, orgID, search string, page, 
 	var agents []model.Agent
 	for rows.Next() {
 		var a model.Agent
+		var parentName *string
 		if err := rows.Scan(
 			&a.ID, &a.OrgID, &a.Name, &a.Phone, &a.Email, &a.Address, &a.CommissionRate,
-			&a.BankName, &a.BankAccountNumber, &a.BankAccountName, &a.Notes, &a.IsActive, &a.CreatedAt, &a.UpdatedAt,
+			&a.BankName, &a.BankAccountNumber, &a.BankAccountName, &a.Notes, &a.IsActive,
+			&a.ParentID, &a.Level, &a.Type, &parentName, &a.CreatedAt, &a.UpdatedAt,
 			&a.TotalCommissions, &a.TotalPaid, &a.TotalOutstanding, &a.TotalJamaah,
 		); err != nil {
 			return nil, 0, err
+		}
+		if parentName != nil {
+			a.ParentName = *parentName
 		}
 		agents = append(agents, a)
 	}
@@ -78,11 +91,14 @@ func (r *AgentRepo) ListAgents(ctx context.Context, orgID, search string, page, 
 
 func (r *AgentRepo) GetAgent(ctx context.Context, id, orgID string) (*model.Agent, error) {
 	var a model.Agent
+	var parentName *string
 	err := r.pool.QueryRow(ctx, `
 		SELECT a.id, a.org_id, a.name, a.phone, a.email, a.address, a.commission_rate,
-		       a.bank_name, a.bank_account_number, a.bank_account_name, a.notes, a.is_active, a.created_at, a.updated_at,
+		       a.bank_name, a.bank_account_number, a.bank_account_name, a.notes, a.is_active,
+		       a.parent_id, a.level, a.type, p.name, a.created_at, a.updated_at,
 		       COALESCE(c.total_comm, 0), COALESCE(c.total_paid, 0), COALESCE(c.total_comm - c.total_paid, 0), COALESCE(c.jamaah_count, 0)
 		FROM agents a
+		LEFT JOIN agents p ON p.id = a.parent_id
 		LEFT JOIN (
 			SELECT agent_id,
 			       SUM(commission_amount) as total_comm,
@@ -93,11 +109,15 @@ func (r *AgentRepo) GetAgent(ctx context.Context, id, orgID string) (*model.Agen
 		WHERE a.id = $1 AND a.org_id = $2
 	`, id, orgID).Scan(
 		&a.ID, &a.OrgID, &a.Name, &a.Phone, &a.Email, &a.Address, &a.CommissionRate,
-		&a.BankName, &a.BankAccountNumber, &a.BankAccountName, &a.Notes, &a.IsActive, &a.CreatedAt, &a.UpdatedAt,
+		&a.BankName, &a.BankAccountNumber, &a.BankAccountName, &a.Notes, &a.IsActive,
+		&a.ParentID, &a.Level, &a.Type, &parentName, &a.CreatedAt, &a.UpdatedAt,
 		&a.TotalCommissions, &a.TotalPaid, &a.TotalOutstanding, &a.TotalJamaah,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("agent not found")
+	}
+	if parentName != nil {
+		a.ParentName = *parentName
 	}
 	return &a, nil
 }
@@ -126,7 +146,7 @@ func (r *AgentRepo) CreateCommission(ctx context.Context, c *model.AgentCommissi
 		Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt)
 }
 
-func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status string, page, limit int) ([]model.AgentCommission, int64, error) {
+func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status, tierLevel string, page, limit int) ([]model.AgentCommission, int64, error) {
 	var total int64
 	baseWhere := "WHERE c.org_id = $1"
 	args := []interface{}{orgID}
@@ -141,12 +161,17 @@ func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status 
 		args = append(args, status)
 		argIdx++
 	}
+	if tierLevel != "" {
+		baseWhere += fmt.Sprintf(" AND c.tier_level = $%d", argIdx)
+		args = append(args, tierLevel)
+		argIdx++
+	}
 	r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agent_commissions c %s", baseWhere), args...).Scan(&total)
 
 	offset := (page - 1) * limit
 	query := fmt.Sprintf(`
 		SELECT c.id, c.org_id, c.agent_id, c.jamaah_id, c.invoice_id, c.package_id, c.jamaah_name, c.package_name,
-		       c.commission_amount, c.commission_rate, c.status, c.paid_at, c.notes, c.created_at, c.updated_at, a.name
+		       c.commission_amount, c.commission_rate, c.status, c.paid_at, c.notes, c.tier_level, c.source_commission_id, c.created_at, c.updated_at, a.name
 		FROM agent_commissions c JOIN agents a ON c.agent_id = a.id
 		%s ORDER BY c.created_at DESC LIMIT $%d OFFSET $%d
 	`, baseWhere, argIdx, argIdx+1)
@@ -163,7 +188,7 @@ func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status 
 		var c model.AgentCommission
 		if err := rows.Scan(
 			&c.ID, &c.OrgID, &c.AgentID, &c.JamaahID, &c.InvoiceID, &c.PackageID, &c.JamaahName, &c.PackageName,
-			&c.CommissionAmount, &c.CommissionRate, &c.Status, &c.PaidAt, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.AgentName,
+			&c.CommissionAmount, &c.CommissionRate, &c.Status, &c.PaidAt, &c.Notes, &c.TierLevel, &c.SourceCommissionID, &c.CreatedAt, &c.UpdatedAt, &c.AgentName,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -183,7 +208,7 @@ func (r *AgentRepo) PayCommission(ctx context.Context, id, orgID string) error {
 func (r *AgentRepo) GetAgentCommissions(ctx context.Context, agentID, orgID string) ([]model.AgentCommission, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT c.id, c.org_id, c.agent_id, c.jamaah_id, c.invoice_id, c.package_id, c.jamaah_name, c.package_name,
-		       c.commission_amount, c.commission_rate, c.status, c.paid_at, c.notes, c.created_at, c.updated_at, a.name
+		       c.commission_amount, c.commission_rate, c.status, c.paid_at, c.notes, c.tier_level, c.source_commission_id, c.created_at, c.updated_at, a.name
 		FROM agent_commissions c JOIN agents a ON c.agent_id = a.id
 		WHERE c.agent_id = $1 AND c.org_id = $2 ORDER BY c.created_at DESC
 	`, agentID, orgID)
@@ -197,7 +222,7 @@ func (r *AgentRepo) GetAgentCommissions(ctx context.Context, agentID, orgID stri
 		var c model.AgentCommission
 		if err := rows.Scan(
 			&c.ID, &c.OrgID, &c.AgentID, &c.JamaahID, &c.InvoiceID, &c.PackageID, &c.JamaahName, &c.PackageName,
-			&c.CommissionAmount, &c.CommissionRate, &c.Status, &c.PaidAt, &c.Notes, &c.CreatedAt, &c.UpdatedAt, &c.AgentName,
+			&c.CommissionAmount, &c.CommissionRate, &c.Status, &c.PaidAt, &c.Notes, &c.TierLevel, &c.SourceCommissionID, &c.CreatedAt, &c.UpdatedAt, &c.AgentName,
 		); err != nil {
 			return nil, err
 		}

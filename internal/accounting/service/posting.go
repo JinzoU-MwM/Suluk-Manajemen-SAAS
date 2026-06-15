@@ -43,8 +43,10 @@ type payrollPayload struct {
 }
 
 type commissionPayload struct {
-	Amount    int64  `json:"amount"`
-	AgentName string `json:"agent_name"`
+	Amount          int64  `json:"amount"`
+	AgentName       string `json:"agent_name"`
+	Tier            int    `json:"tier"`              // 1 = seller, ≥2 = upline override
+	SourceAgentName string `json:"source_agent_name"` // selling agent, for tier ≥2
 }
 
 type savingsPayload struct {
@@ -166,6 +168,12 @@ func buildPosting(env *events.Envelope) (*posting, error) {
 			return nil, fmt.Errorf("commission amount must be > 0")
 		}
 		memo := "Komisi agen " + p.AgentName
+		if p.Tier >= 2 {
+			memo = fmt.Sprintf("Komisi berjenjang tier %d agen %s", p.Tier, p.AgentName)
+			if p.SourceAgentName != "" {
+				memo += " (dari " + p.SourceAgentName + ")"
+			}
+		}
 		return &posting{
 			module:      "agent",
 			description: memo,

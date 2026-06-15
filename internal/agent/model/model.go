@@ -15,13 +15,37 @@ type Agent struct {
 	BankAccountName   string    `json:"bank_account_name" db:"bank_account_name"`
 	Notes             string    `json:"notes" db:"notes"`
 	IsActive          bool      `json:"is_active" db:"is_active"`
+	ParentID          *string   `json:"parent_id,omitempty" db:"parent_id"`
+	Level             int       `json:"level" db:"level"`
+	Type              string    `json:"type" db:"type"`
 	CreatedAt         time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
 
-	TotalCommissions int64 `json:"total_commissions" db:"-"`
-	TotalPaid        int64 `json:"total_paid" db:"-"`
-	TotalOutstanding int64 `json:"total_outstanding" db:"-"`
-	TotalJamaah      int   `json:"total_jamaah" db:"-"`
+	ParentName       string `json:"parent_name,omitempty" db:"-"`
+	TotalCommissions int64  `json:"total_commissions" db:"-"`
+	TotalPaid        int64  `json:"total_paid" db:"-"`
+	TotalOutstanding int64  `json:"total_outstanding" db:"-"`
+	TotalJamaah      int    `json:"total_jamaah" db:"-"`
+}
+
+// CommissionTier is a per-org override rate for an upline level (distance from
+// the seller). level 2 = direct upline, level 3 = next, etc.
+type CommissionTier struct {
+	Level   int     `json:"level" db:"level"`
+	RatePct float64 `json:"rate_pct" db:"rate_pct"`
+}
+
+// DownlineNode is one agent in a hierarchy tree/list (with its depth relative to
+// the queried root) plus its commission aggregates.
+type DownlineNode struct {
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	ParentID         *string `json:"parent_id,omitempty"`
+	Level            int     `json:"level"`
+	Depth            int     `json:"depth"` // distance below the queried root (root = 0)
+	IsActive         bool    `json:"is_active"`
+	TotalCommissions int64   `json:"total_commissions"`
+	TotalJamaah      int     `json:"total_jamaah"`
 }
 
 type AgentCommission struct {
@@ -37,9 +61,11 @@ type AgentCommission struct {
 	CommissionRate   float64    `json:"commission_rate" db:"commission_rate"`
 	Status           string     `json:"status" db:"status"`
 	PaidAt           *time.Time `json:"paid_at,omitempty" db:"paid_at"`
-	Notes            string     `json:"notes" db:"notes"`
-	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+	Notes              string     `json:"notes" db:"notes"`
+	TierLevel          int        `json:"tier_level" db:"tier_level"`
+	SourceCommissionID *string    `json:"source_commission_id,omitempty" db:"source_commission_id"`
+	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
 
 	AgentName string `json:"agent_name,omitempty" db:"-"`
 }
@@ -54,6 +80,8 @@ type CreateAgentRequest struct {
 	BankAccountNumber string  `json:"bank_account_number"`
 	BankAccountName   string  `json:"bank_account_name"`
 	Notes             string  `json:"notes"`
+	ParentID          string  `json:"parent_id"`
+	Type              string  `json:"type"`
 }
 
 type UpdateAgentRequest struct {
@@ -67,6 +95,8 @@ type UpdateAgentRequest struct {
 	BankAccountName   *string  `json:"bank_account_name,omitempty"`
 	Notes             *string  `json:"notes,omitempty"`
 	IsActive          *bool    `json:"is_active,omitempty"`
+	ParentID          *string  `json:"parent_id,omitempty"` // "" clears the parent
+	Type              *string  `json:"type,omitempty"`
 }
 
 type CreateCommissionRequest struct {
@@ -93,4 +123,15 @@ type AgentListResponse struct {
 type CommissionListResponse struct {
 	Commissions []AgentCommission `json:"commissions"`
 	Total       int64             `json:"total"`
+}
+
+type SetTiersRequest struct {
+	Tiers []CommissionTier `json:"tiers"`
+}
+
+// B2BDashboard is the agent-portal landing summary for the signed-in agent.
+type B2BDashboard struct {
+	Agent         *Agent `json:"agent"`
+	DownlineCount int    `json:"downline_count"`
+	DirectCount   int    `json:"direct_count"`
 }
