@@ -29,9 +29,16 @@ func (h *PackageHandler) ReserveSeat(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	if err := h.svc.ReserveSeat(c.Context(), id, claims.OrgID); err != nil {
+	var body struct {
+		RoomType string `json:"room_type"`
+	}
+	_ = c.BodyParser(&body) // optional; empty room_type reserves only the total
+	if err := h.svc.ReserveSeat(c.Context(), id, claims.OrgID, body.RoomType); err != nil {
 		if errors.Is(err, repository.ErrPackageFull) {
 			return response.Conflict(c, "kuota paket sudah penuh")
+		}
+		if errors.Is(err, repository.ErrRoomTypeFull) {
+			return response.Conflict(c, "kuota tipe kamar sudah penuh")
 		}
 		if errors.Is(err, repository.ErrPackageNotFound) {
 			return response.NotFound(c, "paket tidak ditemukan")
@@ -48,7 +55,11 @@ func (h *PackageHandler) ReleaseSeat(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	if err := h.svc.ReleaseSeat(c.Context(), id, claims.OrgID); err != nil {
+	var body struct {
+		RoomType string `json:"room_type"`
+	}
+	_ = c.BodyParser(&body)
+	if err := h.svc.ReleaseSeat(c.Context(), id, claims.OrgID, body.RoomType); err != nil {
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"released": true})

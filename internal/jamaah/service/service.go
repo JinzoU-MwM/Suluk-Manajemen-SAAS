@@ -349,7 +349,7 @@ func (s *JamaahService) RegisterToPackage(ctx context.Context, orgID, userID uui
 
 	// Reserve a seat first (capacity-checked in package-service) so a full
 	// package cannot be overbooked. Aborts the registration when full.
-	if err := s.reserveSeat(ctx, req.PackageID, authToken); err != nil {
+	if err := s.reserveSeat(ctx, req.PackageID, req.RoomType, authToken); err != nil {
 		return nil, err
 	}
 
@@ -370,7 +370,7 @@ func (s *JamaahService) RegisterToPackage(ctx context.Context, orgID, userID uui
 
 	if err := s.repo.CreateRegistration(ctx, reg); err != nil {
 		// Compensate: give the reserved seat back if the registration failed.
-		s.releaseSeat(ctx, req.PackageID, authToken)
+		s.releaseSeat(ctx, req.PackageID, req.RoomType, authToken)
 		return nil, err
 	}
 	return reg, nil
@@ -437,11 +437,17 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID,
 }
 
 func (s *JamaahService) RemoveFromPackage(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, authToken string) error {
+	// Capture the room type before deleting so the matching room-type quota is
+	// released too (best-effort lookup).
+	roomType := ""
+	if reg, err := s.repo.GetRegistration(ctx, orgID, jamaahID, packageID); err == nil && reg != nil {
+		roomType = reg.RoomType
+	}
 	if err := s.repo.RemoveFromPackage(ctx, orgID, jamaahID, packageID); err != nil {
 		return err
 	}
 	// Free the seat (best-effort; never block the unregister on this).
-	s.releaseSeat(ctx, packageID, authToken)
+	s.releaseSeat(ctx, packageID, roomType, authToken)
 	return nil
 }
 

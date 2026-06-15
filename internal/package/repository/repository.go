@@ -183,7 +183,7 @@ func (r *PackageRepo) pricingTiersFor(ctx context.Context, packageIDs []string) 
 	if len(packageIDs) == 0 {
 		return out, nil
 	}
-	rows, err := r.pool.Query(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, created_at, updated_at
+	rows, err := r.pool.Query(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, quota_seats, reserved_seats, created_at, updated_at
 		FROM pricing_tiers WHERE package_id = ANY($1::uuid[]) ORDER BY package_id, sort_order`, packageIDs)
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (r *PackageRepo) pricingTiersFor(ctx context.Context, packageIDs []string) 
 	defer rows.Close()
 	for rows.Next() {
 		var t model.PricingTier
-		if err := rows.Scan(&t.ID, &t.PackageID, &t.RoomType, &t.Price, &t.Label, &t.IsEarlyBird, &t.EarlyBirdExpiresAt, &t.SortOrder, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.PackageID, &t.RoomType, &t.Price, &t.Label, &t.IsEarlyBird, &t.EarlyBirdExpiresAt, &t.SortOrder, &t.QuotaSeats, &t.ReservedSeats, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		k := t.PackageID.String()
@@ -248,8 +248,18 @@ func (r *PackageRepo) UpdatePackageStatus(ctx context.Context, id, orgID uuid.UU
 // ReserveSeat atomically increments reserved_seats by one only if a seat is
 // available (reserved_seats < total_seats), so concurrent registrations cannot
 // overbook a package. Returns ErrPackageFull when no seat is free.
-func (r *PackageRepo) ReserveSeat(ctx context.Context, id, orgID uuid.UUID) error {
-	result, err := r.pool.Exec(ctx,
+// ReserveSeat atomically books one package-wide seat and, when the room type has
+// a configured cap (quota_seats > 0), one seat of that room type — both in a
+// single transaction so neither can overshoot. roomType "" reserves only the
+// package total (back-compat). ErrPackageFull / ErrRoomTypeFull on capacity.
+func (r *PackageRepo) ReserveSeat(ctx context.Context, id, orgID uuid.UUID, roomType string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	result, err := tx.Exec(ctx,
 		`UPDATE packages SET reserved_seats = reserved_seats + 1, updated_at = NOW()
 		 WHERE id = $1 AND org_id = $2 AND reserved_seats < total_seats`, id, orgID)
 	if err != nil {
@@ -257,21 +267,53 @@ func (r *PackageRepo) ReserveSeat(ctx context.Context, id, orgID uuid.UUID) erro
 	}
 	if result.RowsAffected() == 0 {
 		var exists bool
-		_ = r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM packages WHERE id = $1 AND org_id = $2)`, id, orgID).Scan(&exists)
+		_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM packages WHERE id = $1 AND org_id = $2)`, id, orgID).Scan(&exists)
 		if !exists {
 			return ErrPackageNotFound
 		}
 		return ErrPackageFull
 	}
-	return nil
+
+	if roomType != "" {
+		res2, err := tx.Exec(ctx,
+			`UPDATE pricing_tiers SET reserved_seats = reserved_seats + 1, updated_at = NOW()
+			 WHERE package_id = $1 AND room_type = $2 AND quota_seats > 0 AND reserved_seats < quota_seats`, id, roomType)
+		if err != nil {
+			return err
+		}
+		if res2.RowsAffected() == 0 {
+			// Distinguish "no cap configured" (allow) from "cap full" (reject).
+			var capped bool
+			_ = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pricing_tiers WHERE package_id = $1 AND room_type = $2 AND quota_seats > 0)`, id, roomType).Scan(&capped)
+			if capped {
+				return ErrRoomTypeFull
+			}
+		}
+	}
+	return tx.Commit(ctx)
 }
 
-// ReleaseSeat decrements reserved_seats by one (never below zero).
-func (r *PackageRepo) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID) error {
-	_, err := r.pool.Exec(ctx,
+// ReleaseSeat frees one package-wide seat and, when applicable, one of that room
+// type (never below zero). Mirror of ReserveSeat.
+func (r *PackageRepo) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID, roomType string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx,
 		`UPDATE packages SET reserved_seats = GREATEST(reserved_seats - 1, 0), updated_at = NOW()
-		 WHERE id = $1 AND org_id = $2`, id, orgID)
-	return err
+		 WHERE id = $1 AND org_id = $2`, id, orgID); err != nil {
+		return err
+	}
+	if roomType != "" {
+		if _, err := tx.Exec(ctx,
+			`UPDATE pricing_tiers SET reserved_seats = GREATEST(reserved_seats - 1, 0), updated_at = NOW()
+			 WHERE package_id = $1 AND room_type = $2 AND quota_seats > 0`, id, roomType); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *PackageRepo) UpdateReservedSeats(ctx context.Context, id, orgID uuid.UUID, delta int) error {
@@ -297,16 +339,16 @@ func (r *PackageRepo) IsSlugTaken(ctx context.Context, slug string, excludeID *u
 }
 
 func (r *PackageRepo) CreatePricingTier(ctx context.Context, tier *model.PricingTier) error {
-	query := `INSERT INTO pricing_tiers (id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING created_at, updated_at`
+	query := `INSERT INTO pricing_tiers (id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, quota_seats)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING created_at, updated_at`
 	return r.pool.QueryRow(ctx, query,
 		tier.ID, tier.PackageID, tier.RoomType, tier.Price, tier.Label,
-		tier.IsEarlyBird, tier.EarlyBirdExpiresAt, tier.SortOrder,
+		tier.IsEarlyBird, tier.EarlyBirdExpiresAt, tier.SortOrder, tier.QuotaSeats,
 	).Scan(&tier.CreatedAt, &tier.UpdatedAt)
 }
 
 func (r *PackageRepo) GetPricingTiers(ctx context.Context, packageID uuid.UUID) ([]model.PricingTier, error) {
-	rows, err := r.pool.Query(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, created_at, updated_at
+	rows, err := r.pool.Query(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, quota_seats, reserved_seats, created_at, updated_at
 		FROM pricing_tiers WHERE package_id = $1 ORDER BY sort_order`, packageID)
 	if err != nil {
 		return nil, err
@@ -316,7 +358,7 @@ func (r *PackageRepo) GetPricingTiers(ctx context.Context, packageID uuid.UUID) 
 	tiers := []model.PricingTier{}
 	for rows.Next() {
 		var t model.PricingTier
-		if err := rows.Scan(&t.ID, &t.PackageID, &t.RoomType, &t.Price, &t.Label, &t.IsEarlyBird, &t.EarlyBirdExpiresAt, &t.SortOrder, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.PackageID, &t.RoomType, &t.Price, &t.Label, &t.IsEarlyBird, &t.EarlyBirdExpiresAt, &t.SortOrder, &t.QuotaSeats, &t.ReservedSeats, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		tiers = append(tiers, t)
@@ -325,8 +367,8 @@ func (r *PackageRepo) GetPricingTiers(ctx context.Context, packageID uuid.UUID) 
 }
 
 func (r *PackageRepo) UpdatePricingTier(ctx context.Context, tier *model.PricingTier) error {
-	query := `UPDATE pricing_tiers SET room_type = $2, price = $3, label = $4, is_early_bird = $5, early_bird_expires_at = $6, sort_order = $7, updated_at = NOW() WHERE id = $1`
-	result, err := r.pool.Exec(ctx, query, tier.ID, tier.RoomType, tier.Price, tier.Label, tier.IsEarlyBird, tier.EarlyBirdExpiresAt, tier.SortOrder)
+	query := `UPDATE pricing_tiers SET room_type = $2, price = $3, label = $4, is_early_bird = $5, early_bird_expires_at = $6, sort_order = $7, quota_seats = $8, updated_at = NOW() WHERE id = $1`
+	result, err := r.pool.Exec(ctx, query, tier.ID, tier.RoomType, tier.Price, tier.Label, tier.IsEarlyBird, tier.EarlyBirdExpiresAt, tier.SortOrder, tier.QuotaSeats)
 	if err != nil {
 		return err
 	}
@@ -338,9 +380,9 @@ func (r *PackageRepo) UpdatePricingTier(ctx context.Context, tier *model.Pricing
 
 func (r *PackageRepo) GetPricingTierByID(ctx context.Context, id uuid.UUID) (*model.PricingTier, error) {
 	tier := &model.PricingTier{}
-	err := r.pool.QueryRow(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, created_at, updated_at
+	err := r.pool.QueryRow(ctx, `SELECT id, package_id, room_type, price, label, is_early_bird, early_bird_expires_at, sort_order, quota_seats, reserved_seats, created_at, updated_at
 		FROM pricing_tiers WHERE id = $1`, id).Scan(
-		&tier.ID, &tier.PackageID, &tier.RoomType, &tier.Price, &tier.Label, &tier.IsEarlyBird, &tier.EarlyBirdExpiresAt, &tier.SortOrder, &tier.CreatedAt, &tier.UpdatedAt,
+		&tier.ID, &tier.PackageID, &tier.RoomType, &tier.Price, &tier.Label, &tier.IsEarlyBird, &tier.EarlyBirdExpiresAt, &tier.SortOrder, &tier.QuotaSeats, &tier.ReservedSeats, &tier.CreatedAt, &tier.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, ErrTierNotFound
@@ -485,6 +527,7 @@ func GenerateSlug(name string) string {
 var (
 	ErrPackageNotFound = fmt.Errorf("package not found")
 	ErrPackageFull     = fmt.Errorf("package is full")
+	ErrRoomTypeFull    = fmt.Errorf("room type quota is full")
 	ErrSlugExists      = fmt.Errorf("package slug already exists")
 	ErrTierNotFound    = fmt.Errorf("pricing tier not found")
 	ErrCostNotFound    = fmt.Errorf("cost component not found")

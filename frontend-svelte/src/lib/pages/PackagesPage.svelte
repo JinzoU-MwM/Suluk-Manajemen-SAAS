@@ -123,6 +123,12 @@
         double: 0,
         single: 0,
       },
+      quotas: {
+        quad: 0,
+        triple: 0,
+        double: 0,
+        single: 0,
+      },
       existingPricingTiers: [],
     };
   }
@@ -299,8 +305,10 @@
 
   function packageToForm(pkg) {
     const prices = { quad: 0, triple: 0, double: 0, single: 0 };
+    const quotas = { quad: 0, triple: 0, double: 0, single: 0 };
     for (const tier of pkg.pricing_tiers || []) {
       prices[tier.room_type] = Number(tier.price || 0);
+      quotas[tier.room_type] = Number(tier.quota_seats || 0);
     }
 
     return {
@@ -318,6 +326,7 @@
       hotelMakkahName: pkg.hotel_makkah_name || '',
       hotelMadinahName: pkg.hotel_madinah_name || '',
       prices,
+      quotas,
       existingPricingTiers: pkg.pricing_tiers || [],
     };
   }
@@ -344,6 +353,7 @@
           label: room.label,
           is_early_bird: false,
           sort_order: sortOrder++,
+          quota_seats: Number(formState.quotas?.[room.room_type] || 0),
         };
       })
       .filter(Boolean);
@@ -394,6 +404,7 @@
           label: tier.label,
           is_early_bird: false,
           sort_order: tier.sort_order,
+          quota_seats: tier.quota_seats,
         });
       } else {
         await ApiService.createPricingTier(packageId, {
@@ -402,6 +413,7 @@
           label: tier.label,
           is_early_bird: false,
           sort_order: tier.sort_order,
+          quota_seats: tier.quota_seats,
         });
       }
     }
@@ -755,6 +767,7 @@
               <tr class="text-left text-xs text-slate-400">
                 <th class="pb-2 font-semibold">Tipe</th>
                 <th class="pb-2 text-right font-semibold">Harga</th>
+                <th class="pb-2 text-right font-semibold">Kuota</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
@@ -764,6 +777,13 @@
                   <tr>
                     <td class="py-2 text-slate-700">{room.label}</td>
                     <td class="py-2 text-right font-semibold text-slate-800">{formatIDR(tier.price)}</td>
+                    <td class="py-2 text-right text-slate-600">
+                      {#if Number(tier.quota_seats) > 0}
+                        <span class:text-red-600={Number(tier.reserved_seats) >= Number(tier.quota_seats)}>{tier.reserved_seats || 0}/{tier.quota_seats}</span>
+                      {:else}
+                        <span class="text-slate-300">—</span>
+                      {/if}
+                    </td>
                   </tr>
                 {/if}
               {/each}
@@ -981,10 +1001,18 @@
     </div>
 
     <div class="rounded-2xl border border-slate-100 p-4">
-      <h3 class="mb-4 text-sm font-bold text-slate-800">Harga per Tipe Kamar</h3>
+      <h3 class="mb-1 text-sm font-bold text-slate-800">Harga &amp; Kuota per Tipe Kamar</h3>
+      <p class="mb-4 text-xs text-slate-400">Kuota 0 = tanpa batas tipe kamar (hanya total kursi yang berlaku).</p>
       <div class="grid gap-4 sm:grid-cols-2">
         {#each ROOM_FIELDS as room}
-          <IDRInput bind:value={formState.prices[room.room_type]} label={room.label} />
+          <div class="rounded-xl border border-slate-100 p-3">
+            <p class="mb-2 text-xs font-semibold text-slate-600">{room.label}</p>
+            <IDRInput bind:value={formState.prices[room.room_type]} label="Harga" />
+            <div class="mt-2 flex flex-col gap-1">
+              <label for="q-{room.room_type}" class="text-xs font-medium text-slate-500">Kuota kursi</label>
+              <input id="q-{room.room_type}" type="number" min="0" bind:value={formState.quotas[room.room_type]} class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary-400" />
+            </div>
+          </div>
         {/each}
       </div>
     </div>
