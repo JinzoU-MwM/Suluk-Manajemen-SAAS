@@ -73,6 +73,9 @@ func (s *AgentService) buildUplineTiers(ctx context.Context, orgID string, selle
 	base := saleBase(seller.CommissionAmount, seller.CommissionRate)
 	out := make([]repository.TierCommission, 0, len(uplines))
 	for _, up := range uplines {
+		if !up.IsActive {
+			continue // deactivated upline agents don't accrue override commissions
+		}
 		tierLevel := up.Depth + 1 // depth 1 (direct parent) = tier 2
 		rate, ok := rates[tierLevel]
 		if !ok || rate <= 0 {

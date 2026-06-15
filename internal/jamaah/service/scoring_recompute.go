@@ -7,6 +7,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// daysBetween is whole days from t to now, never negative (guards clock skew /
+// future-stamped timestamps that would otherwise mis-bucket the score).
+func daysBetween(t, now time.Time) int {
+	d := int(now.Sub(t).Hours() / 24)
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
 // noTouchDays is the days-since-last-touch value used when a lead has no notes
 // or follow-ups yet — large enough that ComputeLeadScore awards no freshness
 // bonus.
@@ -45,11 +55,11 @@ func (s *JamaahService) RecomputeScore(ctx context.Context, orgID, jamaahID, pac
 	now := time.Now()
 	daysSinceTouch := noTouchDays
 	if lastTouch != nil {
-		daysSinceTouch = int(now.Sub(*lastTouch).Hours() / 24)
+		daysSinceTouch = daysBetween(*lastTouch, now)
 	}
 	daysInStage := 0
 	if base.StageEnteredAt != nil {
-		daysInStage = int(now.Sub(*base.StageEnteredAt).Hours() / 24)
+		daysInStage = daysBetween(*base.StageEnteredAt, now)
 	}
 
 	score, temp := ComputeLeadScore(ScoreSignals{

@@ -30,7 +30,9 @@ func (s *InventoryService) Scan(ctx context.Context, orgID string, scannedBy *uu
 	if err := s.repo.RecordScanTx(ctx, m, req.Checkpoint, req.Items, scannedBy); err != nil {
 		return nil, err
 	}
-	return s.repo.GetByMemberID(ctx, orgID, m.MemberID)
+	// Re-fetch by token (unique per org) so we return the exact record scanned,
+	// not an arbitrary one if the member appears in multiple packages.
+	return s.repo.GetByToken(ctx, orgID, req.Token)
 }
 
 // ListCheckpoints returns per-member handover progress for a package.

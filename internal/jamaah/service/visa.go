@@ -148,11 +148,23 @@ func (s *JamaahService) StartLifecycleReminders(ctx context.Context, interval ti
 			case <-ctx.Done():
 				return
 			case <-timer.C:
-				s.runLifecycleScan(ctx)
+				s.safeLifecycleScan(ctx)
 				timer.Reset(interval)
 			}
 		}
 	}()
+}
+
+// safeLifecycleScan runs one scan, recovering from any panic so a bad row or a
+// nil client can never crash the whole service (this goroutine runs outside the
+// Fiber recover middleware).
+func (s *JamaahService) safeLifecycleScan(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil && s.log != nil {
+			s.log.Errorw("lifecycle reminder scan panicked", "recover", r)
+		}
+	}()
+	s.runLifecycleScan(ctx)
 }
 
 func (s *JamaahService) runLifecycleScan(ctx context.Context) {

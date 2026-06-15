@@ -218,6 +218,9 @@ func (s *AuthService) ProvisionAgentCredential(ctx context.Context, orgID, invit
 	if req.Email == "" || req.Password == "" || req.AgentID == "" {
 		return nil, fmt.Errorf("email, password, and agent_id are required")
 	}
+	if len(req.Password) < 6 {
+		return nil, fmt.Errorf("password minimal 6 karakter")
+	}
 	agentID, err := uuid.Parse(req.AgentID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid agent_id")
