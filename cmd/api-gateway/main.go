@@ -76,6 +76,7 @@ func main() {
 		"agent":      getEnv("AGENT_SERVICE_ADDR", "localhost:50061"),
 		"accounting": getEnv("ACCOUNTING_SERVICE_ADDR", "localhost:50062"),
 		"tabungan":   getEnv("TABUNGAN_SERVICE_ADDR", "localhost:50063"),
+		"mutawwif":   getEnv("MUTAWWIF_SERVICE_ADDR", "localhost:50064"),
 	}
 
 	api := app.Group("/api/v1")
@@ -132,6 +133,7 @@ func main() {
 
 	// Tabungan (savings) service
 	setupProxy(api, "/tabungan", services["tabungan"])
+	setupProxy(api, "/mutawwif", services["mutawwif"])
 
 	// Kasir POS — cash sessions live in the invoice service
 	setupProxy(api, "/cash-sessions", services["invoice"])

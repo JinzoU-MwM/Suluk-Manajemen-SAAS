@@ -6,7 +6,7 @@
     LayoutDashboard, Users, UserCheck, ScanLine, Package, Briefcase,
     Building2, Receipt, BedDouble, FileSignature, Map, ClipboardList,
     Wallet, Truck, Banknote, Boxes, XCircle, Sparkles, X, BookOpen,
-    PiggyBank, Calculator, FileCheck,
+    PiggyBank, Calculator, FileCheck, UserCog,
   } from "lucide-svelte";
 
   let {
@@ -35,6 +35,7 @@
     { group: "Operasional", items: [
       { id: "rooming", label: "Rooming List", icon: BedDouble },
       { id: "visa", label: "Visa & Dokumen", icon: FileCheck },
+      { id: "pembimbing", label: "Pembimbing", icon: UserCog },
       { id: "contracts", label: "Kontrak", icon: FileSignature },
       { id: "itinerary", label: "Itinerary", icon: Map },
       { id: "manifest", label: "Manifest", icon: ClipboardList },

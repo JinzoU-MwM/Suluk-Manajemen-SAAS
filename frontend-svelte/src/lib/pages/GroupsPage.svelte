@@ -38,6 +38,12 @@
   let depForm = $state({ package_id: "", departure_date: "" });
   let savingDep = $state(false);
   let manifest = $state(null);
+  // Guide assignment (Phase 5B)
+  let groupGuides = $state([]);
+  let allGuides = $state([]);
+  let assignGuideId = $state("");
+  let assignRole = $state("leader");
+  const GUIDE_ROLES = [["leader", "Ketua"], ["co_leader", "Wakil"], ["kesehatan", "Kesehatan"]];
 
   const DEP_STATUS = {
     draft:     { label: "Draf",        color: "var(--c-muted)" },
@@ -60,12 +66,33 @@
     depGroup = group;
     depForm = { package_id: group.package_id || "", departure_date: (group.departure_date || "").slice(0, 10) };
     manifest = null;
+    groupGuides = [];
+    assignGuideId = "";
     showDep = true;
-    try {
-      const m = await ApiService.getGroupManifest(group.id);
-      manifest = m;
-    } catch (e) { /* best-effort */ }
+    try { manifest = await ApiService.getGroupManifest(group.id); } catch (e) { /* best-effort */ }
+    try { const gg = await ApiService.listGroupGuides(group.id); groupGuides = gg.assignments || []; } catch (e) {}
+    try { const ag = await ApiService.listGuides(); allGuides = ag.guides || []; } catch (e) {}
   }
+
+  async function assignGuide() {
+    if (!assignGuideId) return;
+    try {
+      await ApiService.assignGuide({ guide_id: assignGuideId, group_id: depGroup.id, role: assignRole });
+      const gg = await ApiService.listGroupGuides(depGroup.id);
+      groupGuides = gg.assignments || [];
+      assignGuideId = "";
+      showToast("Pembimbing ditugaskan", "success");
+    } catch (e) { showToast(mapError(e.message), "error"); }
+  }
+
+  async function unassignGuide(guideId) {
+    try {
+      await ApiService.unassignGuide(depGroup.id, guideId);
+      groupGuides = groupGuides.filter((a) => a.guide_id !== guideId);
+    } catch (e) { showToast(mapError(e.message), "error"); }
+  }
+
+  function roleLabel(r) { return GUIDE_ROLES.find((x) => x[0] === r)?.[1] || r; }
 
   async function saveDeparture() {
     savingDep = true;
@@ -291,6 +318,26 @@
         {#each NEXT[depGroup.departure_status] || [] as [st, label]}
           <button type="button" onclick={() => transitionDep(st)} class="rounded-xl px-3 py-2 text-xs font-semibold" style="border:1px solid var(--c-line);color:var(--c-ink-soft)">{label}</button>
         {/each}
+      </div>
+
+      <div>
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider" style="color:var(--c-faint)">Pembimbing ({groupGuides.length})</p>
+        {#each groupGuides as a (a.guide_id)}
+          <div class="mb-1 flex items-center justify-between rounded-lg px-3 py-1.5 text-sm" style="background:var(--c-bg-2)">
+            <span style="color:var(--c-ink)">{a.guide_name} <span class="text-xs" style="color:var(--c-faint)">· {roleLabel(a.role)}</span></span>
+            <button type="button" onclick={() => unassignGuide(a.guide_id)} class="text-xs font-semibold" style="color:var(--c-danger)">Lepas</button>
+          </div>
+        {/each}
+        <div class="mt-2 flex gap-2">
+          <select bind:value={assignGuideId} class="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none">
+            <option value="">Pilih pembimbing…</option>
+            {#each allGuides as g}<option value={g.id}>{g.name}</option>{/each}
+          </select>
+          <select bind:value={assignRole} class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none">
+            {#each GUIDE_ROLES as [val, lbl]}<option value={val}>{lbl}</option>{/each}
+          </select>
+          <button type="button" onclick={assignGuide} class="rounded-lg px-3 py-1.5 text-xs font-semibold text-white" style="background:var(--c-primary)">Tugaskan</button>
+        </div>
       </div>
 
       {#if manifest?.members?.length}
