@@ -94,6 +94,7 @@ services:
       AGENT_SERVICE_ADDR: agent-service:50061
       ACCOUNTING_SERVICE_ADDR: accounting-service:50062
       TABUNGAN_SERVICE_ADDR: tabungan-service:50063
+      MUTAWWIF_SERVICE_ADDR: mutawwif-service:50064
       ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:8005,http://localhost:8007,https://test.jni.my.id"
       APP_ENV: production
     depends_on:
@@ -107,6 +108,7 @@ services:
       - contract-service
       - accounting-service
       - tabungan-service
+      - mutawwif-service
     networks:
       - suluk-network
 
@@ -448,6 +450,32 @@ services:
       APP_ENV: production
       AGENT_SERVICE_PORT: "50061"
       NATS_ADDR: nats://nats:4222
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: jamaah
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
+      POSTGRES_SSLMODE: require
+      JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
+      JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
+    volumes:
+      - ../certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - suluk-network
+
+  mutawwif-service:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+      args:
+        SERVICE: mutawwif-service
+    container_name: suluk-mutawwif-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      MUTAWWIF_SERVICE_PORT: "50064"
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
