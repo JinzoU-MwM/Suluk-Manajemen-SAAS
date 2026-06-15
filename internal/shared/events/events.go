@@ -36,6 +36,9 @@ const (
 	EventVisaApproved  = "visa.approved"
 	EventVisaRejected  = "visa.rejected"
 	EventVisaExpired   = "visa.expired"
+	// Kloter / departure ops (Phase 5A). Audit/automation only — no GL template.
+	EventGroupReady    = "group.ready"
+	EventGroupDeparted = "group.departed"
 )
 
 // Subject returns the fully-qualified NATS subject for an event type.
