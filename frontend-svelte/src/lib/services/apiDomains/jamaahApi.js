@@ -131,6 +131,49 @@ export function createJamaahApi({ cacheInvalidate }) {
       return unwrapData(await response.json());
     },
 
+    // ── Visa lifecycle (Phase 4B) ──
+    async listVisas({ status = '', search = '', page = 1, pageSize = 200 } = {}) {
+      const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+      if (status) params.set('status', status);
+      if (search) params.set('search', search);
+      const response = await apiFetch(`${API_URL}/jamaah/visa?${params.toString()}`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(await parseError(response));
+      const json = await response.json();
+      return { data: json.data || [], meta: json.meta || {} };
+    },
+
+    async getVisa(jamaahId) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/visa`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
+    async upsertVisa(jamaahId, data) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/visa`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
+    async transitionVisa(jamaahId, data) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/visa/status`, {
+        method: 'PATCH',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
+    async getVisaHistory(jamaahId) {
+      const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/visa/history`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
     async getDashboardAlerts() {
       const response = await apiFetch(`${API_URL}/jamaah/dashboard/alerts`, { headers: authHeaders() });
       if (!response.ok) throw new Error(await parseError(response));

@@ -165,6 +165,7 @@ const PAGE_PATHS = {
   itinerary: "/app/itinerary",
   packages: "/app/packages",
   crm: "/app/crm",
+  visa: "/app/visa",
   invoices: "/app/invoices",
   finance: "/app/finance",
   kasir: "/app/kasir",

@@ -586,9 +586,15 @@ func (s *JamaahService) GetDashboardAlerts(ctx context.Context, orgID uuid.UUID)
 		return nil, fmt.Errorf("get overdue follow-ups: %w", err)
 	}
 
+	visaExpiring30, err := s.repo.GetVisaExpiring(ctx, orgID, 30)
+	if err != nil {
+		return nil, fmt.Errorf("get visa expiring 30: %w", err)
+	}
+
 	return &model.DashboardAlerts{
 		PassportExpiring90: expiring90,
 		PassportExpiring30: expiring30,
+		VisaExpiring30:     visaExpiring30,
 		OverdueFollowUps:   overdueFollowUps,
 	}, nil
 }
