@@ -95,5 +95,32 @@ export function createPayrollApi({ cacheInvalidate } = /** @type {{cacheInvalida
             if (!res.ok) throw new Error(await parseError(res));
             return unwrapData(await res.json());
         },
+
+        // ── HR attendance + leave (Phase 5C) ──
+        async recordAttendance(data) {
+            const res = await apiFetch(`${BASE}/attendance`, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data) });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+        async listAttendance(employeeId, period) {
+            const res = await apiFetch(`${BASE}/attendance?employee_id=${employeeId}&period=${period}`, { headers: authHeaders() });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+        async createLeave(data) {
+            const res = await apiFetch(`${BASE}/leave`, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data) });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+        async listLeave(status = 'all') {
+            const res = await apiFetch(`${BASE}/leave?status=${status}`, { headers: authHeaders() });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
+        async decideLeave(id, status) {
+            const res = await apiFetch(`${BASE}/leave/${id}/decide`, { method: 'PUT', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ status }) });
+            if (!res.ok) throw new Error(await parseError(res));
+            return unwrapData(await res.json());
+        },
     };
 }

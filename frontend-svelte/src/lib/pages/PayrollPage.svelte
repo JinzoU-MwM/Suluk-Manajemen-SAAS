@@ -43,6 +43,55 @@
   let repayForm = $state({ amount: 0, salary_slip_id: '' });
   let savingRepay = $state(false);
 
+  // HR attendance + leave (Phase 5C)
+  let attEmployee = $state('');
+  let attPeriod = $state(new Date().toISOString().slice(0, 7));
+  let attList = $state([]);
+  let attSummary = $state(null);
+  let attDate = $state(new Date().toISOString().slice(0, 10));
+  let attStatus = $state('hadir');
+  let leaveList = $state([]);
+  let leaveForm = $state({ employee_id: '', type: 'tahunan', start_date: '', end_date: '', reason: '' });
+  let savingLeave = $state(false);
+  const ATT_STATUSES = [['hadir', 'Hadir'], ['absen', 'Absen (mangkir)'], ['izin', 'Izin'], ['sakit', 'Sakit'], ['cuti', 'Cuti'], ['libur', 'Libur'], ['tanpa_gaji', 'Tanpa gaji']];
+  const LEAVE_TYPES = [['tahunan', 'Cuti Tahunan'], ['sakit', 'Sakit'], ['izin', 'Izin'], ['tanpa_gaji', 'Tanpa Gaji']];
+  function attLabel(s) { return ATT_STATUSES.find((x) => x[0] === s)?.[1] || s; }
+  function leaveLabel(t) { return LEAVE_TYPES.find((x) => x[0] === t)?.[1] || t; }
+
+  async function loadAttendance() {
+    if (!attEmployee || !attPeriod) { attList = []; attSummary = null; return; }
+    try {
+      const r = await ApiService.listAttendance(attEmployee, attPeriod);
+      attList = r.attendance || [];
+      attSummary = r.summary || null;
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+  async function recordAttendance() {
+    if (!attEmployee) { showToast('Pilih karyawan', 'warning'); return; }
+    try {
+      await ApiService.recordAttendance({ employee_id: attEmployee, date: attDate, status: attStatus });
+      showToast('Absensi dicatat', 'success');
+      await loadAttendance();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+  async function loadLeave() {
+    try { const r = await ApiService.listLeave(); leaveList = r.leave || []; } catch (e) { showToast(e.message, 'error'); }
+  }
+  async function submitLeave() {
+    if (!leaveForm.employee_id || !leaveForm.start_date || !leaveForm.end_date) { showToast('Lengkapi data cuti', 'warning'); return; }
+    savingLeave = true;
+    try {
+      await ApiService.createLeave(leaveForm);
+      showToast('Pengajuan cuti dibuat', 'success');
+      leaveForm = { employee_id: '', type: 'tahunan', start_date: '', end_date: '', reason: '' };
+      await loadLeave();
+    } catch (e) { showToast(e.message, 'error'); } finally { savingLeave = false; }
+  }
+  async function decideLeave(id, status) {
+    try { await ApiService.decideLeave(id, status); showToast('Diperbarui', 'success'); await loadLeave(); }
+    catch (e) { showToast(e.message, 'error'); }
+  }
+
   function formatIDR(n) { return n ? `Rp ${Number(n).toLocaleString('id-ID')}` : 'Rp 0'; }
   function formatDate(d) { return d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'; }
 
@@ -139,9 +188,17 @@
 
   const payrollTabs = [
     { value: 'employees', label: 'Karyawan' },
+    { value: 'absensi', label: 'Absensi' },
+    { value: 'cuti', label: 'Cuti' },
     { value: 'slips', label: 'Slip Gaji' },
     { value: 'advances', label: 'Kasbon' },
   ];
+
+  // Lazy-load HR tabs on first switch.
+  $effect(() => {
+    if (tab === 'absensi' && attEmployee) loadAttendance();
+    if (tab === 'cuti' && leaveList.length === 0) loadLeave();
+  });
 </script>
 
 <div class="payroll-page">
@@ -229,6 +286,7 @@
                   <th>Karyawan</th>
                   <th>Periode</th>
                   <th class="ta-right">Gaji Kotor</th>
+                  <th class="ta-right">Potongan</th>
                   <th class="ta-right">PPh21</th>
                   <th class="ta-right">BPJS</th>
                   <th class="ta-right">Bersih</th>
@@ -247,6 +305,7 @@
                     </td>
                     <td>{s.period}</td>
                     <td class="ta-right tabular">{formatIDR(s.base_salary + s.allowance)}</td>
+                    <td class="ta-right tabular cell-danger">{s.deductions > 0 ? formatIDR(s.deductions) : '—'}</td>
                     <td class="ta-right tabular cell-danger">{formatIDR(s.pph21_amount)}</td>
                     <td class="ta-right tabular cell-danger">{formatIDR(s.bpjs_amount)}</td>
                     <td class="ta-right tabular cell-net">{formatIDR(s.net_salary)}</td>
@@ -310,6 +369,106 @@
           </div>
         </Card>
       {/if}
+    {/if}
+
+    {#if tab === 'absensi'}
+      <Card>
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex flex-col gap-1">
+            <label for="att-emp" class="text-xs font-medium" style="color:var(--c-muted)">Karyawan</label>
+            <select id="att-emp" bind:value={attEmployee} onchange={loadAttendance} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)">
+              <option value="">Pilih…</option>
+              {#each employees as e}<option value={e.id}>{e.name}</option>{/each}
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label for="att-per" class="text-xs font-medium" style="color:var(--c-muted)">Periode</label>
+            <input id="att-per" type="month" bind:value={attPeriod} onchange={loadAttendance} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label for="att-date" class="text-xs font-medium" style="color:var(--c-muted)">Tanggal</label>
+            <input id="att-date" type="date" bind:value={attDate} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label for="att-st" class="text-xs font-medium" style="color:var(--c-muted)">Status</label>
+            <select id="att-st" bind:value={attStatus} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)">
+              {#each ATT_STATUSES as [v, l]}<option value={v}>{l}</option>{/each}
+            </select>
+          </div>
+          <button type="button" onclick={recordAttendance} class="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">Catat</button>
+        </div>
+
+        {#if attSummary}
+          <div class="mt-4 flex flex-wrap gap-2">
+            {#each Object.entries(attSummary.counts) as [st, n]}
+              <span class="rounded-full px-2.5 py-1 text-xs font-semibold" style="background:var(--c-bg-2);color:var(--c-muted)">{attLabel(st)}: {n}</span>
+            {/each}
+            <span class="rounded-full px-2.5 py-1 text-xs font-bold" style="background:var(--c-danger-soft);color:var(--c-danger)">Tdk dibayar: {attSummary.unpaid_days} hari</span>
+          </div>
+        {/if}
+
+        {#if attList.length}
+          <div class="payroll-table-wrap mt-3">
+            <table class="payroll-table">
+              <thead><tr><th>Tanggal</th><th>Status</th><th>Catatan</th></tr></thead>
+              <tbody>
+                {#each attList as a}
+                  <tr><td>{formatDate(a.date)}</td><td>{attLabel(a.status)}</td><td style="color:var(--c-faint)">{a.notes || '—'}</td></tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else if attEmployee}
+          <p class="mt-4 text-sm" style="color:var(--c-faint)">Belum ada absensi pada periode ini.</p>
+        {/if}
+      </Card>
+    {/if}
+
+    {#if tab === 'cuti'}
+      <Card>
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex flex-col gap-1">
+            <label for="cu-emp" class="text-xs font-medium" style="color:var(--c-muted)">Karyawan</label>
+            <select id="cu-emp" bind:value={leaveForm.employee_id} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)">
+              <option value="">Pilih…</option>{#each employees as e}<option value={e.id}>{e.name}</option>{/each}
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label for="cu-type" class="text-xs font-medium" style="color:var(--c-muted)">Jenis</label>
+            <select id="cu-type" bind:value={leaveForm.type} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)">{#each LEAVE_TYPES as [v, l]}<option value={v}>{l}</option>{/each}</select>
+          </div>
+          <div class="flex flex-col gap-1"><label for="cu-s" class="text-xs font-medium" style="color:var(--c-muted)">Mulai</label><input id="cu-s" type="date" bind:value={leaveForm.start_date} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)" /></div>
+          <div class="flex flex-col gap-1"><label for="cu-e" class="text-xs font-medium" style="color:var(--c-muted)">Selesai</label><input id="cu-e" type="date" bind:value={leaveForm.end_date} class="rounded-xl border px-3 py-2 text-sm outline-none" style="border-color:var(--c-line)" /></div>
+          <button type="button" onclick={submitLeave} disabled={savingLeave} class="rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">Ajukan</button>
+        </div>
+
+        {#if leaveList.length}
+          <div class="payroll-table-wrap mt-4">
+            <table class="payroll-table">
+              <thead><tr><th>Karyawan</th><th>Jenis</th><th>Periode</th><th class="ta-right">Hari</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {#each leaveList as l}
+                  <tr>
+                    <td class="cell-strong">{l.employee_name}</td>
+                    <td>{leaveLabel(l.type)}</td>
+                    <td style="color:var(--c-muted)">{formatDate(l.start_date)} – {formatDate(l.end_date)}</td>
+                    <td class="ta-right tabular">{l.days}</td>
+                    <td>{l.status}</td>
+                    <td class="ta-right">
+                      {#if l.status === 'pending'}
+                        <button type="button" onclick={() => decideLeave(l.id, 'approved')} class="rounded-lg px-2 py-1 text-xs font-semibold" style="background:var(--c-success-soft);color:var(--c-success)">Setujui</button>
+                        <button type="button" onclick={() => decideLeave(l.id, 'rejected')} class="rounded-lg px-2 py-1 text-xs font-semibold" style="background:var(--c-danger-soft);color:var(--c-danger)">Tolak</button>
+                      {/if}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {:else}
+          <p class="mt-4 text-sm" style="color:var(--c-faint)">Belum ada pengajuan cuti.</p>
+        {/if}
+      </Card>
     {/if}
   {/if}
 </div>
