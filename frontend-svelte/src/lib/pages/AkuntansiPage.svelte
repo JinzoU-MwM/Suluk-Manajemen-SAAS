@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { Scale, TrendingUp, ListTree, BookOpen } from "lucide-svelte";
+  import { Scale, TrendingUp, ListTree, BookOpen, Sparkles, AlertTriangle, CheckCircle, Info } from "lucide-svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import Card from "$lib/components/ui/Card.svelte";
   import FilterTabs from "$lib/components/ui/FilterTabs.svelte";
@@ -10,6 +10,7 @@
   import { formatRupiah, formatDate } from "$lib/utils/formatting.js";
 
   const TABS = [
+    { value: "insight", label: "Insight" },
     { value: "neraca", label: "Neraca" },
     { value: "laba-rugi", label: "Laba Rugi" },
     { value: "jurnal", label: "Jurnal" },
@@ -26,17 +27,27 @@
     opening: "Saldo Awal",
   };
 
-  let activeTab = $state("neraca");
+  let activeTab = $state("insight");
   let isLoading = $state(true);
   let neraca = $state(null);
   let labaRugi = $state(null);
   let journals = $state([]);
   let coa = $state([]);
+  let insight = $state(null);
+
+  const SEV = {
+    critical: { color: "var(--c-danger)", icon: AlertTriangle },
+    warning: { color: "var(--c-warning)", icon: AlertTriangle },
+    info: { color: "var(--c-info)", icon: Info },
+    good: { color: "var(--c-success)", icon: CheckCircle },
+  };
+  const sevMeta = (s) => SEV[s] || SEV.info;
 
   async function loadTab(tab) {
     isLoading = true;
     try {
-      if (tab === "neraca") neraca = await ApiService.getNeraca();
+      if (tab === "insight") insight = await ApiService.getInsights();
+      else if (tab === "neraca") neraca = await ApiService.getNeraca();
       else if (tab === "laba-rugi") labaRugi = await ApiService.getLabaRugi();
       else if (tab === "jurnal") {
         const r = await ApiService.listJournals({ page: 1, limit: 50 });
@@ -73,6 +84,54 @@
 
   {#if isLoading}
     <div class="h-48 animate-pulse rounded-2xl" style="background:var(--c-bg-2,#eef2f0)"></div>
+
+  {:else if activeTab === "insight"}
+    {#if !insight}
+      <Card><EmptyState icon={Sparkles} title="Belum ada data" text="Insight keuangan akan muncul setelah ada transaksi." /></Card>
+    {:else}
+      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {#each [["Kas + Bank", insight.metrics.cash], ["Piutang Jemaah", insight.metrics.receivables], ["Pendapatan (bln)", insight.metrics.revenue], ["Laba/Rugi (bln)", insight.metrics.net_income]] as [label, val]}
+          <Card><p class="text-xs" style="color:var(--c-faint)">{label}</p><p class="mt-1 text-lg font-extrabold tabular" style="font-variant-numeric:tabular-nums;color:{val < 0 ? 'var(--c-danger)' : 'var(--c-ink)'}">{formatRupiah(val)}</p></Card>
+        {/each}
+      </div>
+
+      {#if insight.ai_narrative}
+        <Card style="margin-top:12px;border-color:var(--c-primary)">
+          <div class="mb-1 flex items-center gap-2"><Sparkles class="h-4 w-4" style="color:var(--c-primary)" /><h3 class="text-sm font-bold" style="color:var(--c-primary)">Analisis AI</h3></div>
+          <p class="text-sm leading-relaxed" style="color:var(--c-ink-soft)">{insight.ai_narrative}</p>
+        </Card>
+      {/if}
+
+      {#if insight.anomalies.length}
+        <h3 class="mb-2 mt-5 text-sm font-bold uppercase tracking-wider" style="color:var(--c-faint)">Perlu Perhatian</h3>
+        <div class="space-y-2">
+          {#each insight.anomalies as a}
+            {@const meta = sevMeta(a.severity)}
+            <div class="flex items-start gap-3 rounded-2xl p-3.5" style="background:var(--c-surface);border:1px solid {meta.color}40">
+              <meta.icon class="mt-0.5 h-4.5 w-4.5 flex-shrink-0" style="color:{meta.color}" />
+              <div><p class="text-sm font-bold" style="color:var(--c-ink)">{a.title}</p><p class="text-xs" style="color:var(--c-muted)">{a.detail}</p></div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if insight.highlights.length}
+        <h3 class="mb-2 mt-5 text-sm font-bold uppercase tracking-wider" style="color:var(--c-faint)">Ringkasan</h3>
+        <div class="space-y-2">
+          {#each insight.highlights as a}
+            {@const meta = sevMeta(a.severity)}
+            <div class="flex items-start gap-3 rounded-2xl p-3.5" style="background:var(--c-surface);border:1px solid var(--c-line)">
+              <meta.icon class="mt-0.5 h-4.5 w-4.5 flex-shrink-0" style="color:{meta.color}" />
+              <div><p class="text-sm font-bold" style="color:var(--c-ink)">{a.title}</p><p class="text-xs" style="color:var(--c-muted)">{a.detail}</p></div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if !insight.ai_available}
+        <p class="mt-4 text-xs" style="color:var(--c-faint)">💡 Analisis naratif AI aktif bila GEMINI_API_KEY dikonfigurasi.</p>
+      {/if}
+    {/if}
 
   {:else if activeTab === "neraca"}
     {#if !neraca}

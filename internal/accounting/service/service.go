@@ -11,17 +11,26 @@ import (
 
 	"github.com/jamaah-in/v2/internal/accounting/model"
 	"github.com/jamaah-in/v2/internal/accounting/repository"
+	"github.com/jamaah-in/v2/internal/shared/ai"
 	"github.com/jamaah-in/v2/internal/shared/events"
 )
 
 type Service struct {
 	repo   *repository.Repo
 	log    *zap.SugaredLogger
+	ai     *ai.Client
 	seeded sync.Map // orgID -> struct{}: in-process cache so we don't re-check COA every event
 }
 
 func NewService(repo *repository.Repo, log *zap.SugaredLogger) *Service {
 	return &Service{repo: repo, log: log}
+}
+
+// WithAI attaches an optional Gemini client for copilot narratives. A nil client
+// (no GEMINI_API_KEY) is fine — insights still return the rule-based findings.
+func (s *Service) WithAI(c *ai.Client) *Service {
+	s.ai = c
+	return s
 }
 
 // EnsureCOA seeds the standard chart of accounts for an org on first use.

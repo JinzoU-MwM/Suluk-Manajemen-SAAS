@@ -508,6 +508,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deployments/.env}
       POSTGRES_SSLMODE: require
       NATS_ADDR: nats://nats:4222
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-} # optional — copilot adds AI narrative when set
+
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m

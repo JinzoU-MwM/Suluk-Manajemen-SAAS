@@ -72,5 +72,9 @@ export function createAccountingApi({ cacheInvalidate, cacheGet, cacheSet } = /*
             const qs = p.toString();
             return get(`${REPORTS}/ledger/${accountId}${qs ? `?${qs}` : ''}`);
         },
+        // AI accounting copilot: rule-based insights + optional AI narrative.
+        getInsights(asOf) {
+            return get(`${REPORTS}/insights${asOf ? `?as_of=${asOf}` : ''}`);
+        },
     };
 }
