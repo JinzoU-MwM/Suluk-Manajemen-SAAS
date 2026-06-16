@@ -192,6 +192,20 @@ func (h *AuthHandler) ProvisionAgentCredential(c *fiber.Ctx) error {
 	return response.Created(c, sanitizeUser(user))
 }
 
+// ProvisionJamaahCredential creates a pilgrim portal login (owner/admin only).
+func (h *AuthHandler) ProvisionJamaahCredential(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	var req model.ProvisionJamaahRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	user, err := h.svc.ProvisionJamaahCredential(c.Context(), claims.OrgID, claims.UserID, req)
+	if err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.Created(c, sanitizeUser(user))
+}
+
 func (h *AuthHandler) RemoveTeamMember(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	userID, err := uuid.Parse(c.Params("userId"))
@@ -462,6 +476,7 @@ func sanitizeUserMap(u *model.User) fiber.Map {
 		"is_active":      u.IsActive,
 		"is_super_admin": u.IsSuperAdmin,
 		"agent_id":       u.AgentID,
+		"jamaah_id":      u.JamaahID,
 		"created_at":     u.CreatedAt,
 		"updated_at":     u.UpdatedAt,
 	}

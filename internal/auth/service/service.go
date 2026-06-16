@@ -98,7 +98,7 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 		return nil, nil, nil, err
 	}
 
-	tokens, err := s.jwt.GenerateTokenPair(userID, org.ID, "owner", user.Email, nil)
+	tokens, err := s.jwt.GenerateTokenPair(userID, org.ID, "owner", user.Email, nil, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -144,7 +144,7 @@ func (s *AuthService) Login(ctx context.Context, req model.LoginRequest) (*model
 		role = member.Role
 	}
 
-	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID)
+	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID, user.JamaahID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -185,7 +185,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*s
 
 	s.repo.DeleteRefreshToken(ctx, hash)
 
-	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID)
+	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID, user.JamaahID)
 	if err != nil {
 		return nil, err
 	}
@@ -261,6 +261,60 @@ func (s *AuthService) ProvisionAgentCredential(ctx context.Context, orgID, invit
 		Entity:   "user",
 		EntityID: &user.ID,
 		NewValue: map[string]string{"email": user.Email, "agent_id": agentID.String()},
+	})
+	return user, nil
+}
+
+// ProvisionJamaahCredential creates a pilgrim portal login bound to a jamaah
+// profile (role "jamaah"), mirroring ProvisionAgentCredential. jamaah_id is
+// trusted from the caller (an org admin); portal queries still scope by org_id.
+func (s *AuthService) ProvisionJamaahCredential(ctx context.Context, orgID, invitedBy uuid.UUID, req model.ProvisionJamaahRequest) (*model.User, error) {
+	if req.Email == "" || req.Password == "" || req.JamaahID == "" {
+		return nil, fmt.Errorf("email, password, and jamaah_id are required")
+	}
+	if len(req.Password) < 6 {
+		return nil, fmt.Errorf("password minimal 6 karakter")
+	}
+	jamaahID, err := uuid.Parse(req.JamaahID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid jamaah_id")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+	name := req.Name
+	if name == "" {
+		name = req.Email
+	}
+	user := &model.User{
+		ID:           uuid.New(),
+		Email:        req.Email,
+		Name:         name,
+		PasswordHash: string(hashed),
+		Role:         string(model.RoleJamaah),
+		IsActive:     true,
+		JamaahID:     &jamaahID,
+	}
+	member := &model.TeamMember{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		UserID:    user.ID,
+		Role:      string(model.RoleJamaah),
+		Status:    string(model.StatusActive),
+		InvitedBy: &invitedBy,
+	}
+	if err := s.repo.CreateAgentUserTx(ctx, user, member); err != nil {
+		return nil, err
+	}
+	s.repo.CreateAuditLog(ctx, &model.AuditLog{
+		ID:       uuid.New(),
+		OrgID:    &orgID,
+		UserID:   &invitedBy,
+		Action:   "jamaah.credential.provision",
+		Entity:   "user",
+		EntityID: &user.ID,
+		NewValue: map[string]string{"email": user.Email, "jamaah_id": jamaahID.String()},
 	})
 	return user, nil
 }

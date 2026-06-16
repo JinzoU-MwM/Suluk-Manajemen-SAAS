@@ -4,7 +4,7 @@
     Plus, Search, LayoutGrid, List,
     Phone, ChevronRight, UserCircle, Loader2,
     Users, CheckCircle, CreditCard, Clock, Package as PackageIcon,
-    Flame, BarChart3, ArrowDownUp, X,
+    Flame, BarChart3, ArrowDownUp, X, KeyRound,
   } from 'lucide-svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
   import SlideDrawer from '../components/SlideDrawer.svelte';
@@ -208,6 +208,17 @@
     selectedJamaah = j;
     activeTab = 'profil';
     drawerOpen = true;
+  }
+
+  async function provisionPortal(j) {
+    const email = prompt(`Email login portal untuk ${j.name}:`, j.email || '');
+    if (!email) return;
+    const password = prompt('Password (min. 6 karakter):');
+    if (!password) return;
+    try {
+      await ApiService.provisionJamaahPortal({ jamaah_id: j.id, email, name: j.name, password });
+      showToast('Akun portal jemaah dibuat', 'success');
+    } catch (e) { showToast(mapError(e.message), 'error'); }
   }
 
   function openWhatsApp(phone) {
@@ -727,6 +738,15 @@
             class="flex items-center gap-1.5 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
           >
             Invoice
+          </button>
+          <button
+            type="button"
+            onclick={() => provisionPortal(selectedJamaah)}
+            class="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+            title="Buat akun login portal jemaah"
+          >
+            <KeyRound class="h-3.5 w-3.5" />
+            Portal
           </button>
         </div>
       </div>

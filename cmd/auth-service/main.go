@@ -146,6 +146,7 @@ func main() {
 	orgs.Put("/members/:userId/role", adminRole, authHandler.UpdateMemberRole)
 	orgs.Post("/invite", adminRole, authHandler.InviteMember)
 	orgs.Post("/agent-credentials", adminRole, authHandler.ProvisionAgentCredential)
+	orgs.Post("/jamaah-credentials", adminRole, authHandler.ProvisionJamaahCredential)
 	orgs.Post("/branches", adminRole, authHandler.CreateBranch)
 	orgs.Get("/branches", authHandler.ListBranches)
 	orgs.Get("/dashboard/consolidated", authHandler.GetConsolidatedDashboard)
