@@ -150,4 +150,5 @@ type InsightReport struct {
 	Highlights  []Insight      `json:"highlights"`
 	AINarrative string         `json:"ai_narrative"`
 	AIAvailable bool           `json:"ai_available"`
+	AICached    bool           `json:"ai_cached"` // narrative served from cache (no new Gemini call)
 }
