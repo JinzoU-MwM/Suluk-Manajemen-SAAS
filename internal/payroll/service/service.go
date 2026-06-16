@@ -102,7 +102,16 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 	gross := emp.BaseSalary + emp.Allowance
 	pph21 := int64(float64(gross) * emp.Pph21Rate / 100)
 	bpjs := emp.BpjsTk + emp.BpjsKes
-	net := gross - pph21 - bpjs
+
+	// Attendance-based deduction: unpaid days (absen / tanpa_gaji) in the period,
+	// at base/22 per day. Best-effort — never block a slip on the lookup.
+	var deduction int64
+	if sum, serr := s.repo.AttendanceSummary(ctx, orgID, req.EmployeeID, req.Period); serr == nil && sum.UnpaidDays > 0 {
+		perDay := emp.BaseSalary / model.WorkingDaysPerMonth
+		deduction = int64(sum.UnpaidDays) * perDay
+	}
+
+	net := gross - pph21 - bpjs - deduction
 
 	slip := &model.SalarySlip{
 		OrgID:       orgID,
@@ -110,6 +119,7 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 		Period:      req.Period,
 		BaseSalary:  emp.BaseSalary,
 		Allowance:   emp.Allowance,
+		Deductions:  deduction,
 		Pph21Amount: pph21,
 		BpjsAmount:  bpjs,
 		NetSalary:   net,
@@ -118,11 +128,13 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 	if req.PackageID != "" {
 		slip.PackageID = &req.PackageID
 	}
-	// payroll.posted → Dr Beban Gaji (gross) / Cr Kas (net) / Cr Hutang Pajak
-	// (withheld). tax = gross - net lumps pph21+bpjs so the journal always
-	// balances regardless of deduction breakdown.
-	tax := gross - net
-	payload, _ := json.Marshal(map[string]any{"gross": gross, "tax": tax, "net": net})
+	// payroll.posted → Dr Beban Gaji / Cr Kas (net) / Cr Hutang Pajak (withheld).
+	// The unpaid-absence deduction lowers the salary expense (employee earned
+	// less), so the journal's gross = net + tax = (base+allowance) - deduction,
+	// keeping it balanced and semantically correct.
+	grossJournal := gross - deduction
+	tax := grossJournal - net
+	payload, _ := json.Marshal(map[string]any{"gross": grossJournal, "tax": tax, "net": net})
 	if err := s.repo.CreateSalarySlipTx(ctx, slip, events.EventPayrollPosted, payload); err != nil {
 		return nil, err
 	}

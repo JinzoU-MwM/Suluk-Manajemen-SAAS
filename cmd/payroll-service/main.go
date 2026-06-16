@@ -98,6 +98,12 @@ func main() {
 	api.Post("/advances", payrollHandler.CreateAdvance)
 	api.Get("/advances", payrollHandler.ListAdvances)
 	api.Put("/advances/:id/repay", payrollHandler.RepayAdvance)
+	// HR attendance + leave (Phase 5C)
+	api.Post("/attendance", payrollHandler.RecordAttendance)
+	api.Get("/attendance", payrollHandler.ListAttendance)
+	api.Post("/leave", payrollHandler.CreateLeave)
+	api.Get("/leave", payrollHandler.ListLeave)
+	api.Put("/leave/:id/decide", payrollHandler.DecideLeave)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
