@@ -15,6 +15,7 @@ import (
 	"github.com/jamaah-in/v2/internal/accounting/handler"
 	"github.com/jamaah-in/v2/internal/accounting/repository"
 	"github.com/jamaah-in/v2/internal/accounting/service"
+	"github.com/jamaah-in/v2/internal/shared/ai"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
@@ -50,7 +51,7 @@ func main() {
 	logger.Info("connected to database")
 
 	repo := repository.NewRepo(pool)
-	svc := service.NewService(repo, logger)
+	svc := service.NewService(repo, logger).WithAI(ai.New(cfg.Gemini.APIKey))
 
 	if *backfill {
 		if err := runBackfill(ctx, cfg, svc, logger); err != nil {
@@ -118,6 +119,7 @@ func main() {
 	reports.Get("/neraca", h.BalanceSheet)
 	reports.Get("/laba-rugi", h.IncomeStatement)
 	reports.Get("/ledger/:accountId", h.GeneralLedger)
+	reports.Get("/insights", finRole, h.Insights) // AI accounting copilot
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

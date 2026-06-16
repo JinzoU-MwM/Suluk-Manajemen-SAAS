@@ -126,6 +126,21 @@ func (h *Handler) TrialBalance(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+// Insights is the AI accounting copilot: rule-based financial findings over the
+// GL, with an optional AI narrative.
+func (h *Handler) Insights(c *fiber.Ctx) error {
+	claims, err := sharedMW.RequireClaims(c)
+	if err != nil {
+		return err
+	}
+	asOf := queryDate(c, "as_of", time.Now())
+	rep, err := h.svc.GenerateInsights(c.Context(), claims.OrgID, asOf)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, rep)
+}
+
 func (h *Handler) BalanceSheet(c *fiber.Ctx) error {
 	claims, err := sharedMW.RequireClaims(c)
 	if err != nil {

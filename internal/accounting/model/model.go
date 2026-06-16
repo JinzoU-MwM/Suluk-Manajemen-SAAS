@@ -118,3 +118,36 @@ type IncomeStatement struct {
 	TotalExpense int64           `json:"total_expense"`
 	NetIncome    int64           `json:"net_income"`
 }
+
+// Insight is one finding from the financial-insights engine.
+type Insight struct {
+	Severity string `json:"severity"` // critical|warning|info|good
+	Title    string `json:"title"`
+	Detail   string `json:"detail"`
+}
+
+// InsightMetrics are the headline numbers the insights are derived from.
+type InsightMetrics struct {
+	TotalAssets          int64 `json:"total_assets"`
+	TotalLiabilities     int64 `json:"total_liabilities"`
+	TotalEquity          int64 `json:"total_equity"`
+	Cash                 int64 `json:"cash"`        // 1101 + 1102
+	Receivables          int64 `json:"receivables"` // 1201
+	Revenue              int64 `json:"revenue"`
+	Expense              int64 `json:"expense"`
+	NetIncome            int64 `json:"net_income"`
+	BalanceSheetBalanced bool  `json:"balance_sheet_balanced"`
+	LedgerBalanced       bool  `json:"ledger_balanced"`
+}
+
+// InsightReport is the financial-insights payload (rule-based + optional AI).
+type InsightReport struct {
+	AsOf        string         `json:"as_of"`
+	PeriodFrom  string         `json:"period_from"`
+	PeriodTo    string         `json:"period_to"`
+	Metrics     InsightMetrics `json:"metrics"`
+	Anomalies   []Insight      `json:"anomalies"`
+	Highlights  []Insight      `json:"highlights"`
+	AINarrative string         `json:"ai_narrative"`
+	AIAvailable bool           `json:"ai_available"`
+}
