@@ -19,11 +19,12 @@ type Service struct {
 	repo   *repository.Repo
 	log    *zap.SugaredLogger
 	ai     *ai.Client
-	seeded sync.Map // orgID -> struct{}: in-process cache so we don't re-check COA every event
+	narr   *narrativeCache // memoized AI narratives, keyed by (org, prompt fingerprint)
+	seeded sync.Map        // orgID -> struct{}: in-process cache so we don't re-check COA every event
 }
 
 func NewService(repo *repository.Repo, log *zap.SugaredLogger) *Service {
-	return &Service{repo: repo, log: log}
+	return &Service{repo: repo, log: log, narr: newNarrativeCache(6*time.Hour, 512)}
 }
 
 // WithAI attaches an optional Gemini client for copilot narratives. A nil client

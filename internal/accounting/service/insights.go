@@ -99,10 +99,20 @@ func (s *Service) GenerateInsights(ctx context.Context, orgID uuid.UUID, asOf ti
 			Detail: fmt.Sprintf("%s sebesar %s.", top.Name, rp(top.Amount))})
 	}
 
-	// ── Optional AI narrative ──
+	// ── Optional AI narrative (memoized) ──
+	// The prompt is fully derived from the numbers above, so an unchanged GL hits
+	// the cache and skips the Gemini call; changed numbers (or a new day) miss and
+	// regenerate. This keeps us well under free-tier rate limits.
 	if s.ai.Available() {
-		if narrative, aerr := s.ai.GenerateText(ctx, insightPrompt(rep)); aerr == nil {
+		prompt := insightPrompt(rep)
+		now := time.Now()
+		key := narrativeKey(orgID, prompt)
+		if cached, ok := s.narr.get(key, now); ok {
+			rep.AINarrative = cached
+			rep.AICached = true
+		} else if narrative, aerr := s.ai.GenerateText(ctx, prompt); aerr == nil {
 			rep.AINarrative = strings.TrimSpace(narrative)
+			s.narr.put(key, rep.AINarrative, now)
 		} else if s.log != nil {
 			s.log.Warnw("copilot AI narrative failed", "org_id", orgID, "err", aerr)
 		}
