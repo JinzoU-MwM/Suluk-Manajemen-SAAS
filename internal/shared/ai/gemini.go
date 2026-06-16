@@ -10,8 +10,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
+
+// defaultModel is the Gemini model used when GEMINI_MODEL is unset. We default to
+// 2.5-flash because gemini-2.0-flash has a free-tier quota of 0 on newer keys.
+const defaultModel = "gemini-2.5-flash"
 
 type Client struct {
 	apiKey string
@@ -25,9 +30,13 @@ func New(apiKey string) *Client {
 	if apiKey == "" {
 		return nil
 	}
+	model := defaultModel
+	if m := os.Getenv("GEMINI_MODEL"); m != "" {
+		model = m
+	}
 	return &Client{
 		apiKey: apiKey,
-		model:  "gemini-2.0-flash",
+		model:  model,
 		httpc:  &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -46,8 +55,15 @@ type part struct {
 	Text string `json:"text"`
 }
 type genCfg struct {
-	Temperature     float64 `json:"temperature"`
-	MaxOutputTokens int     `json:"maxOutputTokens"`
+	Temperature     float64   `json:"temperature"`
+	MaxOutputTokens int       `json:"maxOutputTokens"`
+	Thinking        *thinkCfg `json:"thinkingConfig,omitempty"`
+}
+
+// thinkCfg disables the 2.5-series "thinking" pass. Without this, thinking tokens
+// consume the maxOutputTokens budget and the visible answer is truncated mid-text.
+type thinkCfg struct {
+	ThinkingBudget int `json:"thinkingBudget"`
 }
 type genResp struct {
 	Candidates []struct {
@@ -69,7 +85,7 @@ func (c *Client) GenerateText(ctx context.Context, prompt string) (string, error
 	}
 	body, _ := json.Marshal(genReq{
 		Contents: []content{{Parts: []part{{Text: prompt}}}},
-		Config:   &genCfg{Temperature: 0.3, MaxOutputTokens: 1024},
+		Config:   &genCfg{Temperature: 0.3, MaxOutputTokens: 1024, Thinking: &thinkCfg{ThinkingBudget: 0}},
 	})
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", c.model)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))

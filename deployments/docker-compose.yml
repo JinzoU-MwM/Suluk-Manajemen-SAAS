@@ -509,6 +509,7 @@ services:
       POSTGRES_SSLMODE: require
       NATS_ADDR: nats://nats:4222
       GEMINI_API_KEY: ${GEMINI_API_KEY:-} # optional — copilot adds AI narrative when set
+      GEMINI_MODEL: ${GEMINI_MODEL:-} # optional — overrides default gemini-2.5-flash
 
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
