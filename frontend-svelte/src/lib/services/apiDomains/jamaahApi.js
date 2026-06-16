@@ -131,6 +131,17 @@ export function createJamaahApi({ cacheInvalidate }) {
       return unwrapData(await response.json());
     },
 
+    // Provision a jemaah self-service portal login (owner/admin only).
+    async provisionJamaahPortal(data) {
+      const response = await apiFetch(`${API_URL}/orgs/jamaah-credentials`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(await parseError(response));
+      return unwrapData(await response.json());
+    },
+
     // ── Visa lifecycle (Phase 4B) ──
     async listVisas({ status = '', search = '', page = 1, pageSize = 200 } = {}) {
       const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });

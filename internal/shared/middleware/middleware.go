@@ -71,17 +71,31 @@ func RequireRole(roles ...string) fiber.Handler {
 	}
 }
 
-// RequireStaff blocks external agents (role "agent") from staff/back-office
-// routes. External agents are confined to the /b2b portal; every other route
-// group should run this after AuthMiddleware so an agent token can't reach
-// org-wide staff data by calling the legacy endpoints directly.
+// RequireStaff blocks external portal roles (agent, jamaah) from staff/back-
+// office routes. Those roles are confined to their own portals (/b2b, /portal);
+// every staff route group should run this after AuthMiddleware so an external
+// token can't reach org-wide staff data by calling the legacy endpoints.
 func RequireStaff(c *fiber.Ctx) error {
 	claims, ok := GetClaims(c)
 	if !ok {
 		return response.Unauthorized(c, "unauthorized")
 	}
-	if claims.Role == "agent" {
-		return response.Forbidden(c, "akses ditolak: gunakan portal agen")
+	if claims.Role == "agent" || claims.Role == "jamaah" {
+		return response.Forbidden(c, "akses ditolak: gunakan portal Anda")
+	}
+	return c.Next()
+}
+
+// RequireJamaahScope gates the pilgrim portal: the caller must be a jamaah-role
+// user with a linked JamaahID claim. Must run after AuthMiddleware; handlers
+// downstream can rely on claims.JamaahID being non-nil.
+func RequireJamaahScope(c *fiber.Ctx) error {
+	claims, ok := GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
+	if claims.Role != "jamaah" || claims.JamaahID == nil {
+		return response.Forbidden(c, "portal jemaah hanya untuk akun jemaah")
 	}
 	return c.Next()
 }

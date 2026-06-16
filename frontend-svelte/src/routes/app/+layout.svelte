@@ -35,6 +35,11 @@
       goto("/agency", { replaceState: true });
       return;
     }
+    // Jemaah users belong in the self-service portal.
+    if (session.user?.role === "jamaah") {
+      goto("/portal", { replaceState: true });
+      return;
+    }
     // Return from a Pakasir payment redirect: re-fetch the (possibly upgraded)
     // subscription and clean the URL.
     const params = new URLSearchParams(window.location.search);

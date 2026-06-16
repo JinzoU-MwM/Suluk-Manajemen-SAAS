@@ -18,12 +18,15 @@ const (
 	// see only their own subtree. Provisioned via agent-credentials, not normal
 	// team invites.
 	RoleAgent Role = "agent"
+	// RoleJamaah is a pilgrim self-service portal user: they see only their own
+	// profile, registrations, documents, visa, and payments.
+	RoleJamaah Role = "jamaah"
 )
 
 func (r Role) String() string { return string(r) }
 
 func ValidRoles() []string {
-	return []string{"owner", "admin", "finance", "cs", "viewer", "agent"}
+	return []string{"owner", "admin", "finance", "cs", "viewer", "agent", "jamaah"}
 }
 
 type MemberStatus string
@@ -46,6 +49,7 @@ type User struct {
 	IsActive      bool       `json:"is_active" db:"is_active"`
 	IsSuperAdmin  bool       `json:"is_super_admin" db:"is_super_admin"`
 	AgentID       *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
+	JamaahID      *uuid.UUID `json:"jamaah_id,omitempty" db:"jamaah_id"`
 	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
@@ -270,6 +274,14 @@ type InviteMemberRequest struct {
 // ProvisionAgentRequest creates a B2B portal login bound to an agent record.
 type ProvisionAgentRequest struct {
 	AgentID  string `json:"agent_id" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Name     string `json:"name"`
+	Password string `json:"password" validate:"required,min=6"`
+}
+
+// ProvisionJamaahRequest creates a pilgrim portal login bound to a jamaah profile.
+type ProvisionJamaahRequest struct {
+	JamaahID string `json:"jamaah_id" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Name     string `json:"name"`
 	Password string `json:"password" validate:"required,min=6"`

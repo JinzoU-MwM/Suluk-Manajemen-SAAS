@@ -22,12 +22,12 @@ func NewAuthRepo(pool *pgxpool.Pool) *AuthRepo {
 
 func (r *AuthRepo) CreateUser(ctx context.Context, user *model.User) error {
 	query := `
-		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id, jamaah_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at`
 	err := r.pool.QueryRow(ctx, query,
 		user.ID, user.Email, user.Name, user.PasswordHash,
-		user.Phone, user.Role, user.IsActive, user.AgentID,
+		user.Phone, user.Role, user.IsActive, user.AgentID, user.JamaahID,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
@@ -54,10 +54,10 @@ func (r *AuthRepo) CreateAgentUserTx(ctx context.Context, user *model.User, memb
 	defer tx.Rollback(ctx)
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id, jamaah_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at`,
-		user.ID, user.Email, user.Name, user.PasswordHash, user.Phone, user.Role, user.IsActive, user.AgentID,
+		user.ID, user.Email, user.Name, user.PasswordHash, user.Phone, user.Role, user.IsActive, user.AgentID, user.JamaahID,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
@@ -84,10 +84,10 @@ func (r *AuthRepo) CreateAgentUserTx(ctx context.Context, user *model.User, memb
 
 func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE id = $1`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID,
+		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -101,10 +101,10 @@ func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, 
 
 func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE email = $1`
 	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID,
+		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {

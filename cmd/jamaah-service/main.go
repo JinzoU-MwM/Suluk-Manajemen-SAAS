@@ -147,6 +147,14 @@ func main() {
 	b2b := app.Group("/api/v1/b2b", authMW, sharedMW.RequireAgentScope)
 	b2b.Get("/leads", jamaahHandler.B2BMyLeads)
 
+	// Jemaah self-service portal: scoped to the signed-in jamaah (Phase 6).
+	portal := app.Group("/api/v1/portal", authMW, sharedMW.RequireJamaahScope)
+	portal.Get("/me", jamaahHandler.PortalProfile)
+	portal.Get("/registrations", jamaahHandler.PortalRegistrations)
+	portal.Get("/documents", jamaahHandler.PortalDocuments)
+	portal.Get("/visa", jamaahHandler.PortalVisa)
+	portal.Get("/payments", jamaahHandler.PortalPayments)
+
 	analytics := app.Group("/api/v1/analytics", authMW)
 	analytics.Get("/dashboard", jamaahHandler.GetAnalyticsDashboard)
 

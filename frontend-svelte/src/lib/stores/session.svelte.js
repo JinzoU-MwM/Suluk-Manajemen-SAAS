@@ -139,6 +139,7 @@ export function homePath() {
 // normal app/mobile shell.
 export function homePathForUser(user) {
   if (user?.role === "agent") return "/agency";
+  if (user?.role === "jamaah") return "/portal";
   return homePath();
 }
 

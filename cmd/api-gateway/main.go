@@ -96,6 +96,7 @@ func main() {
 	setupProxy(api, "/jamaah", services["jamaah"])
 	setupProxy(api, "/registration", services["jamaah"])
 	setupProxy(api, "/analytics", services["jamaah"])
+	setupProxy(api, "/portal", services["jamaah"]) // jemaah self-service portal (scoped in jamaah-service)
 
 	// Invoice service
 	setupProxy(api, "/invoices", services["invoice"])

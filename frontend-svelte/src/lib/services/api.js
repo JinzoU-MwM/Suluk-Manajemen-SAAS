@@ -18,6 +18,7 @@ import { createTabunganApi } from './apiDomains/tabunganApi.js';
 import { createPosApi } from './apiDomains/posApi.js';
 import { createAgencyApi } from './apiDomains/agencyApi.js';
 import { createMutawwifApi } from './apiDomains/mutawwifApi.js';
+import { createPortalApi } from './apiDomains/portalApi.js';
 import { exportLinks } from './apiDomains/exportApi.js';
 
 export { API_URL, authHeaders };
@@ -72,6 +73,7 @@ Object.assign(
     createPosApi({ cacheInvalidate }),
     createAgencyApi(),
     createMutawwifApi(),
+    createPortalApi(),
     exportLinks,
     contractApi,
     paymentApi,
