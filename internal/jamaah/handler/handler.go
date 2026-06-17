@@ -189,6 +189,9 @@ func (h *JamaahHandler) UpdatePipelineStatus(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
+	if !model.IsValidPipelineStatus(req.PipelineStatus) {
+		return response.BadRequest(c, "status pipeline tidak valid")
+	}
 
 	reg, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, claims.UserID, jamaahID, packageID, req.PipelineStatus, req.Reason, req.LostReason)
 	if err != nil {

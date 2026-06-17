@@ -118,11 +118,11 @@ func main() {
 	jamaah.Get("/follow-ups", jamaahHandler.ListFollowUps) // literal — before "/:id"
 	jamaah.Get("/:id", jamaahHandler.GetProfile)
 	jamaah.Put("/:id", jamaahHandler.UpdateProfile)
-	jamaah.Delete("/:id", jamaahHandler.DeleteProfile)
+	jamaah.Delete("/:id", sharedMW.RequireRole("owner", "admin"), jamaahHandler.DeleteProfile)
 
 	jamaah.Post("/:id/register", jamaahHandler.RegisterToPackage)
 	jamaah.Get("/:id/registrations/:pkgId", jamaahHandler.GetRegistration)
-	jamaah.Patch("/:id/registrations/:pkgId/status", jamaahHandler.UpdatePipelineStatus)
+	jamaah.Patch("/:id/registrations/:pkgId/status", sharedMW.RequireRole("owner", "admin", "editor", "cs"), jamaahHandler.UpdatePipelineStatus)
 	jamaah.Patch("/:id/registrations/:pkgId/mahram", jamaahHandler.SetMahram)
 	jamaah.Delete("/:id/registrations/:pkgId", jamaahHandler.RemoveFromPackage)
 
@@ -155,7 +155,7 @@ func main() {
 	portal.Get("/visa", jamaahHandler.PortalVisa)
 	portal.Get("/payments", jamaahHandler.PortalPayments)
 
-	analytics := app.Group("/api/v1/analytics", authMW)
+	analytics := app.Group("/api/v1/analytics", authMW, sharedMW.RequireStaff)
 	analytics.Get("/dashboard", jamaahHandler.GetAnalyticsDashboard)
 
 	itineraries := app.Group("/api/v1/itineraries", authMW)

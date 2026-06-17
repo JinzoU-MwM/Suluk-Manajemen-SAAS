@@ -391,7 +391,7 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID,
 		return nil, err
 	}
 
-	var dpDate, lunasDate, berangkatDate *time.Time
+	dpDate, lunasDate, berangkatDate := reg.DPDate, reg.LunasDate, reg.BerangkatDate
 	now := time.Now()
 	switch status {
 	case string(model.StatusProspek):

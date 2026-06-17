@@ -24,6 +24,16 @@ func ValidPipelineStatuses() []string {
 	return []string{"prospek", "survey", "booking", "dp", "cicilan", "lunas", "berangkat", "selesai", "batal"}
 }
 
+// IsValidPipelineStatus reports whether s is a known pipeline stage.
+func IsValidPipelineStatus(s string) bool {
+	for _, v := range ValidPipelineStatuses() {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 type LeadSource string
 
 const (
