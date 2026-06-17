@@ -75,28 +75,13 @@ export const documentExcelApi = {
      * Stream progress updates via SSE
      */
     streamProgress(sessionId, onProgress) {
-        const progressUrl = `/progress/${sessionId}`;
-        const eventSource = new EventSource(progressUrl);
-
-        eventSource.addEventListener('progress', (e) => {
-            try {
-                const data = JSON.parse(e.data);
-                onProgress(data);
-            } catch (err) {
-                console.error('Progress parse error:', err);
-            }
-        });
-
-        eventSource.addEventListener('done', () => {
-            eventSource.close();
-        });
-
-        eventSource.addEventListener('error', (e) => {
-            console.error('SSE error:', e);
-            eventSource.close();
-        });
-
-        return eventSource;
+        // No live progress stream: /process-documents is synchronous and there
+        // is no backend SSE endpoint. Returning a no-op handle (with .close())
+        // keeps callers working without firing a /progress request that 404s
+        // and trips the service worker. Real status comes from the POST result.
+        void sessionId;
+        void onProgress;
+        return { close() {} };
     },
 
     async generateExcel(data) {

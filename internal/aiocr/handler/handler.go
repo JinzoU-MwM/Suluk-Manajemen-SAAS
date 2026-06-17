@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"io"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -36,6 +38,52 @@ func (h *AIOCRHandler) CreateScanJob(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 	return response.Created(c, job)
+}
+
+// ProcessDocuments OCRs uploaded files synchronously and returns normalized
+// records immediately. Matches the scanner frontend's contract:
+// multipart/form-data in (field "files" + optional ?cache_mode=), and a
+// synchronous {data, validation_warnings, file_results} response out.
+func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
+	form, err := c.MultipartForm()
+	if err != nil {
+		return response.BadRequest(c, "invalid multipart form")
+	}
+	fileHeaders := form.File["files"]
+	if len(fileHeaders) == 0 {
+		return response.BadRequest(c, "at least one file is required")
+	}
+
+	const maxFileSize = 20 * 1024 * 1024 // 20 MB per file
+	files := make([]service.SyncFile, 0, len(fileHeaders))
+	for _, fh := range fileHeaders {
+		if fh.Size > maxFileSize {
+			return response.BadRequest(c, "file terlalu besar (maks 20MB): "+fh.Filename)
+		}
+		f, err := fh.Open()
+		if err != nil {
+			return response.BadRequest(c, "gagal membuka file: "+fh.Filename)
+		}
+		data, readErr := io.ReadAll(f)
+		f.Close()
+		if readErr != nil {
+			return response.Internal(c, readErr)
+		}
+		files = append(files, service.SyncFile{
+			FileName:    fh.Filename,
+			ContentType: fh.Header.Get("Content-Type"),
+			Data:        data,
+		})
+	}
+
+	result, err := h.svc.ProcessDocumentsSync(c.Context(), files, c.Query("cache_mode", "default"))
+	if err != nil {
+		if errors.Is(err, service.ErrOCRUnavailable) {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"success": false, "error": err.Error()})
+		}
+		return response.Internal(c, err)
+	}
+	return response.OK(c, result)
 }
 
 func (h *AIOCRHandler) GetScanJob(c *fiber.Ctx) error {

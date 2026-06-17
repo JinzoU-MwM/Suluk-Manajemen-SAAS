@@ -93,7 +93,7 @@ func main() {
 	ocr.Get("/status", aiocrHandler.ListScanJobs)
 
 	processDocs := app.Group("/api/v1/process-documents", authMW)
-	processDocs.Post("/", aiocrHandler.CreateScanJob)
+	processDocs.Post("/", aiocrHandler.ProcessDocuments)
 
 	genExcel := app.Group("/api/v1/generate-excel", authMW)
 	genExcel.Post("/", aiocrHandler.CreateExportTemplate)
