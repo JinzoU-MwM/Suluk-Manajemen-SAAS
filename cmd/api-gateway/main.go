@@ -46,6 +46,9 @@ func main() {
 		AppName:      "jamaah-api-gateway",
 		ReadTimeout:  60 * time.Second,
 		WriteTimeout: 60 * time.Second,
+		// Allow multi-image scanner uploads through (matches ai-ocr's limit);
+		// the default 4 MB would 413 document batches at the gateway.
+		BodyLimit: 50 * 1024 * 1024,
 	})
 
 	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))

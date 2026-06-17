@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -38,9 +39,16 @@ type geminiImage struct {
 }
 
 type geminiConfig struct {
-	Temperature      float64 `json:"temperature,omitempty"`
-	MaxOutputTokens  int     `json:"maxOutputTokens,omitempty"`
-	ResponseMimeType string  `json:"responseMimeType,omitempty"`
+	Temperature      float64               `json:"temperature,omitempty"`
+	MaxOutputTokens  int                   `json:"maxOutputTokens,omitempty"`
+	ResponseMimeType string                `json:"responseMimeType,omitempty"`
+	ThinkingConfig   *geminiThinkingConfig `json:"thinkingConfig,omitempty"`
+}
+
+// geminiThinkingConfig with ThinkingBudget=0 disables the gemini-2.5-flash
+// "thinking" pass so the entire token budget goes to the JSON answer.
+type geminiThinkingConfig struct {
+	ThinkingBudget int `json:"thinkingBudget"`
 }
 
 type geminiResponse struct {
@@ -103,9 +111,14 @@ func NewGeminiClient(apiKey string) *GeminiClient {
 	if apiKey == "" {
 		return nil
 	}
+	model := os.Getenv("GEMINI_MODEL")
+	if model == "" {
+		// gemini-2.0-flash is quota-0 on the current free-tier key; 2.5-flash works.
+		model = "gemini-2.5-flash"
+	}
 	return &GeminiClient{
 		apiKey: apiKey,
-		model:  "gemini-2.0-flash",
+		model:  model,
 		httpCli: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
@@ -180,8 +193,11 @@ func (c *GeminiClient) AnalyzeDocument(imageData []byte, mimeType string) (*Gemi
 		},
 		Config: &geminiConfig{
 			Temperature:      0.1,
-			MaxOutputTokens:  2048,
+			MaxOutputTokens:  4096,
 			ResponseMimeType: "application/json",
+			// Disable 2.5-flash "thinking" so the whole budget goes to the JSON
+			// answer (otherwise extraction truncates mid-object).
+			ThinkingConfig: &geminiThinkingConfig{ThinkingBudget: 0},
 		},
 	}
 

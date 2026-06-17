@@ -229,3 +229,151 @@ func columnLetter(n int) string {
 	}
 	return result
 }
+
+// ExportRecordsExcel builds a Siskopatuh-format .xlsx from inline records (the
+// scanner preview rows or group members the UI sends to /generate-excel),
+// rather than re-querying scan results by package.
+func (s *AIOCRService) ExportRecordsExcel(records []map[string]any) ([]byte, error) {
+	return generateInlineSiskopatuhExcel(records)
+}
+
+func generateInlineSiskopatuhExcel(records []map[string]any) ([]byte, error) {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	sheetName := "Siskopatuh"
+	f.SetSheetName("Sheet1", sheetName)
+
+	for i, colName := range siskopatuhColumns {
+		cell := fmt.Sprintf("%s1", columnLetter(i+1))
+		f.SetCellValue(sheetName, cell, colName)
+	}
+
+	style, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true, Color: "#FFFFFF"},
+		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"#2563EB"}},
+	})
+	f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
+
+	for i, rec := range records {
+		row := i + 2
+		data := siskopatuhRowFromRecord(rec)
+		data["No"] = fmt.Sprintf("%d", i+1)
+		for j, colName := range siskopatuhColumns {
+			cell := fmt.Sprintf("%s%d", columnLetter(j+1), row)
+			if val := data[colName]; val != "" {
+				f.SetCellValue(sheetName, cell, val)
+			}
+		}
+	}
+
+	for i := 1; i <= len(siskopatuhColumns); i++ {
+		col := columnLetter(i)
+		f.SetColWidth(sheetName, col, col, 25)
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("write excel: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// siskopatuhRowFromRecord maps a record to Siskopatuh columns. It accepts both
+// the normalized OCR shape (no_identitas, gender, status_pernikahan, …) and the
+// jamaah member shape (nik, jenis_kelamin, status_perkawinan, …) via aliases.
+func siskopatuhRowFromRecord(rec map[string]any) map[string]string {
+	row := map[string]string{}
+	get := func(keys ...string) string {
+		for _, k := range keys {
+			if v, ok := rec[k].(string); ok && strings.TrimSpace(v) != "" {
+				return v
+			}
+		}
+		return ""
+	}
+
+	if v := get("nama_paspor", "nama"); v != "" {
+		row["NAMA LENGKAP"] = v
+	}
+	if v := get("gender", "jenis_kelamin"); v != "" {
+		row["JENIS KELAMIN"] = mapGender(v)
+	}
+	if v := get("tempat_lahir"); v != "" {
+		row["TEMPAT LAHIR"] = v
+	}
+	if v := get("tanggal_lahir"); v != "" {
+		row["TANGGAL LAHIR"] = v
+	}
+	if v := get("alamat"); v != "" {
+		row["ALAMAT"] = v
+	}
+	if v := get("provinsi"); v != "" {
+		row["PROVINSI"] = v
+	}
+	if v := get("kabupaten"); v != "" {
+		row["KABUPATEN / KOTA"] = v
+	}
+	if v := get("kecamatan"); v != "" {
+		row["KECAMATAN"] = v
+	}
+	if v := get("kelurahan"); v != "" {
+		row["KELURAHAN"] = v
+	}
+	if v := get("no_identitas", "nik"); v != "" {
+		row["NO KTP / NIK"] = v
+	}
+	if v := get("no_paspor"); v != "" {
+		row["NO PASPOR"] = v
+	}
+	if v := get("tanggal_paspor", "tanggal_terbit_paspor"); v != "" {
+		row["TANGGAL TERBIT PASPOR"] = v
+	}
+	if v := get("tanggal_expired_paspor", "tanggal_expired"); v != "" {
+		row["TANGGAL EXPIRED PASPOR"] = v
+	}
+	if v := get("kota_paspor"); v != "" {
+		row["TEMPAT TERBIT PASPOR"] = v
+	}
+	if v := get("no_telepon"); v != "" {
+		row["NO TELEPON"] = v
+	}
+	if v := get("no_hp"); v != "" {
+		row["NO HP"] = v
+	}
+	if v := get("email"); v != "" {
+		row["EMAIL"] = v
+	}
+	if v := get("kewarganegaraan"); v != "" {
+		row["KEWARGANEGARAAN"] = v
+	}
+	if v := get("status_pernikahan", "status_perkawinan"); v != "" {
+		row["STATUS PERKAWINAN"] = v
+	}
+	if v := get("pendidikan"); v != "" {
+		row["PENDIDIKAN TERAKHIR"] = v
+	}
+	if v := get("pekerjaan"); v != "" {
+		row["PEKERJAAN"] = v
+	}
+	if v := get("golongan_darah"); v != "" {
+		row["GOLONGAN DARAH"] = v
+	}
+	if v := get("nama_ayah"); v != "" {
+		row["NAMA AYAH"] = v
+	}
+	if v := get("no_visa"); v != "" {
+		row["NO VISA"] = v
+	}
+	if v := get("tanggal_visa"); v != "" {
+		row["TANGGAL TERBIT VISA"] = v
+	}
+	if v := get("tanggal_visa_akhir"); v != "" {
+		row["TANGGAL EXPIRED VISA"] = v
+	}
+	if v := get("provider_visa"); v != "" {
+		row["PROVIDER VISA"] = v
+	}
+
+	return row
+}

@@ -313,7 +313,8 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set in deployments/.env}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set in deployments/.env}
       MINIO_BUCKET: jamaah-docs
-      GEMINI_API_KEY: ""
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
