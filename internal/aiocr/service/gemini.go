@@ -170,7 +170,7 @@ Field yang mungkin (isi sesuai dokumen yang terlihat):
 Kembalikan HANYA JSON, tanpa teks lain. Jika tidak yakin suatu field, jangan sertakan field tersebut.`,
 }
 
-func (c *GeminiClient) AnalyzeDocument(imageData []byte, mimeType string) (*GeminiResult, error) {
+func (c *GeminiClient) AnalyzeDocument(ctx context.Context, imageData []byte, mimeType string) (*GeminiResult, error) {
 	if c == nil {
 		return nil, fmt.Errorf("gemini client not configured (GEMINI_API_KEY missing)")
 	}
@@ -207,7 +207,7 @@ func (c *GeminiClient) AnalyzeDocument(imageData []byte, mimeType string) (*Gemi
 	}
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", c.model)
-	httpReq, err := http.NewRequestWithContext(context.Background(), "POST", url, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}

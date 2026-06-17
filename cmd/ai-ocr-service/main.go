@@ -77,25 +77,25 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	scan := app.Group("/api/v1/scan", authMW)
+	scan := app.Group("/api/v1/scan", authMW, sharedMW.RequireStaff)
 	scan.Post("/jobs", aiocrHandler.CreateScanJob)
 	scan.Get("/jobs", aiocrHandler.ListScanJobs)
 	scan.Get("/jobs/:id", aiocrHandler.GetScanJob)
 	scan.Get("/results/:id", aiocrHandler.GetScanResult)
 	scan.Get("/jobs/:jobId/results", aiocrHandler.GetScanResultsByJob)
 
-	export := app.Group("/api/v1/export-templates", authMW)
+	export := app.Group("/api/v1/export-templates", authMW, sharedMW.RequireStaff)
 	export.Post("/", aiocrHandler.CreateExportTemplate)
 	export.Get("/", aiocrHandler.ListExportTemplates)
 	export.Delete("/:id", aiocrHandler.DeleteExportTemplate)
 
-	ocr := app.Group("/api/v1/ocr", authMW)
-	ocr.Get("/status", aiocrHandler.ListScanJobs)
+	ocr := app.Group("/api/v1/ocr", authMW, sharedMW.RequireStaff)
+	ocr.Get("/status", aiocrHandler.GetStatus)
 
-	processDocs := app.Group("/api/v1/process-documents", authMW)
+	processDocs := app.Group("/api/v1/process-documents", authMW, sharedMW.RequireStaff)
 	processDocs.Post("/", aiocrHandler.ProcessDocuments)
 
-	genExcel := app.Group("/api/v1/generate-excel", authMW)
+	genExcel := app.Group("/api/v1/generate-excel", authMW, sharedMW.RequireStaff)
 	genExcel.Post("/", aiocrHandler.GenerateExcel)
 
 	go func() {

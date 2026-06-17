@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"io"
+	"net/http"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -54,7 +55,19 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 		return response.BadRequest(c, "at least one file is required")
 	}
 
-	const maxFileSize = 20 * 1024 * 1024 // 20 MB per file
+	const (
+		maxFileSize = 20 * 1024 * 1024 // 20 MB per file
+		maxFiles    = 20               // cap the batch so synchronous OCR stays within the request deadline
+	)
+	if len(fileHeaders) > maxFiles {
+		return response.BadRequest(c, "maksimal 20 file per unggahan")
+	}
+
+	// Only real images/PDFs go to Gemini — sniff the bytes, don't trust the client header.
+	allowed := map[string]bool{
+		"image/jpeg": true, "image/png": true, "image/webp": true,
+		"image/gif": true, "application/pdf": true,
+	}
 	files := make([]service.SyncFile, 0, len(fileHeaders))
 	for _, fh := range fileHeaders {
 		if fh.Size > maxFileSize {
@@ -69,9 +82,13 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 		if readErr != nil {
 			return response.Internal(c, readErr)
 		}
+		mime := http.DetectContentType(data)
+		if !allowed[mime] {
+			return response.BadRequest(c, "tipe file tidak didukung (hanya gambar/PDF): "+fh.Filename)
+		}
 		files = append(files, service.SyncFile{
 			FileName:    fh.Filename,
-			ContentType: fh.Header.Get("Content-Type"),
+			ContentType: mime,
 			Data:        data,
 		})
 	}
@@ -164,21 +181,13 @@ func (h *AIOCRHandler) GetScanResultsByJob(c *fiber.Ctx) error {
 	return response.OK(c, results)
 }
 
-func (h *AIOCRHandler) GetCacheStats(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
-	stats, err := h.svc.GetCacheStats(c.Context(), claims.OrgID)
-	if err != nil {
-		return response.Internal(c, err)
-	}
-	return response.OK(c, stats)
-}
-
-func (h *AIOCRHandler) ClearCache(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
-	if err := h.svc.ClearCache(c.Context(), claims.OrgID); err != nil {
-		return response.Internal(c, err)
-	}
-	return response.OK(c, fiber.Map{"message": "cache cleared"})
+// GetStatus reports OCR provider availability for the scanner UI.
+func (h *AIOCRHandler) GetStatus(c *fiber.Ctx) error {
+	return response.OK(c, fiber.Map{
+		"providers": fiber.Map{
+			"gemini": fiber.Map{"available": h.svc.Available()},
+		},
+	})
 }
 
 func (h *AIOCRHandler) NormalizeToSiskopatuh(c *fiber.Ctx) error {

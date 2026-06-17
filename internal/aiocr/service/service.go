@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -28,13 +27,9 @@ func NewAIOCRService(repo *repository.AIOCRRepo, gemini *GeminiClient, logger *z
 	}
 }
 
-func (s *AIOCRService) StartWorker(ctx context.Context) {
-	if s.gemini == nil {
-		s.logger.Warn("Gemini API key not configured - AI scanner worker will not start")
-		return
-	}
-	worker := NewWorker(s.repo, s.gemini, s.logger)
-	go worker.Start(ctx, 5*time.Second)
+// Available reports whether OCR is configured (Gemini API key present).
+func (s *AIOCRService) Available() bool {
+	return s.gemini != nil
 }
 
 func (s *AIOCRService) CreateScanJob(ctx context.Context, orgID, userID uuid.UUID, req model.CreateScanJobRequest) (*model.ScanJob, error) {
@@ -119,25 +114,6 @@ func (s *AIOCRService) GetScanResult(ctx context.Context, id, orgID uuid.UUID) (
 
 func (s *AIOCRService) GetScanResultsByJob(ctx context.Context, orgID, jobID uuid.UUID) ([]model.ScanResult, error) {
 	return s.repo.GetScanResultsByJob(ctx, orgID, jobID)
-}
-
-func (s *AIOCRService) GetCacheStats(ctx context.Context, orgID uuid.UUID) (*model.CacheStats, error) {
-	r, err := s.repo.GetCacheStats(ctx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	return &model.CacheStats{
-		TotalEntries:          r.TotalEntries,
-		TotalHits:             r.TotalHits,
-		ExpiredEntries:        r.ExpiredEntries,
-		CacheHitsToday:        r.CacheHitsToday,
-		ApiCallsToday:         r.ApiCallsToday,
-		TotalProcessingTimeMs: r.TotalProcessingTimeMs,
-	}, nil
-}
-
-func (s *AIOCRService) ClearCache(ctx context.Context, orgID uuid.UUID) error {
-	return s.repo.ClearCache(ctx)
 }
 
 func (s *AIOCRService) NormalizeToSiskopatuh(ctx context.Context, orgID uuid.UUID, req model.NormalizeRequest) (any, error) {
