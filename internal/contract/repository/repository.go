@@ -138,7 +138,7 @@ func (r *ContractRepo) ListInstances(ctx context.Context, orgID uuid.UUID, statu
 	}
 	defer rows.Close()
 
-	var contracts []model.ContractInstance
+	contracts := []model.ContractInstance{} // non-nil so an empty list serializes as [] not null
 	for rows.Next() {
 		contract, err := scanInstance(rows)
 		if err != nil {
