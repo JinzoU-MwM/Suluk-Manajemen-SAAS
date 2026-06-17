@@ -86,6 +86,29 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 	return response.OK(c, result)
 }
 
+// GenerateExcel turns inline preview rows ({"data":[...]}) into a Siskopatuh
+// .xlsx download. The scanner UI posts the (possibly edited) preview data here.
+func (h *AIOCRHandler) GenerateExcel(c *fiber.Ctx) error {
+	var req struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if len(req.Data) == 0 {
+		return response.BadRequest(c, "tidak ada data untuk diekspor")
+	}
+
+	excelData, err := h.svc.ExportRecordsExcel(req.Data)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+
+	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Set("Content-Disposition", "attachment; filename=jamaah_data.xlsx")
+	return c.Send(excelData)
+}
+
 func (h *AIOCRHandler) GetScanJob(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	id, err := uuid.Parse(c.Params("id"))

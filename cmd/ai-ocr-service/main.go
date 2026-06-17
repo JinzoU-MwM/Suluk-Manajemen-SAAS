@@ -96,7 +96,7 @@ func main() {
 	processDocs.Post("/", aiocrHandler.ProcessDocuments)
 
 	genExcel := app.Group("/api/v1/generate-excel", authMW)
-	genExcel.Post("/", aiocrHandler.CreateExportTemplate)
+	genExcel.Post("/", aiocrHandler.GenerateExcel)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
