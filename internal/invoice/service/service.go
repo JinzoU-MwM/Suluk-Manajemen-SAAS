@@ -290,6 +290,7 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 		"amount":         req.Amount,
 		"payment_method": req.PaymentMethod,
 		"invoice_number": inv.InvoiceNumber,
+		"jamaah_id":      inv.JamaahID,
 	})
 	evt := outbox.Event{
 		OrgID:         orgID,

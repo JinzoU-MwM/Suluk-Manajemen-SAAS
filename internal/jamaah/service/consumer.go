@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 
@@ -32,7 +33,17 @@ func (s *JamaahService) StartConsumer(ctx context.Context, bus *events.Bus) erro
 			}
 			return nil
 		}
-		if err := s.RecomputeOrgActive(ctx, orgID); err != nil {
+		// The payment event carries the invoice's jamaah_id — recompute just that
+		// jamaah. Fall back to a full org sweep only if it's absent (older events).
+		var p struct {
+			JamaahID string `json:"jamaah_id"`
+		}
+		_ = json.Unmarshal(env.Payload, &p)
+		if jamaahID, perr := uuid.Parse(p.JamaahID); perr == nil {
+			if err := s.RecomputeJamaahActive(ctx, orgID, jamaahID); err != nil {
+				return err // NAK → redeliver
+			}
+		} else if err := s.RecomputeOrgActive(ctx, orgID); err != nil {
 			return err // NAK → redeliver
 		}
 		if s.log != nil {
