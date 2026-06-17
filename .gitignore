@@ -52,6 +52,8 @@ desktop.ini
 # Go / v2 Backend
 # =============================================================================
 bin/
+# Compiled service binaries dropped at repo root by `go build ./cmd/<svc>`
+/*-service
 certs/Private.pem
 certs/private.pem
 *.exe

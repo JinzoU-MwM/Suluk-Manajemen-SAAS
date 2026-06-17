@@ -135,7 +135,11 @@ func main() {
 	// Team/branch management is restricted to owner/admin.
 	adminRole := sharedMW.RequireRole("owner", "admin")
 
-	orgs := app.Group("/api/v1/orgs", sharedMW.AuthMiddleware(jwtManager))
+	// Org/subscription/notification/ticket/team management is staff-only.
+	// External portal roles (agent, jamaah) must use their own /b2b and /portal
+	// surfaces — RequireStaff rejects them here so they cannot enumerate staff,
+	// read org financials, mutate billing, or create orgs.
+	orgs := app.Group("/api/v1/orgs", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff)
 	orgs.Post("/", authHandler.CreateOrganization)
 	orgs.Get("/", authHandler.GetOrganization)
 	orgs.Put("/", adminRole, authHandler.UpdateOrganization)
@@ -151,7 +155,7 @@ func main() {
 	orgs.Get("/branches", authHandler.ListBranches)
 	orgs.Get("/dashboard/consolidated", authHandler.GetConsolidatedDashboard)
 
-	subscription := app.Group("/api/v1/subscription", sharedMW.AuthMiddleware(jwtManager))
+	subscription := app.Group("/api/v1/subscription", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff)
 	subscription.Get("/status", authHandler.GetSubscriptionStatus)
 	subscription.Post("/upgrade", authHandler.UpgradeToPro)
 	subscription.Get("/trial-status", authHandler.GetTrialStatus)
@@ -166,18 +170,18 @@ func main() {
 	// Service-to-service: invoice-service fetches billing names for the invoice PDF.
 	app.Post("/api/v1/internal/billing-info", authHandler.BillingInfoInternal)
 
-	notifications := app.Group("/api/v1/notifications", sharedMW.AuthMiddleware(jwtManager))
+	notifications := app.Group("/api/v1/notifications", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff)
 	notifications.Get("/", authHandler.ListNotifications)
 	notifications.Put("/:id/read", authHandler.MarkNotificationRead)
 	notifications.Put("/read-all", authHandler.MarkAllNotificationsRead)
 
-	tickets := app.Group("/api/v1/tickets", sharedMW.AuthMiddleware(jwtManager))
+	tickets := app.Group("/api/v1/tickets", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff)
 	tickets.Get("/", authHandler.ListTickets)
 	tickets.Post("/", authHandler.CreateTicket)
 	tickets.Get("/:id/messages", authHandler.GetTicketMessages)
 	tickets.Post("/:id/messages", authHandler.AddTicketMessage)
 
-	team := app.Group("/api/v1/team", sharedMW.AuthMiddleware(jwtManager))
+	team := app.Group("/api/v1/team", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff)
 	team.Get("/", authHandler.GetOrganization)
 	team.Post("/create", authHandler.CreateOrganization)
 	team.Post("/invite", adminRole, authHandler.InviteMember)
