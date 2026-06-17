@@ -50,6 +50,13 @@
   let lostReason = $state('');
   let pendingBatal = $state(null);
 
+  // Portal credential provisioning (proper modal form; replaces the old prompt() flow)
+  let showPortalModal = $state(false);
+  let portalJamaah = $state(null);
+  let portalForm = $state({ email: '', password: '', confirm: '' });
+  let portalShowPass = $state(false);
+  let savingPortal = $state(false);
+
   const TEMP_FILTERS = [
     { id: '',     label: 'Semua' },
     { id: 'hot',  label: '🔥 Hot' },
@@ -210,15 +217,28 @@
     drawerOpen = true;
   }
 
-  async function provisionPortal(j) {
-    const email = prompt(`Email login portal untuk ${j.name}:`, j.email || '');
-    if (!email) return;
-    const password = prompt('Password (min. 6 karakter):');
-    if (!password) return;
+  function openPortalForm(j) {
+    portalJamaah = j;
+    portalForm = { email: j.email || '', password: '', confirm: '' };
+    portalShowPass = false;
+    showPortalModal = true;
+  }
+
+  async function savePortalCredential() {
+    const email = portalForm.email.trim();
+    if (!email) { showToast('Email login wajib diisi', 'warning'); return; }
+    if (portalForm.password.length < 6) { showToast('Password minimal 6 karakter', 'warning'); return; }
+    if (portalForm.password !== portalForm.confirm) { showToast('Konfirmasi password tidak cocok', 'warning'); return; }
+    savingPortal = true;
     try {
-      await ApiService.provisionJamaahPortal({ jamaah_id: j.id, email, name: j.name, password });
+      await ApiService.provisionJamaahPortal({ jamaah_id: portalJamaah.id, email, name: portalJamaah.name, password: portalForm.password });
       showToast('Akun portal jemaah dibuat', 'success');
-    } catch (e) { showToast(mapError(e.message), 'error'); }
+      showPortalModal = false;
+    } catch (e) {
+      showToast(mapError(e.message), 'error');
+    } finally {
+      savingPortal = false;
+    }
   }
 
   function openWhatsApp(phone) {
@@ -741,7 +761,7 @@
           </button>
           <button
             type="button"
-            onclick={() => provisionPortal(selectedJamaah)}
+            onclick={() => openPortalForm(selectedJamaah)}
             class="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
             title="Buat akun login portal jemaah"
           >
@@ -877,6 +897,80 @@
       <div class="mt-4 flex gap-2">
         <button type="button" onclick={cancelBatal} class="flex-1 rounded-xl border py-2.5 text-sm font-semibold" style="border-color:var(--c-line);color:var(--c-muted)">Batal</button>
         <button type="button" onclick={confirmBatal} class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white" style="background:var(--c-danger)">Tandai Batal</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showPortalModal}
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    style="background:rgba(0,0,0,0.4)"
+    role="button"
+    tabindex="-1"
+    onclick={() => (showPortalModal = false)}
+    onkeydown={(e) => { if (e.key === 'Escape') showPortalModal = false; }}
+  >
+    <div
+      class="w-full max-w-sm rounded-2xl p-5"
+      style="background:var(--c-surface);box-shadow:var(--shadow-lg, 0 10px 40px rgba(0,0,0,0.2))"
+      role="dialog"
+      tabindex="-1"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={() => {}}
+    >
+      <div class="mb-1 flex items-center justify-between">
+        <h3 class="text-sm font-bold" style="color:var(--c-ink)">Akun Portal Jemaah</h3>
+        <button type="button" onclick={() => (showPortalModal = false)} style="color:var(--c-faint)"><X class="h-4 w-4" /></button>
+      </div>
+      <p class="mb-4 text-xs" style="color:var(--c-muted)">
+        Buat login portal mandiri untuk <strong>{portalJamaah?.name || 'jemaah'}</strong>.
+      </p>
+
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-1">
+          <label for="pj-email" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Email Login <span style="color:var(--c-danger)">*</span></label>
+          <input
+            id="pj-email" type="email" autocomplete="off" bind:value={portalForm.email}
+            class="rounded-xl px-3 py-2 text-sm outline-none"
+            style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <label for="pj-pass" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Password <span style="color:var(--c-danger)">*</span></label>
+            <button type="button" onclick={() => (portalShowPass = !portalShowPass)} class="text-[11px] font-semibold" style="color:var(--c-primary)">
+              {portalShowPass ? 'Sembunyikan' : 'Lihat'}
+            </button>
+          </div>
+          <input
+            id="pj-pass" type={portalShowPass ? 'text' : 'password'} autocomplete="new-password"
+            placeholder="min. 6 karakter" bind:value={portalForm.password}
+            class="rounded-xl px-3 py-2 text-sm outline-none"
+            style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label for="pj-confirm" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Konfirmasi Password <span style="color:var(--c-danger)">*</span></label>
+          <input
+            id="pj-confirm" type={portalShowPass ? 'text' : 'password'} autocomplete="new-password"
+            bind:value={portalForm.confirm}
+            class="rounded-xl px-3 py-2 text-sm outline-none"
+            style="border:1px solid var(--c-line);background:var(--c-surface);color:var(--c-ink)"
+          />
+          {#if portalForm.confirm && portalForm.password !== portalForm.confirm}
+            <span class="text-[11px]" style="color:var(--c-danger)">Password tidak cocok</span>
+          {/if}
+        </div>
+      </div>
+
+      <div class="mt-5 flex gap-2">
+        <button type="button" onclick={() => (showPortalModal = false)} class="flex-1 rounded-xl border py-2.5 text-sm font-semibold" style="border-color:var(--c-line);color:var(--c-muted)">Batal</button>
+        <button type="button" onclick={savePortalCredential} disabled={savingPortal} class="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white disabled:opacity-50" style="background:var(--c-primary)">
+          {savingPortal ? 'Menyimpan…' : 'Buat Akun'}
+        </button>
       </div>
     </div>
   </div>
