@@ -28,7 +28,7 @@
     error = '';
     try {
       const response = await ApiService.getPublicContract(token);
-      contract = response.data ?? response;
+      contract = response?.data ?? response;
       typedName = contract?.signed_name || contract?.recipient_name || '';
     } catch (e) {
       error = e.message || 'Link kontrak tidak valid atau sudah kadaluarsa.';
@@ -140,7 +140,7 @@
         consent_accepted: consentAccepted,
         scrolled_to_bottom: scrolledToBottom,
       });
-      contract = response.data ?? response;
+      contract = response?.data ?? response;
     } catch (e) {
       error = e.message || 'Gagal menandatangani kontrak.';
     } finally {

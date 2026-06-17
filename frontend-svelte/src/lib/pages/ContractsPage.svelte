@@ -186,7 +186,7 @@
     isLoadingTemplates = true;
     try {
       const response = await ApiService.listContractTemplates(true);
-      templates = response.data ?? response ?? [];
+      templates = response?.data ?? response ?? [];
     } catch (error) {
       templates = [];
       showToast(error.message || 'Gagal memuat template kontrak', 'error');
@@ -199,7 +199,7 @@
     isLoadingContracts = true;
     try {
       const response = await ApiService.listContracts(selectedStatus);
-      contracts = response.data ?? response ?? [];
+      contracts = response?.data ?? response ?? [];
     } catch (error) {
       contracts = [];
       showToast(error.message || 'Gagal memuat kontrak yang dikirim', 'error');
@@ -257,7 +257,7 @@
         content: template.content,
         data: SAMPLE_VALUES,
       });
-      previewHtml = renderContent((response.data ?? response)?.rendered || '');
+      previewHtml = renderContent((response?.data ?? response)?.rendered || '');
     } catch (error) {
       previewHtml = '';
       showToast(error.message || 'Gagal menampilkan preview kontrak', 'error');
@@ -292,7 +292,7 @@
       } else {
         response = await ApiService.createContractTemplate(payload);
       }
-      const saved = response.data ?? response;
+      const saved = response?.data ?? response;
       if (editor.id) {
         templates = templates.map((tpl) => (tpl.id === saved.id ? saved : tpl));
       } else {
@@ -335,7 +335,7 @@
         ),
       };
       const response = await ApiService.createContract(payload);
-      const saved = response.data ?? response;
+      const saved = response?.data ?? response;
       contracts = [saved, ...contracts];
       generateOpen = false;
       showToast('Kontrak berhasil digenerate', 'success');
