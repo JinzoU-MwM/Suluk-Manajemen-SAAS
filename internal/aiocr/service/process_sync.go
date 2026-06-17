@@ -56,13 +56,13 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 			mimeType = detectMimeType(f.FileName)
 		}
 
-		result, err := s.gemini.AnalyzeDocument(f.Data, mimeType)
+		result, err := s.gemini.AnalyzeDocument(ctx, f.Data, mimeType)
 		if err != nil {
 			s.logger.Errorf("ocr analyze %s: %v", f.FileName, err)
 			res.FileResults = append(res.FileResults, SyncFileResult{
 				Filename: f.FileName,
 				Status:   "failed",
-				Error:    err.Error(),
+				Error:    "gagal mengekstrak dokumen (coba foto yang lebih jelas/terang)",
 			})
 			continue
 		}
