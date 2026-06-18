@@ -84,12 +84,16 @@ func main() {
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 	finRole := sharedMW.RequireRole("owner", "admin", "finance")
 
-	g := app.Group("/api/v1/tabungan", authMW)
+	// Savings accounts hold customers' financial data (balances + deposit
+	// history) — gate the whole module to finance roles. List/Get were previously
+	// authMW-only, letting any role (incl. agent/jamaah) read every jamaah's
+	// balance and deposits; only the write routes were gated.
+	g := app.Group("/api/v1/tabungan", authMW, finRole)
 	g.Get("/", h.List)
-	g.Post("/", finRole, h.Create)
+	g.Post("/", h.Create)
 	g.Get("/:id", h.Get)
-	g.Post("/:id/deposit", finRole, h.Deposit)
-	g.Post("/:id/convert", finRole, h.Convert)
+	g.Post("/:id/deposit", h.Deposit)
+	g.Post("/:id/convert", h.Convert)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

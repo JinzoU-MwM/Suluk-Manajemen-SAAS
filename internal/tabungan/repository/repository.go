@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	ErrNotFound        = errors.New("savings account not found")
-	ErrInsufficient    = errors.New("insufficient savings balance")
-	ErrNotActive       = errors.New("savings account is not active")
+	ErrNotFound      = errors.New("savings account not found")
+	ErrInsufficient  = errors.New("insufficient savings balance")
+	ErrNotActive     = errors.New("savings account is not active")
+	ErrInvalidAmount = errors.New("amount harus lebih dari 0")
 )
 
 type Repo struct{ pool *pgxpool.Pool }
