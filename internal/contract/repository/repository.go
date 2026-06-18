@@ -181,20 +181,26 @@ func (r *ContractRepo) GetInstanceByToken(ctx context.Context, token string) (*m
 	return instance, nil
 }
 
+// SignInstance records the signature only if the contract is still in the
+// "sent" state. The status guard + RowsAffected check make signing atomically
+// idempotent: a concurrent double-submit (the read-then-write check in the
+// service is otherwise racy) finds 0 rows on the second write and gets
+// ErrContractNotSignable instead of silently overwriting the first signature.
 func (r *ContractRepo) SignInstance(ctx context.Context, contract *model.ContractInstance) error {
 	query := `UPDATE contract_instances
 		SET status = $2, signed_at = $3, signed_name = $4, signature_mode = $5,
 			signature_value = $6, signed_ip_address = $7, document_hash = $8, updated_at = NOW()
-		WHERE id = $1`
+		WHERE id = $1 AND status = $9`
 	result, err := r.pool.Exec(ctx, query,
 		contract.ID, contract.Status, contract.SignedAt, contract.SignedName, contract.SignatureMode,
 		contract.SignatureValue, contract.SignedIPAddress, contract.DocumentHash,
+		string(model.ContractStatusSent),
 	)
 	if err != nil {
 		return fmt.Errorf("sign contract instance: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return ErrInstanceNotFound
+		return ErrContractNotSignable
 	}
 	return nil
 }
@@ -253,6 +259,7 @@ func GeneratePublicToken() (string, error) {
 }
 
 var (
-	ErrTemplateNotFound = fmt.Errorf("contract template not found")
-	ErrInstanceNotFound = fmt.Errorf("contract instance not found")
+	ErrTemplateNotFound    = fmt.Errorf("contract template not found")
+	ErrInstanceNotFound    = fmt.Errorf("contract instance not found")
+	ErrContractNotSignable = fmt.Errorf("contract is not in a signable state")
 )

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -226,6 +227,14 @@ func (s *ContractService) SignPublicContract(ctx context.Context, token string, 
 	}
 	contract.DocumentHash = &hashValue
 	if err := s.repo.SignInstance(ctx, contract); err != nil {
+		if errors.Is(err, repository.ErrContractNotSignable) {
+			// Lost a concurrent race: another submit signed it first. Return the
+			// already-signed state rather than overwriting the recorded signature.
+			if latest, gerr := s.repo.GetInstanceByToken(ctx, token); gerr == nil {
+				return buildPublicContractResponse(latest), fmt.Errorf("contract has already been signed")
+			}
+			return nil, fmt.Errorf("contract has already been signed")
+		}
 		return nil, err
 	}
 	return buildPublicContractResponse(contract), nil

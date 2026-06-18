@@ -74,7 +74,11 @@ func main() {
 		sharedHealth.Check{Name: "database", Ping: pool.Ping}))
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
-	api := app.Group("/api/v1/contracts", authMW)
+	// Staff-only: the instance reads return recipient PII and the public_token
+	// (which alone authorizes signing), so an external agent or jamaah token must
+	// not reach them. Recipients sign via the public /public/contracts routes.
+	// Writes are further restricted to owner/admin in the handler.
+	api := app.Group("/api/v1/contracts", authMW, sharedMW.RequireStaff)
 	api.Get("/templates", contractHandler.ListTemplates)
 	api.Get("/templates/:id", contractHandler.GetTemplate)
 	api.Post("/templates", contractHandler.CreateTemplate)
