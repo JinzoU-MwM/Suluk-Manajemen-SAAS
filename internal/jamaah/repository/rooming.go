@@ -86,8 +86,8 @@ func (r *JamaahRepo) AssignMemberToRoom(ctx context.Context, orgID, roomID uuid.
 	return err
 }
 
-func (r *JamaahRepo) UnassignMember(ctx context.Context, roomID uuid.UUID, memberID string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM room_assignments WHERE room_id = $1 AND member_id = $2`, roomID, memberID)
+func (r *JamaahRepo) UnassignMember(ctx context.Context, orgID uuid.UUID, memberID string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM room_assignments WHERE member_id = $1 AND org_id = $2`, memberID, orgID)
 	return err
 }
 
@@ -135,8 +135,10 @@ func (r *JamaahRepo) RevokeSharedManifest(ctx context.Context, groupID, orgID uu
 }
 
 func (r *JamaahRepo) GetSharedManifestByToken(ctx context.Context, token string) (*model.SharedManifest, error) {
+	// Enforce expiry here: the old query matched on token + is_active only, so an
+	// expired share link still resolved (the service never re-checked expires_at).
 	query := `SELECT id, org_id, group_id, token, pin_hash, expires_at, is_active, created_at
-		FROM shared_manifests WHERE token = $1 AND is_active = TRUE`
+		FROM shared_manifests WHERE token = $1 AND is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())`
 	var sm model.SharedManifest
 	var id, orgID uuid.UUID
 	var groupID *uuid.UUID

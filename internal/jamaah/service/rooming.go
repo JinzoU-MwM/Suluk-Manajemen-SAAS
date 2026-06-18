@@ -149,8 +149,8 @@ func (s *JamaahService) AssignMemberToRoom(ctx context.Context, orgID, roomID uu
 	return s.repo.AssignMemberToRoom(ctx, orgID, roomID, memberID)
 }
 
-func (s *JamaahService) UnassignMember(ctx context.Context, roomID uuid.UUID, memberID string) error {
-	return s.repo.UnassignMember(ctx, roomID, memberID)
+func (s *JamaahService) UnassignMember(ctx context.Context, orgID uuid.UUID, memberID string) error {
+	return s.repo.UnassignMember(ctx, orgID, memberID)
 }
 
 func (s *JamaahService) ShareGroup(ctx context.Context, orgID, groupID uuid.UUID, pin string, expiresInDays int) (*model.SharedManifest, error) {

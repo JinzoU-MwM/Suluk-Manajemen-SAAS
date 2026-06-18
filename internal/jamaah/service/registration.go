@@ -112,20 +112,20 @@ func (s *JamaahService) ApprovePending(ctx context.Context, orgID string, pendin
 		return fmt.Errorf("registration already %s", pr.Status)
 	}
 
+	// Only the fields the public form actually collects (name/phone/email).
+	// The KTP/passport uploads are FILE URLs — they must NOT be written into the
+	// NIK (no_identitas) / passport-number (no_paspor) fields; staff fill those in
+	// later. ID is set explicitly (the insert passes it; an unset ID inserted a
+	// zero-UUID profile).
 	profile := &model.JamaahProfile{
-		OrgID:       uuid.MustParse(orgID),
-		Nama:        pr.Name,
-		NoHP:        pr.PhoneNumber,
-		Email:       pr.Email,
-		NoIdentitas: &pr.KtpFileURL,
-		NoPaspor:    &pr.PassportFileURL,
+		ID:    uuid.New(),
+		OrgID: uuid.MustParse(orgID),
+		Nama:  pr.Name,
+		NoHP:  pr.PhoneNumber,
+		Email: pr.Email,
 	}
 
-	if err := s.repo.CreateProfile(ctx, profile); err != nil {
-		return err
-	}
-
-	return s.repo.ApprovePendingRegistration(ctx, uuid.MustParse(pendingID.String()), uuid.MustParse(orgID), reviewerID, profile.ID)
+	return s.repo.ApprovePendingTx(ctx, pendingID, uuid.MustParse(orgID), reviewerID, profile)
 }
 
 func (s *JamaahService) RejectPending(ctx context.Context, orgID string, pendingID, reviewerID uuid.UUID) error {
