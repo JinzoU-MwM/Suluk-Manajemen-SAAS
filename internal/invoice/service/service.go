@@ -183,7 +183,29 @@ func (s *InvoiceService) UpdateInvoice(ctx context.Context, id, orgID uuid.UUID,
 }
 
 func (s *InvoiceService) CancelInvoice(ctx context.Context, id, orgID uuid.UUID, reason string) error {
-	return s.repo.CancelInvoice(ctx, id, orgID, reason)
+	inv, err := s.repo.GetInvoiceByID(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+	// On cancel, reverse the uncollected receivable + unearned revenue
+	// (Dr Pendapatan / Cr Piutang for the remaining balance). Collected amounts
+	// are returned via the separate refund flow.
+	var evt *outbox.Event
+	if inv.Status != string(model.InvoiceStatusBatal) && inv.AmountRemaining > 0 {
+		payload, _ := json.Marshal(map[string]any{
+			"amount":         inv.AmountRemaining,
+			"invoice_number": inv.InvoiceNumber,
+		})
+		evt = &outbox.Event{
+			OrgID:         orgID,
+			AggregateType: "invoice",
+			AggregateID:   id,
+			EventType:     events.EventInvoiceCancelled,
+			Payload:       payload,
+			OccurredAt:    time.Now(),
+		}
+	}
+	return s.repo.CancelInvoiceTx(ctx, id, orgID, reason, evt)
 }
 
 func (s *InvoiceService) CreatePaymentSchedules(ctx context.Context, orgID, invoiceID uuid.UUID, req model.CreatePaymentScheduleRequest) ([]model.PaymentSchedule, error) {
@@ -276,25 +298,10 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 		payment.CashSessionID = s.repo.ActiveSessionID(ctx, orgID, userID)
 	}
 
-	// Balances are recomputed under a row lock inside RecordPaymentTx (prevents
-	// lost updates on concurrent payments and rejects overpayment).
-
-	// Persist payment + invoice update + payment.received outbox event in one tx.
-	payload, _ := json.Marshal(map[string]any{
-		"amount":         req.Amount,
-		"payment_method": req.PaymentMethod,
-		"invoice_number": inv.InvoiceNumber,
-		"jamaah_id":      inv.JamaahID,
-	})
-	evt := outbox.Event{
-		OrgID:         orgID,
-		AggregateType: "invoice",
-		AggregateID:   invoiceID,
-		EventType:     events.EventPaymentReceived,
-		Payload:       payload,
-		OccurredAt:    paidAt,
-	}
-	if err := s.repo.RecordPaymentTx(ctx, payment, inv, evt); err != nil {
+	// RecordPaymentTx locks the invoice, applies the payment (capping at the
+	// remaining balance), books any overpayment to the titipan liability, and
+	// emits the GL events, all in one tx.
+	if err := s.repo.RecordPaymentTx(ctx, payment, inv); err != nil {
 		return nil, nil, fmt.Errorf("record payment: %w", err)
 	}
 

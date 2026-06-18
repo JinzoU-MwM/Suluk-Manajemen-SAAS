@@ -24,6 +24,8 @@ const (
 	EventInvoiceIssued    = "invoice.issued"      // invoice terbit (Dr Piutang Jemaah, Cr Pendapatan Paket)
 	EventPaymentReceived  = "payment.received"   // jemaah membayar invoice (Dr Kas/Bank, Cr Piutang)
 	EventRefundCompleted  = "refund.completed"    // refund cair (Dr Piutang/again, Cr Kas)
+	EventInvoiceCancelled = "invoice.cancelled"   // invoice batal: balik sisa piutang (Dr Pendapatan, Cr Piutang)
+	EventOverpaymentReceived = "payment.overpayment" // kelebihan bayar jadi titipan (Dr Kas/Bank, Cr Hutang Titipan)
 	EventVendorBillCreated = "vendor.bill.created" // tagihan vendor (Dr Beban/Persediaan, Cr Hutang Vendor)
 	EventPayrollPosted    = "payroll.posted"      // slip gaji (Dr Beban Gaji, Cr Kas/Hutang)
 	EventCommissionAccrued = "commission.accrued"  // komisi agen (Dr Beban Komisi, Cr Hutang Komisi)
