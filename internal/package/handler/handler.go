@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -10,7 +11,7 @@ import (
 	"github.com/jamaah-in/v2/internal/package/model"
 	"github.com/jamaah-in/v2/internal/package/repository"
 	"github.com/jamaah-in/v2/internal/package/service"
-	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	"github.com/jamaah-in/v2/internal/shared/response"
 )
 
@@ -24,7 +25,10 @@ func NewPackageHandler(svc *service.PackageService) *PackageHandler {
 
 // ReserveSeat reserves one seat (called by jamaah-service on registration).
 func (h *PackageHandler) ReserveSeat(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -50,7 +54,10 @@ func (h *PackageHandler) ReserveSeat(c *fiber.Ctx) error {
 
 // ReleaseSeat frees one previously-reserved seat (called on unregister/rollback).
 func (h *PackageHandler) ReleaseSeat(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -60,13 +67,19 @@ func (h *PackageHandler) ReleaseSeat(c *fiber.Ctx) error {
 	}
 	_ = c.BodyParser(&body)
 	if err := h.svc.ReleaseSeat(c.Context(), id, claims.OrgID, body.RoomType); err != nil {
+		if errors.Is(err, repository.ErrPackageNotFound) {
+			return response.NotFound(c, "paket tidak ditemukan")
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"released": true})
 }
 
 func (h *PackageHandler) CreatePackage(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to create package")
 	}
@@ -81,6 +94,9 @@ func (h *PackageHandler) CreatePackage(c *fiber.Ctx) error {
 	if req.PackageType == "" {
 		return response.BadRequest(c, "package_type is required")
 	}
+	if !slices.Contains(model.ValidPackageTypes(), req.PackageType) {
+		return response.BadRequest(c, "package_type tidak valid")
+	}
 	if req.TotalSeats < 1 {
 		return response.BadRequest(c, "total_seats must be at least 1")
 	}
@@ -93,7 +109,10 @@ func (h *PackageHandler) CreatePackage(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) GetPackage(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -107,7 +126,10 @@ func (h *PackageHandler) GetPackage(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) ListPackages(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	status := c.Query("status")
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	limit, _ := strconv.Atoi(c.Query("page_size", "20"))
@@ -120,7 +142,10 @@ func (h *PackageHandler) ListPackages(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to update package")
 	}
@@ -129,7 +154,7 @@ func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
 	}
-	_, err = h.svc.GetPackage(c.Context(), id, claims.OrgID)
+	existing, err := h.svc.GetPackage(c.Context(), id, claims.OrgID)
 	if err != nil {
 		return response.NotFound(c, "package not found")
 	}
@@ -141,6 +166,17 @@ func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
 	if req.IsPublished != nil && !canPublishPackages(claims.Role) {
 		return response.Forbidden(c, "only owner can publish package")
 	}
+	if req.TotalSeats != nil {
+		if *req.TotalSeats < 1 {
+			return response.BadRequest(c, "total_seats must be at least 1")
+		}
+		if *req.TotalSeats < existing.ReservedSeats {
+			return response.BadRequest(c, "total_seats tidak boleh kurang dari kursi yang sudah dipesan")
+		}
+	}
+	if req.PackageType != nil && !slices.Contains(model.ValidPackageTypes(), *req.PackageType) {
+		return response.BadRequest(c, "package_type tidak valid")
+	}
 
 	pkg, err := h.svc.UpdatePackage(c.Context(), id, claims.OrgID, req)
 	if err != nil {
@@ -150,7 +186,10 @@ func (h *PackageHandler) UpdatePackage(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) DeletePackage(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canDeletePackages(claims.Role) {
 		return response.Forbidden(c, "only owner can delete package")
 	}
@@ -170,7 +209,10 @@ func (h *PackageHandler) DeletePackage(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) UpdatePackageStatus(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to update package status")
 	}
@@ -188,6 +230,9 @@ func (h *PackageHandler) UpdatePackageStatus(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
+	if !slices.Contains(model.ValidPackageStatuses(), req.Status) {
+		return response.BadRequest(c, "status tidak valid")
+	}
 
 	pkg, err := h.svc.UpdatePackageStatus(c.Context(), id, claims.OrgID, req.Status)
 	if err != nil {
@@ -197,7 +242,10 @@ func (h *PackageHandler) UpdatePackageStatus(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) GetPackageQuota(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -214,7 +262,10 @@ func (h *PackageHandler) GetPackageQuota(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) GetProfitProjection(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -231,7 +282,10 @@ func (h *PackageHandler) GetProfitProjection(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) CreatePricingTier(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to manage pricing tiers")
 	}
@@ -252,6 +306,9 @@ func (h *PackageHandler) CreatePricingTier(c *fiber.Ctx) error {
 	if req.RoomType == "" {
 		return response.BadRequest(c, "room_type is required")
 	}
+	if !slices.Contains(model.ValidRoomTypes(), req.RoomType) {
+		return response.BadRequest(c, "room_type tidak valid")
+	}
 	if req.Price < 1 {
 		return response.BadRequest(c, "price must be at least 1")
 	}
@@ -264,7 +321,10 @@ func (h *PackageHandler) CreatePricingTier(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) UpdatePricingTier(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to manage pricing tiers")
 	}
@@ -286,6 +346,12 @@ func (h *PackageHandler) UpdatePricingTier(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
+	if req.RoomType == "" || !slices.Contains(model.ValidRoomTypes(), req.RoomType) {
+		return response.BadRequest(c, "room_type tidak valid")
+	}
+	if req.Price < 1 {
+		return response.BadRequest(c, "price must be at least 1")
+	}
 
 	tier, err = h.svc.UpdatePricingTier(c.Context(), tierID, req)
 	if err != nil {
@@ -295,7 +361,10 @@ func (h *PackageHandler) UpdatePricingTier(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) DeletePricingTier(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to manage pricing tiers")
 	}
@@ -319,7 +388,10 @@ func (h *PackageHandler) DeletePricingTier(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) CreateCostComponent(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to manage cost components")
 	}
@@ -340,8 +412,14 @@ func (h *PackageHandler) CreateCostComponent(c *fiber.Ctx) error {
 	if req.Name == "" {
 		return response.BadRequest(c, "name is required")
 	}
-	if req.Category == "" {
-		return response.BadRequest(c, "category is required")
+	if req.Category == "" || !slices.Contains(model.ValidCostCategories(), req.Category) {
+		return response.BadRequest(c, "category tidak valid")
+	}
+	if req.Quantity < 1 {
+		return response.BadRequest(c, "quantity must be at least 1")
+	}
+	if req.AmountPerPerson < 0 {
+		return response.BadRequest(c, "amount_per_person tidak boleh negatif")
 	}
 
 	cc, err := h.svc.CreateCostComponent(c.Context(), packageID, claims.OrgID, req)
@@ -352,7 +430,10 @@ func (h *PackageHandler) CreateCostComponent(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) UpdateCostComponent(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to manage cost components")
 	}
@@ -374,6 +455,18 @@ func (h *PackageHandler) UpdateCostComponent(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
+	if req.Name == "" {
+		return response.BadRequest(c, "name is required")
+	}
+	if req.Category == "" || !slices.Contains(model.ValidCostCategories(), req.Category) {
+		return response.BadRequest(c, "category tidak valid")
+	}
+	if req.Quantity < 1 {
+		return response.BadRequest(c, "quantity must be at least 1")
+	}
+	if req.AmountPerPerson < 0 {
+		return response.BadRequest(c, "amount_per_person tidak boleh negatif")
+	}
 
 	cc, err = h.svc.UpdateCostComponent(c.Context(), ccID, req)
 	if err != nil {
@@ -383,7 +476,10 @@ func (h *PackageHandler) UpdateCostComponent(c *fiber.Ctx) error {
 }
 
 func (h *PackageHandler) DeleteCostComponent(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	if !canEditPackages(claims.Role) {
 		return response.Forbidden(c, "insufficient permissions to manage cost components")
 	}
