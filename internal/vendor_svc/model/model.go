@@ -96,7 +96,8 @@ type UpdateBillRequest struct {
 	Currency     *string  `json:"currency,omitempty"`
 	ExchangeRate *float64 `json:"exchange_rate,omitempty"`
 	DueDate      *string  `json:"due_date,omitempty"`
-	Status       *string  `json:"status,omitempty"`
+	// Status is system-derived from payments (paid_amount vs amount_idr) and is
+	// not client-settable — see VendorService.deriveBillStatus.
 }
 
 type VendorPayment struct {

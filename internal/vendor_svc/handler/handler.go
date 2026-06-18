@@ -47,7 +47,7 @@ func (h *VendorHandler) CreateVendor(c *fiber.Ctx) error {
 
 	vendor, err := h.svc.CreateVendor(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.Internal(c, err)
+		return writeError(c, err)
 	}
 	return response.Created(c, vendor)
 }
@@ -92,7 +92,7 @@ func (h *VendorHandler) UpdateVendor(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrVendorNotFound) {
 			return response.NotFound(c, "vendor not found")
 		}
-		return response.Internal(c, err)
+		return writeError(c, err)
 	}
 	return response.OK(c, vendor)
 }
@@ -176,7 +176,7 @@ func (h *VendorHandler) CreateBill(c *fiber.Ctx) error {
 		if errors.Is(err, service.ErrPackageNotFound) {
 			return response.BadRequest(c, "package_id tidak ditemukan untuk organisasi ini")
 		}
-		return response.Internal(c, err)
+		return writeError(c, err)
 	}
 	return response.Created(c, bill)
 }
@@ -223,16 +223,13 @@ func (h *VendorHandler) UpdateBill(c *fiber.Ctx) error {
 			return response.BadRequest(c, "format due_date tidak valid (gunakan YYYY-MM-DD)")
 		}
 	}
-	if req.Status != nil && !isValidBillStatus(*req.Status) {
-		return response.BadRequest(c, "status must be one of: belum_bayar, sebagian, lunas")
-	}
 
 	bill, err := h.svc.UpdateBill(c.Context(), id, claims.OrgID, req)
 	if err != nil {
 		if errors.Is(err, repository.ErrBillNotFound) {
 			return response.NotFound(c, "vendor bill not found")
 		}
-		return response.Internal(c, err)
+		return writeError(c, err)
 	}
 	return response.OK(c, bill)
 }
@@ -382,7 +379,7 @@ func (h *VendorHandler) CreatePayment(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrBillNotFound) {
 			return response.NotFound(c, "vendor bill not found")
 		}
-		return response.Internal(c, err)
+		return writeError(c, err)
 	}
 	return response.Created(c, payment)
 }
@@ -464,11 +461,20 @@ func isValidVendorType(s string) bool {
 	return false
 }
 
-func isValidBillStatus(s string) bool {
-	for _, v := range model.ValidBillStatuses() {
-		if s == v {
-			return true
-		}
+// writeError maps known Postgres constraint violations from a write to a precise
+// 4xx instead of a generic 500: a unique/duplicate violation is a 409, and a
+// length-overflow or CHECK violation is bad input (400). Anything else is a real
+// server error. Keeps create/update paths from surfacing raw DB failures as 500.
+func writeError(c *fiber.Ctx, err error) error {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint"):
+		return response.Conflict(c, "data sudah ada (duplikat)")
+	case strings.Contains(msg, "value too long"):
+		return response.BadRequest(c, "salah satu nilai melebihi batas panjang yang diizinkan")
+	case strings.Contains(msg, "violates check constraint"):
+		return response.BadRequest(c, "nilai tidak valid")
+	default:
+		return response.Internal(c, err)
 	}
-	return false
 }

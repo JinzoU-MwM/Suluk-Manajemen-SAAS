@@ -214,13 +214,24 @@ func (s *VendorService) UpdateBill(ctx context.Context, id, orgID uuid.UUID, req
 			b.DueDate = d
 		}
 	}
-	if req.Status != nil {
-		b.Status = *req.Status
-	}
 	if err := s.repo.UpdateBill(ctx, b); err != nil {
 		return nil, err
 	}
-	return s.repo.GetBillByID(ctx, id, orgID)
+
+	// Status is derived, never client-set. Editing amount/exchange_rate shifts
+	// the DB-computed amount_idr, so recompute against paid_amount to keep
+	// lunas/sebagian/belum_bayar consistent with reality.
+	updated, err := s.repo.GetBillByID(ctx, id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if status := deriveBillStatus(updated.PaidAmount, updated.AmountIDR); status != updated.Status {
+		if err := s.repo.UpdateBillStatus(ctx, id, status); err != nil {
+			return nil, err
+		}
+		updated.Status = status
+	}
+	return updated, nil
 }
 
 func (s *VendorService) DeleteBill(ctx context.Context, id, orgID uuid.UUID) error {
@@ -309,12 +320,7 @@ func (s *VendorService) CreatePayment(ctx context.Context, orgID uuid.UUID, req 
 	if err != nil {
 		return p, nil
 	}
-
-	if updatedBill.PaidAmount >= updatedBill.AmountIDR {
-		_ = s.repo.UpdateBillStatus(ctx, bill.ID, "lunas")
-	} else if updatedBill.PaidAmount > 0 {
-		_ = s.repo.UpdateBillStatus(ctx, bill.ID, "sebagian")
-	}
+	_ = s.repo.UpdateBillStatus(ctx, bill.ID, deriveBillStatus(updatedBill.PaidAmount, updatedBill.AmountIDR))
 
 	return p, nil
 }
@@ -342,14 +348,23 @@ func (s *VendorService) DeletePayment(ctx context.Context, id, orgID uuid.UUID) 
 	if err != nil {
 		return nil
 	}
-	if updatedBill.PaidAmount >= updatedBill.AmountIDR {
-		_ = s.repo.UpdateBillStatus(ctx, billID, "lunas")
-	} else if updatedBill.PaidAmount > 0 {
-		_ = s.repo.UpdateBillStatus(ctx, billID, "sebagian")
-	} else {
-		_ = s.repo.UpdateBillStatus(ctx, billID, "belum_bayar")
-	}
+	_ = s.repo.UpdateBillStatus(ctx, billID, deriveBillStatus(updatedBill.PaidAmount, updatedBill.AmountIDR))
 	return nil
+}
+
+// deriveBillStatus is the single source of truth for a bill's payment status:
+// lunas once paid_amount covers the IDR total, sebagian while partially paid,
+// belum_bayar otherwise. Used by create/delete payment and bill update so the
+// status can never be set inconsistently with paid_amount.
+func deriveBillStatus(paidAmount, amountIDR int64) string {
+	switch {
+	case paidAmount >= amountIDR:
+		return "lunas"
+	case paidAmount > 0:
+		return "sebagian"
+	default:
+		return "belum_bayar"
+	}
 }
 
 func (s *VendorService) ListPaymentsByBill(ctx context.Context, billID, orgID uuid.UUID) ([]model.VendorPayment, error) {
