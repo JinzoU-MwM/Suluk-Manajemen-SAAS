@@ -246,7 +246,7 @@ func (s *PackageService) GetPackageQuota(ctx context.Context, id, orgID uuid.UUI
 	q := &model.PackageQuota{
 		TotalSeats:    pkg.TotalSeats,
 		ReservedSeats: pkg.ReservedSeats,
-		Available:     pkg.TotalSeats - pkg.ReservedSeats,
+		Available:     max(0, pkg.TotalSeats-pkg.ReservedSeats),
 		RoomQuotas:    []model.RoomTypeQuota{},
 	}
 	tiers, err := s.repo.GetPricingTiers(ctx, id)
@@ -257,7 +257,7 @@ func (s *PackageService) GetPackageQuota(ctx context.Context, id, orgID uuid.UUI
 					RoomType:      t.RoomType,
 					QuotaSeats:    t.QuotaSeats,
 					ReservedSeats: t.ReservedSeats,
-					Available:     t.QuotaSeats - t.ReservedSeats,
+					Available:     max(0, t.QuotaSeats-t.ReservedSeats),
 				})
 			}
 		}

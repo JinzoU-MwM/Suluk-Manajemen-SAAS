@@ -162,6 +162,9 @@ func (r *PackageRepo) ListPackages(ctx context.Context, orgID uuid.UUID, status 
 		packages = append(packages, pkg)
 		ids = append(ids, pkg.ID.String())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
 	rows.Close()
 
 	// Batch-load pricing tiers for the whole page in one query (was a
@@ -196,6 +199,9 @@ func (r *PackageRepo) pricingTiersFor(ctx context.Context, packageIDs []string) 
 		}
 		k := t.PackageID.String()
 		out[k] = append(out[k], t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -301,10 +307,14 @@ func (r *PackageRepo) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID, room
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx,
+	res, err := tx.Exec(ctx,
 		`UPDATE packages SET reserved_seats = GREATEST(reserved_seats - 1, 0), updated_at = NOW()
-		 WHERE id = $1 AND org_id = $2`, id, orgID); err != nil {
+		 WHERE id = $1 AND org_id = $2`, id, orgID)
+	if err != nil {
 		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrPackageNotFound
 	}
 	if roomType != "" {
 		if _, err := tx.Exec(ctx,
@@ -362,6 +372,9 @@ func (r *PackageRepo) GetPricingTiers(ctx context.Context, packageID uuid.UUID) 
 			return nil, err
 		}
 		tiers = append(tiers, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return tiers, nil
 }
@@ -428,17 +441,23 @@ func (r *PackageRepo) GetCostComponents(ctx context.Context, packageID uuid.UUID
 		}
 		ccs = append(ccs, cc)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return ccs, nil
 }
 
 func (r *PackageRepo) UpdateCostComponent(ctx context.Context, cc *model.CostComponent) error {
-	query := `UPDATE cost_components SET name = $2, category = $3, amount_per_person = $4, quantity = $5, sort_order = $6, updated_at = NOW() WHERE id = $1`
-	result, err := r.pool.Exec(ctx, query, cc.ID, cc.Name, cc.Category, cc.AmountPerPerson, cc.Quantity, cc.SortOrder)
+	// RETURNING total_amount so the response reflects the DB-generated value
+	// (total_amount = amount_per_person * quantity) instead of a stale zero.
+	query := `UPDATE cost_components SET name = $2, category = $3, amount_per_person = $4, quantity = $5, sort_order = $6, updated_at = NOW() WHERE id = $1
+		RETURNING total_amount, updated_at`
+	err := r.pool.QueryRow(ctx, query, cc.ID, cc.Name, cc.Category, cc.AmountPerPerson, cc.Quantity, cc.SortOrder).Scan(&cc.TotalAmount, &cc.UpdatedAt)
+	if err == pgx.ErrNoRows {
+		return ErrCostNotFound
+	}
 	if err != nil {
 		return err
-	}
-	if result.RowsAffected() == 0 {
-		return ErrCostNotFound
 	}
 	return nil
 }

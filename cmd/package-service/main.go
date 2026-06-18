@@ -75,7 +75,11 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	pkgs := app.Group("/api/v1/packages", authMW)
+	// RequireStaff: reserve/release + profit/quota/cost reads are staff-only.
+	// External portal tokens (agent/jamaah) must never reach package inventory or
+	// cost data directly — the legit registration flow (jamaah-service) forwards a
+	// staff token, so this does not break it.
+	pkgs := app.Group("/api/v1/packages", authMW, sharedMW.RequireStaff)
 	pkgs.Post("/", pkgHandler.CreatePackage)
 	pkgs.Get("/", pkgHandler.ListPackages)
 	pkgs.Get("/:id", pkgHandler.GetPackage)
