@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jamaah-in/v2/internal/agent/model"
 	"github.com/jamaah-in/v2/internal/agent/repository"
 )
+
+// ErrAgentNotFound means the commission's agent_id doesn't belong to the org.
+var ErrAgentNotFound = errors.New("agent not found for this organization")
 
 type AgentService struct {
 	repo *repository.AgentRepo
@@ -159,12 +163,16 @@ func (s *AgentService) CreateCommission(ctx context.Context, orgID string, req m
 		c.CommissionRate = 5.0
 	}
 	c.TierLevel = 1 // the seller's own commission
-	// commission.accrued → Dr Beban Komisi / Cr Hutang Komisi. Agent name is
-	// best-effort.
-	agentName := ""
-	if a, aerr := s.repo.GetAgent(ctx, req.AgentID, orgID); aerr == nil && a != nil {
-		agentName = a.Name
+	// The agent must belong to the caller's org — authoritative. agent_commissions
+	// has an FK to agents(id) but it isn't org-scoped, so a foreign-org agent_id
+	// would otherwise be accepted, accruing a GL liability (commission.accrued)
+	// for another org's agent and leaking its name through the list/get JOIN.
+	agent, err := s.repo.GetAgent(ctx, req.AgentID, orgID)
+	if err != nil || agent == nil {
+		return nil, ErrAgentNotFound
 	}
+	agentName := agent.Name
+	// commission.accrued → Dr Beban Komisi / Cr Hutang Komisi.
 	sellerPayload := commissionPayload(c.CommissionAmount, agentName, 1, "")
 	// Berjenjang: build override commissions for the seller's upline, then write
 	// the seller + all tiers (and one event each) atomically.
