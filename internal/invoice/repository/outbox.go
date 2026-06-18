@@ -64,6 +64,18 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 	if curStatus == "lunas" {
 		return ErrAlreadyLunas
 	}
+
+	// For cash payments, lock the stamped session and confirm it is still open, so
+	// a payment cannot land in a session being concurrently closed (which would
+	// drop it from the tutup-kas reconciliation). Detach from a missing/closed
+	// session rather than corrupt its recon.
+	if p.CashSessionID != nil {
+		var sessStatus string
+		if err := tx.QueryRow(ctx, `SELECT status FROM cash_sessions WHERE id=$1 AND org_id=$2 FOR UPDATE`, *p.CashSessionID, inv.OrgID).Scan(&sessStatus); err != nil || sessStatus != "open" {
+			p.CashSessionID = nil
+		}
+	}
+
 	remaining := total - paid
 	applied := p.Amount
 	if applied > remaining {
