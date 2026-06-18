@@ -76,7 +76,10 @@ func main() {
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 
-	api := app.Group("/api/v1/inventory", authMW)
+	// Staff-only: equipment handover, member sync, and QR scanning are
+	// departure-day staff operations — not reachable by an external agent or a
+	// jamaah-portal token.
+	api := app.Group("/api/v1/inventory", authMW, sharedMW.RequireStaff)
 	api.Post("/sync", inventoryHandler.SyncMembers)
 	api.Get("/forecast/:packageId", inventoryHandler.GetForecast)
 	api.Get("/fulfillment/:packageId", inventoryHandler.GetFulfillment)
