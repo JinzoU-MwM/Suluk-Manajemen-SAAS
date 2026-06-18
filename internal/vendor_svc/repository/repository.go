@@ -272,9 +272,9 @@ func (r *VendorRepo) GetOverdueBills(ctx context.Context, orgID uuid.UUID) ([]mo
 func (r *VendorRepo) GetBillsDueSoon(ctx context.Context, orgID uuid.UUID, withinDays int) ([]model.VendorBill, error) {
 	query := fmt.Sprintf(`SELECT %s FROM vendor_bills vb JOIN vendors v ON vb.vendor_id = v.id
 		WHERE vb.org_id = $1 AND vb.status IN ('belum_bayar','sebagian') AND vb.due_date IS NOT NULL
-		AND vb.due_date >= NOW() AND vb.due_date <= NOW() + INTERVAL '%d days'
-		ORDER BY vb.due_date ASC`, billCols, withinDays)
-	rows, err := r.pool.Query(ctx, query, orgID)
+		AND vb.due_date >= NOW() AND vb.due_date <= NOW() + ($2 * INTERVAL '1 day')
+		ORDER BY vb.due_date ASC`, billCols)
+	rows, err := r.pool.Query(ctx, query, orgID, withinDays)
 	if err != nil {
 		return nil, err
 	}
@@ -440,6 +440,9 @@ func (r *VendorRepo) GetDebtSummary(ctx context.Context, orgID uuid.UUID, vendor
 			return nil, err
 		}
 		s.ByStatus[status] = model.BillStatusSummary{Count: count, TotalAmount: total}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return s, nil

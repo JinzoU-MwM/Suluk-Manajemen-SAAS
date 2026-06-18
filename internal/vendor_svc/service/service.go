@@ -3,24 +3,31 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/shared/events"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 	"github.com/jamaah-in/v2/internal/shared/outbox"
 	"github.com/jamaah-in/v2/internal/vendor_svc/model"
 	"github.com/jamaah-in/v2/internal/vendor_svc/repository"
 )
 
 type VendorService struct {
-	repo *repository.VendorRepo
+	repo        *repository.VendorRepo
+	packageAddr string
+	httpc       *httpclient.Client
 }
 
-var ErrVendorNotFound = repository.ErrVendorNotFound
+var (
+	ErrVendorNotFound  = repository.ErrVendorNotFound
+	ErrPackageNotFound = errors.New("package not found for this organization")
+)
 
-func NewVendorService(repo *repository.VendorRepo) *VendorService {
-	return &VendorService{repo: repo}
+func NewVendorService(repo *repository.VendorRepo, packageAddr string) *VendorService {
+	return &VendorService{repo: repo, packageAddr: packageAddr, httpc: httpclient.New()}
 }
 
 // --- Vendor Master ---
@@ -112,7 +119,23 @@ func (s *VendorService) ListVendors(ctx context.Context, orgID uuid.UUID, vendor
 
 // --- Vendor Bills ---
 
-func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req model.CreateBillRequest) (*model.VendorBill, error) {
+func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req model.CreateBillRequest, authToken string) (*model.VendorBill, error) {
+	// The vendor must belong to the caller's org — authoritative, not
+	// best-effort. vendor_bills.vendor_id has no org-scoped FK, so without this
+	// a foreign-org vendor_id would be accepted and later leak that vendor's
+	// name/type into this org's bill reads via the (un-org-scoped) JOIN.
+	vendor, err := s.repo.GetVendorByID(ctx, req.VendorID, orgID)
+	if err != nil {
+		return nil, err // ErrVendorNotFound
+	}
+
+	// The package lives in package-service (separate DB) — no local FK can scope
+	// it by org. Confirm it belongs to the caller's org so a bill can't be
+	// attached to a foreign-org package_id and contaminate package debt rollups.
+	if err := s.validatePackage(ctx, req.PackageID, authToken); err != nil {
+		return nil, err
+	}
+
 	if req.Currency == "" {
 		req.Currency = "IDR"
 	}
@@ -143,13 +166,9 @@ func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req mod
 	}
 
 	// vendor.bill.created → Dr Beban / Cr Hutang Vendor at the IDR-converted
-	// amount (GL is IDR). Vendor name is best-effort.
+	// amount (GL is IDR).
 	amountIDR := int64(float64(req.Amount) * req.ExchangeRate)
-	vendorName := ""
-	if v, verr := s.repo.GetVendorByID(ctx, req.VendorID, orgID); verr == nil && v != nil {
-		vendorName = v.Name
-	}
-	payload, _ := json.Marshal(map[string]any{"amount": amountIDR, "vendor_name": vendorName})
+	payload, _ := json.Marshal(map[string]any{"amount": amountIDR, "vendor_name": vendor.Name})
 	evt := outbox.Event{
 		OrgID:         orgID,
 		AggregateType: "vendor_bill",
@@ -195,13 +214,24 @@ func (s *VendorService) UpdateBill(ctx context.Context, id, orgID uuid.UUID, req
 			b.DueDate = d
 		}
 	}
-	if req.Status != nil {
-		b.Status = *req.Status
-	}
 	if err := s.repo.UpdateBill(ctx, b); err != nil {
 		return nil, err
 	}
-	return s.repo.GetBillByID(ctx, id, orgID)
+
+	// Status is derived, never client-set. Editing amount/exchange_rate shifts
+	// the DB-computed amount_idr, so recompute against paid_amount to keep
+	// lunas/sebagian/belum_bayar consistent with reality.
+	updated, err := s.repo.GetBillByID(ctx, id, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if status := deriveBillStatus(updated.PaidAmount, updated.AmountIDR); status != updated.Status {
+		if err := s.repo.UpdateBillStatus(ctx, id, status); err != nil {
+			return nil, err
+		}
+		updated.Status = status
+	}
+	return updated, nil
 }
 
 func (s *VendorService) DeleteBill(ctx context.Context, id, orgID uuid.UUID) error {
@@ -226,6 +256,9 @@ func (s *VendorService) GetOverdueBills(ctx context.Context, orgID uuid.UUID) ([
 func (s *VendorService) GetBillsDueSoon(ctx context.Context, orgID uuid.UUID, withinDays int) ([]model.VendorBill, error) {
 	if withinDays < 1 {
 		withinDays = 7
+	}
+	if withinDays > 365 {
+		withinDays = 365
 	}
 	return s.repo.GetBillsDueSoon(ctx, orgID, withinDays)
 }
@@ -254,8 +287,11 @@ func (s *VendorService) CreatePayment(ctx context.Context, orgID uuid.UUID, req 
 	}
 
 	paymentDate, err := repository.ParseDate(req.PaymentDate)
-	if err != nil || paymentDate == nil {
+	if err != nil {
 		return nil, err
+	}
+	if paymentDate == nil {
+		return nil, errors.New("payment_date is required")
 	}
 
 	p := &model.VendorPayment{
@@ -284,12 +320,7 @@ func (s *VendorService) CreatePayment(ctx context.Context, orgID uuid.UUID, req 
 	if err != nil {
 		return p, nil
 	}
-
-	if updatedBill.PaidAmount >= updatedBill.AmountIDR {
-		_ = s.repo.UpdateBillStatus(ctx, bill.ID, "lunas")
-	} else if updatedBill.PaidAmount > 0 {
-		_ = s.repo.UpdateBillStatus(ctx, bill.ID, "sebagian")
-	}
+	_ = s.repo.UpdateBillStatus(ctx, bill.ID, deriveBillStatus(updatedBill.PaidAmount, updatedBill.AmountIDR))
 
 	return p, nil
 }
@@ -317,14 +348,23 @@ func (s *VendorService) DeletePayment(ctx context.Context, id, orgID uuid.UUID) 
 	if err != nil {
 		return nil
 	}
-	if updatedBill.PaidAmount >= updatedBill.AmountIDR {
-		_ = s.repo.UpdateBillStatus(ctx, billID, "lunas")
-	} else if updatedBill.PaidAmount > 0 {
-		_ = s.repo.UpdateBillStatus(ctx, billID, "sebagian")
-	} else {
-		_ = s.repo.UpdateBillStatus(ctx, billID, "belum_bayar")
-	}
+	_ = s.repo.UpdateBillStatus(ctx, billID, deriveBillStatus(updatedBill.PaidAmount, updatedBill.AmountIDR))
 	return nil
+}
+
+// deriveBillStatus is the single source of truth for a bill's payment status:
+// lunas once paid_amount covers the IDR total, sebagian while partially paid,
+// belum_bayar otherwise. Used by create/delete payment and bill update so the
+// status can never be set inconsistently with paid_amount.
+func deriveBillStatus(paidAmount, amountIDR int64) string {
+	switch {
+	case paidAmount >= amountIDR:
+		return "lunas"
+	case paidAmount > 0:
+		return "sebagian"
+	default:
+		return "belum_bayar"
+	}
 }
 
 func (s *VendorService) ListPaymentsByBill(ctx context.Context, billID, orgID uuid.UUID) ([]model.VendorPayment, error) {
@@ -340,6 +380,21 @@ func (s *VendorService) ListPaymentsByVendor(ctx context.Context, vendorID, orgI
 	}
 	offset := (page - 1) * limit
 	return s.repo.ListPaymentsByVendor(ctx, vendorID, orgID, offset, limit)
+}
+
+// validatePackage confirms the package belongs to the caller's org by fetching
+// it from package-service with the caller's own (org-scoped) token: a foreign or
+// missing package returns 404 there, surfaced here as ErrPackageNotFound, which
+// blocks a cross-org bill. If package-service isn't configured (dev/test) or no
+// token is present, it no-ops — mirroring jamaah-service's seat reservation.
+func (s *VendorService) validatePackage(ctx context.Context, packageID uuid.UUID, authToken string) error {
+	if s.packageAddr == "" || authToken == "" {
+		return nil
+	}
+	if _, err := s.httpc.GetRaw(ctx, s.packageAddr, "/api/v1/packages/"+packageID.String(), authToken); err != nil {
+		return ErrPackageNotFound
+	}
+	return nil
 }
 
 func strPtr(s string) *string {

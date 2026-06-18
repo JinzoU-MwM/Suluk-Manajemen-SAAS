@@ -341,6 +341,7 @@ services:
       APP_ENV: production
       VENDOR_SERVICE_PORT: "50057"
       NATS_ADDR: nats://nats:4222
+      PACKAGE_SERVICE_ADDR: package-service:50052
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
