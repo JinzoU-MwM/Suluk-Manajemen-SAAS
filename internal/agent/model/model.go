@@ -49,18 +49,18 @@ type DownlineNode struct {
 }
 
 type AgentCommission struct {
-	ID               string     `json:"id" db:"id"`
-	OrgID            string     `json:"org_id" db:"org_id"`
-	AgentID          string     `json:"agent_id" db:"agent_id"`
-	JamaahID         *string    `json:"jamaah_id,omitempty" db:"jamaah_id"`
-	InvoiceID        *string    `json:"invoice_id,omitempty" db:"invoice_id"`
-	PackageID        *string    `json:"package_id,omitempty" db:"package_id"`
-	JamaahName       string     `json:"jamaah_name" db:"jamaah_name"`
-	PackageName      string     `json:"package_name" db:"package_name"`
-	CommissionAmount int64      `json:"commission_amount" db:"commission_amount"`
-	CommissionRate   float64    `json:"commission_rate" db:"commission_rate"`
-	Status           string     `json:"status" db:"status"`
-	PaidAt           *time.Time `json:"paid_at,omitempty" db:"paid_at"`
+	ID                 string     `json:"id" db:"id"`
+	OrgID              string     `json:"org_id" db:"org_id"`
+	AgentID            string     `json:"agent_id" db:"agent_id"`
+	JamaahID           *string    `json:"jamaah_id,omitempty" db:"jamaah_id"`
+	InvoiceID          *string    `json:"invoice_id,omitempty" db:"invoice_id"`
+	PackageID          *string    `json:"package_id,omitempty" db:"package_id"`
+	JamaahName         string     `json:"jamaah_name" db:"jamaah_name"`
+	PackageName        string     `json:"package_name" db:"package_name"`
+	CommissionAmount   int64      `json:"commission_amount" db:"commission_amount"`
+	CommissionRate     float64    `json:"commission_rate" db:"commission_rate"`
+	Status             string     `json:"status" db:"status"`
+	PaidAt             *time.Time `json:"paid_at,omitempty" db:"paid_at"`
 	Notes              string     `json:"notes" db:"notes"`
 	TierLevel          int        `json:"tier_level" db:"tier_level"`
 	SourceCommissionID *string    `json:"source_commission_id,omitempty" db:"source_commission_id"`

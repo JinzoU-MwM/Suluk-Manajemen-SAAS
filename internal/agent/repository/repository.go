@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,10 @@ import (
 
 	"github.com/jamaah-in/v2/internal/agent/model"
 )
+
+// ErrCommissionNotPayable means PayCommission matched no pending commission for
+// the org (already paid, not found, or wrong org).
+var ErrCommissionNotPayable = errors.New("commission not found or already paid")
 
 type AgentRepo struct {
 	pool *pgxpool.Pool
@@ -174,7 +179,7 @@ func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status,
 	query := fmt.Sprintf(`
 		SELECT c.id, c.org_id, c.agent_id, c.jamaah_id, c.invoice_id, c.package_id, c.jamaah_name, c.package_name,
 		       c.commission_amount, c.commission_rate, c.status, c.paid_at, c.notes, c.tier_level, c.source_commission_id, c.created_at, c.updated_at, a.name
-		FROM agent_commissions c JOIN agents a ON c.agent_id = a.id
+		FROM agent_commissions c JOIN agents a ON c.agent_id = a.id AND a.org_id = c.org_id
 		%s ORDER BY c.created_at DESC LIMIT $%d OFFSET $%d
 	`, baseWhere, argIdx, argIdx+1)
 	selectArgs := append(args, limit, offset)
@@ -201,17 +206,23 @@ func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status,
 
 func (r *AgentRepo) PayCommission(ctx context.Context, id, orgID string) error {
 	now := time.Now()
-	_, err := r.pool.Exec(ctx, `
+	tag, err := r.pool.Exec(ctx, `
 		UPDATE agent_commissions SET status = 'paid', paid_at = $1, updated_at = $1 WHERE id = $2 AND org_id = $3 AND status = 'pending'
 	`, now, id, orgID)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrCommissionNotPayable
+	}
+	return nil
 }
 
 func (r *AgentRepo) GetAgentCommissions(ctx context.Context, agentID, orgID string) ([]model.AgentCommission, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT c.id, c.org_id, c.agent_id, c.jamaah_id, c.invoice_id, c.package_id, c.jamaah_name, c.package_name,
 		       c.commission_amount, c.commission_rate, c.status, c.paid_at, c.notes, c.tier_level, c.source_commission_id, c.created_at, c.updated_at, a.name
-		FROM agent_commissions c JOIN agents a ON c.agent_id = a.id
+		FROM agent_commissions c JOIN agents a ON c.agent_id = a.id AND a.org_id = c.org_id
 		WHERE c.agent_id = $1 AND c.org_id = $2 ORDER BY c.created_at DESC
 	`, agentID, orgID)
 	if err != nil {

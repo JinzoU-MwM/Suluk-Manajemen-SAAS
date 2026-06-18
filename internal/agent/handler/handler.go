@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/jamaah-in/v2/internal/agent/model"
+	"github.com/jamaah-in/v2/internal/agent/repository"
 	"github.com/jamaah-in/v2/internal/agent/service"
 	"github.com/jamaah-in/v2/internal/shared/middleware"
 	"github.com/jamaah-in/v2/internal/shared/response"
@@ -91,8 +93,14 @@ func (h *AgentHandler) CreateCommission(c *fiber.Ctx) error {
 	if req.AgentID == "" {
 		return response.BadRequest(c, "agent_id is required")
 	}
+	if req.CommissionAmount < 1 {
+		return response.BadRequest(c, "commission_amount minimal 1")
+	}
 	comm, err := h.svc.CreateCommission(c.Context(), claims.OrgID.String(), req)
 	if err != nil {
+		if errors.Is(err, service.ErrAgentNotFound) {
+			return response.BadRequest(c, "agent_id tidak ditemukan untuk organisasi ini")
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, comm)
@@ -121,6 +129,9 @@ func (h *AgentHandler) PayCommission(c *fiber.Ctx) error {
 		return response.Unauthorized(c, "unauthorized")
 	}
 	if err := h.svc.PayCommission(c.Context(), c.Params("id"), claims.OrgID.String()); err != nil {
+		if errors.Is(err, repository.ErrCommissionNotPayable) {
+			return response.Conflict(c, "komisi tidak ditemukan atau sudah dibayar")
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "commission paid"})
