@@ -276,14 +276,8 @@ func (s *InvoiceService) RecordPayment(ctx context.Context, orgID, userID, invoi
 		payment.CashSessionID = s.repo.ActiveSessionID(ctx, orgID, userID)
 	}
 
-	inv.AmountPaid += req.Amount
-	inv.AmountRemaining = inv.TotalAmount - inv.AmountPaid
-	if inv.AmountRemaining <= 0 {
-		inv.AmountRemaining = 0
-		inv.Status = string(model.InvoiceStatusLunas)
-	} else if inv.AmountPaid > 0 {
-		inv.Status = string(model.InvoiceStatusSebagian)
-	}
+	// Balances are recomputed under a row lock inside RecordPaymentTx (prevents
+	// lost updates on concurrent payments and rejects overpayment).
 
 	// Persist payment + invoice update + payment.received outbox event in one tx.
 	payload, _ := json.Marshal(map[string]any{

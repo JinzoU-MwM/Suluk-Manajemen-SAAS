@@ -2,16 +2,21 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/invoice/model"
+	"github.com/jamaah-in/v2/internal/shared/events"
+	"github.com/jamaah-in/v2/internal/shared/outbox"
 )
 
 var (
 	ErrRefundNotFound   = fmt.Errorf("refund not found")
 	ErrRefundNotPending = fmt.Errorf("refund not in pending status")
+	ErrRefundExceedsPaid = fmt.Errorf("refund amount exceeds invoice paid amount")
 	ErrPolicyNotFound   = fmt.Errorf("refund policy not found")
 )
 
@@ -110,17 +115,65 @@ func (r *InvoiceRepo) ProcessRefund(ctx context.Context, id, orgID uuid.UUID) er
 }
 
 func (r *InvoiceRepo) CompleteRefund(ctx context.Context, id, orgID uuid.UUID) error {
-	result, err := r.pool.Exec(ctx, `
-		UPDATE refunds SET status = 'completed', updated_at = NOW()
-		WHERE id = $1 AND org_id = $2 AND status = 'processed'
-	`, id, orgID)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected() == 0 {
+	defer tx.Rollback(ctx)
+
+	// Confirm the refund is processed and capture its amount + invoice.
+	var invoiceID uuid.UUID
+	var amount int64
+	if err := tx.QueryRow(ctx, `SELECT invoice_id, amount FROM refunds WHERE id=$1 AND org_id=$2 AND status='processed' FOR UPDATE`,
+		id, orgID).Scan(&invoiceID, &amount); err != nil {
 		return fmt.Errorf("refund not in processed status")
 	}
-	return nil
+	if _, err := tx.Exec(ctx, `UPDATE refunds SET status='completed', updated_at=NOW() WHERE id=$1 AND org_id=$2`, id, orgID); err != nil {
+		return err
+	}
+
+	// Reduce the invoice's paid amount so the subledger matches the GL.
+	var total, paid int64
+	var invStatus, invNumber string
+	if err := tx.QueryRow(ctx, `SELECT total_amount, amount_paid, status, invoice_number FROM invoices WHERE id=$1 AND org_id=$2 FOR UPDATE`,
+		invoiceID, orgID).Scan(&total, &paid, &invStatus, &invNumber); err != nil {
+		return ErrInvoiceNotFound
+	}
+	newPaid := paid - amount
+	if newPaid < 0 {
+		newPaid = 0
+	}
+	newRemaining := total - newPaid
+	if newRemaining < 0 {
+		newRemaining = 0
+	}
+	if invStatus != "batal" {
+		if newRemaining <= 0 {
+			invStatus = "lunas"
+		} else if newPaid > 0 {
+			invStatus = "sebagian"
+		} else {
+			invStatus = "belum_bayar"
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE invoices SET amount_paid=$3, amount_remaining=$4, status=$5, updated_at=NOW() WHERE id=$1 AND org_id=$2`,
+		invoiceID, orgID, newPaid, newRemaining, invStatus); err != nil {
+		return err
+	}
+
+	// Emit refund.completed so accounting posts Dr Piutang / Cr Kas|Bank.
+	payload, _ := json.Marshal(map[string]any{"amount": amount, "invoice_number": invNumber})
+	if err := outbox.Insert(ctx, tx, outbox.Event{
+		OrgID:         orgID,
+		AggregateType: "invoice",
+		AggregateID:   invoiceID,
+		EventType:     events.EventRefundCompleted,
+		Payload:       payload,
+		OccurredAt:    time.Now(),
+	}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *InvoiceRepo) RejectRefund(ctx context.Context, id, orgID uuid.UUID) error {

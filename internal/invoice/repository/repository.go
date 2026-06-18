@@ -26,6 +26,7 @@ var (
 	ErrPaymentNotFound  = fmt.Errorf("payment not found")
 	ErrAlreadyCancelled = fmt.Errorf("invoice already cancelled")
 	ErrAlreadyLunas     = fmt.Errorf("invoice already fully paid")
+	ErrOverpayment      = fmt.Errorf("payment exceeds remaining balance")
 )
 
 var invoiceCols = `id, org_id, invoice_number, jamaah_id, package_id, registration_id, room_type,

@@ -18,6 +18,13 @@ type RefundService struct {
 }
 
 func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest) (*model.Refund, error) {
+	inv, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if req.Amount > inv.AmountPaid {
+		return nil, repository.ErrRefundExceedsPaid
+	}
 	ref := &model.Refund{
 		OrgID:     orgID,
 		InvoiceID: invoiceID,

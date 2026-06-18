@@ -105,7 +105,7 @@ func main() {
 	// authenticated role (cs needs to view invoices/balances).
 	finRole := sharedMW.RequireRole("owner", "admin", "finance")
 
-	invoices := app.Group("/api/v1/invoices", authMW)
+	invoices := app.Group("/api/v1/invoices", authMW, sharedMW.RequireStaff)
 	invoices.Post("/", finRole, invoiceHandler.CreateInvoice)
 	invoices.Get("/", invoiceHandler.ListInvoices)
 	invoices.Get("/summary", invoiceHandler.GetSummary)
@@ -134,18 +134,18 @@ func main() {
 	// Protected by an HMAC sig query param rather than a JWT.
 	app.Get("/api/v1/payment/invoice/:orderID", invoiceHandler.SubscriptionInvoicePDF)
 
-	payment := app.Group("/api/v1/payment", authMW)
+	payment := app.Group("/api/v1/payment", authMW, sharedMW.RequireStaff)
 	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)
 	payment.Get("/status/:id", invoiceHandler.CheckPaymentStatus)
 
 	// Kasir POS — cash drawer sessions (buka/tutup kas).
-	sessions := app.Group("/api/v1/cash-sessions", authMW)
+	sessions := app.Group("/api/v1/cash-sessions", authMW, sharedMW.RequireStaff)
 	sessions.Get("/", invoiceHandler.ListCashSessions)
 	sessions.Get("/active", invoiceHandler.GetActiveCashSession)
 	sessions.Post("/", finRole, invoiceHandler.OpenCashSession)
 	sessions.Post("/:id/close", finRole, invoiceHandler.CloseCashSession)
 
-	refunds := app.Group("/api/v1/refunds", authMW)
+	refunds := app.Group("/api/v1/refunds", authMW, sharedMW.RequireStaff)
 	refunds.Get("/policies", refundHandler.ListPolicies)
 	refunds.Post("/policies", finRole, refundHandler.CreatePolicy)
 	refunds.Put("/policies/:id", finRole, refundHandler.UpdatePolicy)

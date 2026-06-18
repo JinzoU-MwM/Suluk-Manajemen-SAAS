@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/invoice/model"
+	"github.com/jamaah-in/v2/internal/invoice/repository"
 	"github.com/jamaah-in/v2/internal/invoice/service"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 )
@@ -69,6 +71,12 @@ func (h *RefundHandler) InitiateRefund(c *fiber.Ctx) error {
 
 	ref, err := h.svc.InitiateRefund(c.Context(), claims.OrgID, invoiceID, req)
 	if err != nil {
+		if errors.Is(err, repository.ErrInvoiceNotFound) {
+			return c.Status(404).JSON(fiber.Map{"success": false, "error": "invoice not found"})
+		}
+		if errors.Is(err, repository.ErrRefundExceedsPaid) {
+			return c.Status(400).JSON(fiber.Map{"success": false, "error": err.Error()})
+		}
 		return c.Status(500).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}
 	return c.Status(201).JSON(fiber.Map{"success": true, "data": ref})

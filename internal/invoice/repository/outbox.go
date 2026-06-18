@@ -46,6 +46,31 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 	}
 	defer tx.Rollback(ctx)
 
+	// Lock the invoice and recompute balances under the lock: prevents lost
+	// updates on concurrent payments and rejects overpayment.
+	var total, paid int64
+	var curStatus string
+	if err := tx.QueryRow(ctx, `SELECT total_amount, amount_paid, status FROM invoices WHERE id=$1 AND org_id=$2 FOR UPDATE`,
+		inv.ID, inv.OrgID).Scan(&total, &paid, &curStatus); err != nil {
+		return ErrInvoiceNotFound
+	}
+	if curStatus == "batal" {
+		return ErrAlreadyCancelled
+	}
+	if curStatus == "lunas" {
+		return ErrAlreadyLunas
+	}
+	if p.Amount > total-paid {
+		return ErrOverpayment
+	}
+	newPaid := paid + p.Amount
+	newRemaining := total - newPaid
+	newStatus := "sebagian"
+	if newRemaining <= 0 {
+		newRemaining = 0
+		newStatus = "lunas"
+	}
+
 	if err := tx.QueryRow(ctx, `INSERT INTO payments (id, org_id, invoice_id, amount, payment_method, bank_name, account_number, reference_number, proof_url, notes, received_by, paid_at, cash_session_id)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING created_at`,
 		p.ID, p.OrgID, p.InvoiceID, p.Amount, p.PaymentMethod, p.BankName, p.AccountNumber,
@@ -53,19 +78,17 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 		return err
 	}
 
-	tag, err := tx.Exec(ctx, `UPDATE invoices SET discount_amount=$2, surcharge_amount=$3, total_amount=$4,
-		amount_paid=$5, amount_remaining=$6, due_date=$7, notes=$8, status=$9, updated_at=NOW() WHERE id = $1 AND org_id = $10`,
-		inv.ID, inv.DiscountAmount, inv.SurchargeAmount, inv.TotalAmount,
-		inv.AmountPaid, inv.AmountRemaining, inv.DueDate, inv.Notes, inv.Status, inv.OrgID)
-	if err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE invoices SET amount_paid=$3, amount_remaining=$4, status=$5, updated_at=NOW() WHERE id=$1 AND org_id=$2`,
+		inv.ID, inv.OrgID, newPaid, newRemaining, newStatus); err != nil {
 		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrInvoiceNotFound
 	}
 
 	if err := outbox.Insert(ctx, tx, evt); err != nil {
 		return err
 	}
+	// Reflect the locked computation back for the caller (schedule allocation + response).
+	inv.AmountPaid = newPaid
+	inv.AmountRemaining = newRemaining
+	inv.Status = newStatus
 	return tx.Commit(ctx)
 }
