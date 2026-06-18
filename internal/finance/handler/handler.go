@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
@@ -8,8 +9,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/finance/model"
+	"github.com/jamaah-in/v2/internal/finance/repository"
 	"github.com/jamaah-in/v2/internal/finance/service"
-	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	"github.com/jamaah-in/v2/internal/shared/response"
 )
 
@@ -22,7 +24,10 @@ func NewFinanceHandler(svc *service.FinanceService) *FinanceHandler {
 }
 
 func (h *FinanceHandler) CreateExpense(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 
 	var req model.CreateExpenseRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -43,8 +48,19 @@ func (h *FinanceHandler) CreateExpense(c *fiber.Ctx) error {
 	if req.Amount < 1 {
 		return response.BadRequest(c, "amount must be at least 1")
 	}
+	if req.ExchangeRate < 0 {
+		return response.BadRequest(c, "exchange_rate tidak boleh negatif")
+	}
 	if req.ExpenseDate == "" {
 		return response.BadRequest(c, "expense_date is required")
+	}
+	if _, err := repository.ParseDate(req.ExpenseDate); err != nil {
+		return response.BadRequest(c, "format expense_date tidak valid (gunakan YYYY-MM-DD)")
+	}
+	if req.DueDate != "" {
+		if _, err := repository.ParseDate(req.DueDate); err != nil {
+			return response.BadRequest(c, "format due_date tidak valid (gunakan YYYY-MM-DD)")
+		}
 	}
 	if req.Status != "" && !isValidExpenseStatus(req.Status) {
 		return response.BadRequest(c, "status must be one of: belum_bayar, sebagian, lunas")
@@ -58,7 +74,10 @@ func (h *FinanceHandler) CreateExpense(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) GetExpense(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid expense id")
@@ -72,7 +91,10 @@ func (h *FinanceHandler) GetExpense(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) UpdateExpense(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid expense id")
@@ -88,16 +110,28 @@ func (h *FinanceHandler) UpdateExpense(c *fiber.Ctx) error {
 	if req.Status != nil && !isValidExpenseStatus(*req.Status) {
 		return response.BadRequest(c, "status must be one of: belum_bayar, sebagian, lunas")
 	}
+	if req.Amount != nil && *req.Amount < 1 {
+		return response.BadRequest(c, "amount must be at least 1")
+	}
+	if req.ExchangeRate != nil && *req.ExchangeRate <= 0 {
+		return response.BadRequest(c, "exchange_rate harus lebih dari 0")
+	}
 
 	expense, err := h.svc.UpdateExpense(c.Context(), id, claims.OrgID, req)
 	if err != nil {
+		if errors.Is(err, repository.ErrExpenseNotFound) {
+			return response.NotFound(c, "expense not found")
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, expense)
 }
 
 func (h *FinanceHandler) DeleteExpense(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid expense id")
@@ -109,7 +143,10 @@ func (h *FinanceHandler) DeleteExpense(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) ListExpenses(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	category := c.Query("category")
 	status := c.Query("status")
 	page, _ := strconv.Atoi(c.Query("page", "1"))
@@ -123,7 +160,10 @@ func (h *FinanceHandler) ListExpenses(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) ListExpensesByPackage(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	packageID, err := uuid.Parse(c.Params("pkgId"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -137,13 +177,17 @@ func (h *FinanceHandler) ListExpensesByPackage(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) GetSummary(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	var packageID *uuid.UUID
 	if pid := c.Query("package_id"); pid != "" {
 		parsed, err := uuid.Parse(pid)
-		if err == nil {
-			packageID = &parsed
+		if err != nil {
+			return response.BadRequest(c, "invalid package_id")
 		}
+		packageID = &parsed
 	}
 
 	summary, err := h.svc.GetSummary(c.Context(), claims.OrgID, packageID)
@@ -154,7 +198,10 @@ func (h *FinanceHandler) GetSummary(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) GetOverdueExpenses(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	expenses, err := h.svc.GetOverdueExpenses(c.Context(), claims.OrgID)
 	if err != nil {
 		return response.Internal(c, err)
@@ -163,7 +210,10 @@ func (h *FinanceHandler) GetOverdueExpenses(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) GetPnL(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	packageID, err := uuid.Parse(c.Params("pkgId"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -178,7 +228,10 @@ func (h *FinanceHandler) GetPnL(c *fiber.Ctx) error {
 }
 
 func (h *FinanceHandler) GetOwnerDashboard(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 
 	if claims.Role != "owner" && claims.Role != "admin" {
 		return response.Forbidden(c, "only owner and admin can access dashboard")
