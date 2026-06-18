@@ -190,6 +190,9 @@ func (r *FinanceRepo) GetSummary(ctx context.Context, orgID uuid.UUID, packageID
 		}
 		s.ByCategory[cat] = model.CategorySummary{Count: count, TotalAmount: total}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	statusQuery := `SELECT status, COUNT(*) FROM trip_expenses WHERE org_id = $1`
 	statusArgs := []any{orgID}
@@ -211,6 +214,9 @@ func (r *FinanceRepo) GetSummary(ctx context.Context, orgID uuid.UUID, packageID
 			return nil, err
 		}
 		s.ByStatus[status] = count
+	}
+	if err := sRows.Err(); err != nil {
+		return nil, err
 	}
 
 	return s, nil

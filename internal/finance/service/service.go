@@ -71,10 +71,10 @@ func (s *FinanceService) CreateExpense(ctx context.Context, orgID uuid.UUID, req
 		Amount:       req.Amount,
 		Currency:     req.Currency,
 		ExchangeRate: req.ExchangeRate,
-		AmountIDR:    int64(float64(req.Amount) * req.ExchangeRate),
-		ExpenseDate:  *expenseDate,
-		DueDate:      dueDate,
-		Status:       req.Status,
+		// AmountIDR is a DB GENERATED column; CreateExpense RETURNINGs it.
+		ExpenseDate: *expenseDate,
+		DueDate:     dueDate,
+		Status:      req.Status,
 	}
 
 	if err := s.repo.CreateExpense(ctx, e); err != nil {
@@ -135,8 +135,7 @@ func (s *FinanceService) UpdateExpense(ctx context.Context, id, orgID uuid.UUID,
 		e.Status = *req.Status
 	}
 
-	e.AmountIDR = int64(float64(e.Amount) * e.ExchangeRate)
-
+	// AmountIDR is a DB GENERATED column and is repopulated by the re-read below.
 	if err := s.repo.UpdateExpense(ctx, e); err != nil {
 		return nil, err
 	}
@@ -459,6 +458,10 @@ func (s *FinanceService) GetPnL(ctx context.Context, orgID, packageID uuid.UUID,
 		return nil, fmt.Errorf("list expenses by package: %w", err)
 	}
 
+	// Track failed upstream sources so the P&L can signal partial data instead of
+	// silently reporting zeros as if they were real (mirrors the owner dashboard).
+	var degraded []string
+
 	invoiceData, err := s.fetchFromService(ctx, s.invoiceAddr, fmt.Sprintf("/api/v1/invoices/package/%s/revenue", packageID), authToken)
 	if err == nil {
 		var rev model.RevenueSummary
@@ -467,7 +470,11 @@ func (s *FinanceService) GetPnL(ctx context.Context, orgID, packageID uuid.UUID,
 			pnl.TotalRevenue = rev.TotalBilled
 			pnl.RevenueCollected = rev.TotalPaid
 			pnl.RevenueOutstanding = rev.TotalRemaining
+		} else {
+			degraded = append(degraded, "invoices")
 		}
+	} else {
+		degraded = append(degraded, "invoices")
 	}
 
 	vendorSummaryData, err := s.fetchFromService(ctx, s.vendorAddr, fmt.Sprintf("/api/v1/vendors/bills/package/%s", packageID), authToken)
@@ -478,7 +485,11 @@ func (s *FinanceService) GetPnL(ctx context.Context, orgID, packageID uuid.UUID,
 			pnl.TotalVendorCosts = vcs.TotalAmountIDR
 			pnl.VendorPaidOut = vcs.TotalPaidIDR
 			pnl.VendorOutstanding = vcs.TotalOutstandingIDR
+		} else {
+			degraded = append(degraded, "vendor_costs")
 		}
+	} else {
+		degraded = append(degraded, "vendor_costs")
 	}
 
 	projectedRevenue, lowestPrice := projectedRevenue(pkg)
@@ -504,17 +515,21 @@ func (s *FinanceService) GetPnL(ctx context.Context, orgID, packageID uuid.UUID,
 		}
 	}
 
-	actualExpense := sumCategoryTotals(actualCategories)
+	// Profit uses the EXACT operating-expense + vendor-cost summaries, NOT the
+	// sampled (<=500) vendor bill breakdown in actualCategories — otherwise a failed
+	// or capped vendor bill-list call would silently drop vendor cost and overstate
+	// profit. actualCategories is used only for the per-category cost breakdown.
+	totalActualCost := pnl.TotalOpExpenses + pnl.TotalVendorCosts
 	pnl.Actual = &model.ActualPnL{
 		Revenue:       pnl.TotalRevenue,
-		Expense:       actualExpense,
-		Profit:        pnl.TotalRevenue - actualExpense,
-		MarginPercent: marginPercent(pnl.TotalRevenue-actualExpense, pnl.TotalRevenue),
+		Expense:       totalActualCost,
+		Profit:        pnl.TotalRevenue - totalActualCost,
+		MarginPercent: marginPercent(pnl.TotalRevenue-totalActualCost, pnl.TotalRevenue),
 	}
 
 	pnl.CostBreakdown = buildCostBreakdown(projectedCategories, actualCategories)
 	if pnl.Revenue != nil {
-		pnl.GrossProfit = pnl.TotalRevenue - actualExpense
+		pnl.GrossProfit = pnl.TotalRevenue - totalActualCost
 		pnl.NetProfit = pnl.GrossProfit
 		pnl.CashFlow = pnl.RevenueCollected - pnl.VendorPaidOut - pnl.TotalOpExpenses
 	}
@@ -522,6 +537,11 @@ func (s *FinanceService) GetPnL(ctx context.Context, orgID, packageID uuid.UUID,
 	pnl.DataNotes = []string{
 		"equipment: reflects vendor procurement cost (perlengkapan bills); distributed inventory HPP requires the inventory module (Phase 3.3)",
 		"cost_breakdown: vendor bill category detail is sampled up to 500 bills; summary totals are always exact",
+	}
+
+	if len(degraded) > 0 {
+		pnl.Partial = true
+		pnl.DegradedSources = degraded
 	}
 
 	return pnl, nil

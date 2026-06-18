@@ -6,13 +6,19 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 
-	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
+	"github.com/jamaah-in/v2/internal/finance/model"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
+	"github.com/jamaah-in/v2/internal/shared/response"
 )
 
 func (h *FinanceHandler) ExportPnL(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	packageID := c.Query("package_id", "")
 
 	f := excelize.NewFile()
@@ -40,20 +46,34 @@ func (h *FinanceHandler) ExportPnL(c *fiber.Ctx) error {
 	headerStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Color: "FFFFFF"}, Fill: excelize.Fill{Type: "pattern", Color: []string{"1E40AF"}, Pattern: 1}})
 	f.SetCellStyle(sheet, "A4", "C4", headerStyle)
 
-	// Get data
-	expenses, _, _ := h.svc.ListExpenses(c.Context(), claims.OrgID, "", "", 1, 500)
+	// Get data — use the package-scoped query when filtering so we don't post-filter
+	// after a 500-row org-wide cap (which can silently drop a package's later rows).
+	var expenses []model.TripExpense
+	if packageID != "" {
+		pkgUUID, err := uuid.Parse(packageID)
+		if err != nil {
+			return response.BadRequest(c, "invalid package_id")
+		}
+		expenses, err = h.svc.ListExpensesByPackage(c.Context(), claims.OrgID, pkgUUID)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+	} else {
+		var err error
+		expenses, _, err = h.svc.ListExpenses(c.Context(), claims.OrgID, "", "", 1, 500)
+		if err != nil {
+			return response.Internal(c, err)
+		}
+	}
 
 	row := 5
 	totalExp := int64(0)
 
 	for _, expense := range expenses {
-		if packageID != "" && expense.PackageID.String() != packageID {
-			continue
-		}
 		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), expense.Category)
 		f.SetCellValue(sheet, fmt.Sprintf("B%d", row), expense.Description)
-		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), expense.Amount)
-		totalExp += expense.Amount
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), expense.AmountIDR)
+		totalExp += expense.AmountIDR
 		row++
 	}
 
@@ -65,14 +85,19 @@ func (h *FinanceHandler) ExportPnL(c *fiber.Ctx) error {
 	f.SetCellStyle(sheet, fmt.Sprintf("A%d", row), fmt.Sprintf("C%d", row), totalStyle)
 
 	var buf bytes.Buffer
-	f.Write(&buf)
+	if err := f.Write(&buf); err != nil {
+		return response.Internal(c, err)
+	}
 	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Set("Content-Disposition", `attachment; filename="pnl_report.xlsx"`)
 	return c.Send(buf.Bytes())
 }
 
 func (h *FinanceHandler) ExportExpenses(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 
 	f := excelize.NewFile()
 	defer f.Close()
@@ -99,7 +124,10 @@ func (h *FinanceHandler) ExportExpenses(c *fiber.Ctx) error {
 	headerStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}, Fill: excelize.Fill{Type: "pattern", Color: []string{"E2E8F0"}, Pattern: 1}})
 	f.SetCellStyle(sheet, "A4", "E4", headerStyle)
 
-	expenses, _, _ := h.svc.ListExpenses(c.Context(), claims.OrgID, "", "", 1, 500)
+	expenses, _, err := h.svc.ListExpenses(c.Context(), claims.OrgID, "", "", 1, 500)
+	if err != nil {
+		return response.Internal(c, err)
+	}
 
 	row := 5
 	total := int64(0)
@@ -108,8 +136,8 @@ func (h *FinanceHandler) ExportExpenses(c *fiber.Ctx) error {
 		f.SetCellValue(sheet, fmt.Sprintf("B%d", row), exp.CreatedAt.Format("02/01/2006"))
 		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), exp.Category)
 		f.SetCellValue(sheet, fmt.Sprintf("D%d", row), exp.Description)
-		f.SetCellValue(sheet, fmt.Sprintf("E%d", row), exp.Amount)
-		total += exp.Amount
+		f.SetCellValue(sheet, fmt.Sprintf("E%d", row), exp.AmountIDR)
+		total += exp.AmountIDR
 		row++
 	}
 
@@ -120,7 +148,9 @@ func (h *FinanceHandler) ExportExpenses(c *fiber.Ctx) error {
 	f.SetCellStyle(sheet, fmt.Sprintf("D%d", row), fmt.Sprintf("E%d", row), boldStyle)
 
 	var buf bytes.Buffer
-	f.Write(&buf)
+	if err := f.Write(&buf); err != nil {
+		return response.Internal(c, err)
+	}
 	c.Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Set("Content-Disposition", `attachment; filename="expenses.xlsx"`)
 	return c.Send(buf.Bytes())

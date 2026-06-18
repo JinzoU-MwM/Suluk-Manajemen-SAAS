@@ -97,7 +97,9 @@ func main() {
 	export.Get("/pnl", financeHandler.ExportPnL)
 	export.Get("/expenses", financeHandler.ExportExpenses)
 
-	dashboard := app.Group("/api/v1/dashboard", authMW)
+	// Owner dashboard is owner/admin-only financial data — enforce at the group
+	// (the handler also re-checks, but authz belongs in middleware).
+	dashboard := app.Group("/api/v1/dashboard", authMW, sharedMW.RequireRole("owner", "admin"))
 	dashboard.Get("/owner", financeHandler.GetOwnerDashboard)
 
 	go func() {

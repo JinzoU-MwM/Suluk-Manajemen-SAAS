@@ -123,6 +123,11 @@ type PackagePnL struct {
 	VendorPaidOut      int64              `json:"vendor_paid_out"`
 	VendorOutstanding  int64              `json:"vendor_outstanding"`
 	CashFlow           int64              `json:"cash_flow"`
+	// Partial is true when an upstream service (invoice/vendor) failed, so revenue
+	// or vendor-cost figures are zeros rather than real data; DegradedSources names
+	// which failed so the UI can warn instead of showing a wrong-but-plausible P&L.
+	Partial         bool     `json:"partial"`
+	DegradedSources []string `json:"degraded_sources,omitempty"`
 }
 
 type ProjectedPnL struct {
