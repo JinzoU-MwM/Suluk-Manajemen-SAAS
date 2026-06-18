@@ -62,7 +62,10 @@ func main() {
 	}
 
 	vendorRepo := repository.NewVendorRepo(pool)
-	vendorService := service.NewVendorService(vendorRepo)
+	// Cross-org package validation for bills. Empty when unset (local dev) so
+	// the check no-ops; wired to package-service in production via compose.
+	packageAddr := os.Getenv("PACKAGE_SERVICE_ADDR")
+	vendorService := service.NewVendorService(vendorRepo, packageAddr)
 	vendorHandler := handler.NewVendorHandler(vendorService)
 
 	// Integration Bus: outbox relay for vendor.bill.created events.

@@ -1,15 +1,17 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
-	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
+	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	"github.com/jamaah-in/v2/internal/shared/response"
 	"github.com/jamaah-in/v2/internal/vendor_svc/model"
+	"github.com/jamaah-in/v2/internal/vendor_svc/repository"
 	"github.com/jamaah-in/v2/internal/vendor_svc/service"
 )
 
@@ -24,7 +26,10 @@ func NewVendorHandler(svc *service.VendorService) *VendorHandler {
 // --- Vendor Master ---
 
 func (h *VendorHandler) CreateVendor(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 
 	var req model.CreateVendorRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -48,7 +53,10 @@ func (h *VendorHandler) CreateVendor(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) GetVendor(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid vendor id")
@@ -62,7 +70,10 @@ func (h *VendorHandler) GetVendor(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) UpdateVendor(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid vendor id")
@@ -78,19 +89,25 @@ func (h *VendorHandler) UpdateVendor(c *fiber.Ctx) error {
 
 	vendor, err := h.svc.UpdateVendor(c.Context(), id, claims.OrgID, req)
 	if err != nil {
+		if errors.Is(err, repository.ErrVendorNotFound) {
+			return response.NotFound(c, "vendor not found")
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, vendor)
 }
 
 func (h *VendorHandler) DeleteVendor(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid vendor id")
 	}
 	if err := h.svc.DeleteVendor(c.Context(), id, claims.OrgID); err != nil {
-		if err == service.ErrVendorNotFound {
+		if errors.Is(err, service.ErrVendorNotFound) {
 			return response.NotFound(c, "vendor not found")
 		}
 		if strings.Contains(err.Error(), "foreign key") || strings.Contains(err.Error(), "violates") {
@@ -102,7 +119,10 @@ func (h *VendorHandler) DeleteVendor(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) ListVendors(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	vendorType := c.Query("type")
 	search := c.Query("search")
 	page, _ := strconv.Atoi(c.Query("page", "1"))
@@ -118,7 +138,10 @@ func (h *VendorHandler) ListVendors(c *fiber.Ctx) error {
 // --- Vendor Bills ---
 
 func (h *VendorHandler) CreateBill(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 
 	var req model.CreateBillRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -136,16 +159,33 @@ func (h *VendorHandler) CreateBill(c *fiber.Ctx) error {
 	if req.Amount < 1 {
 		return response.BadRequest(c, "amount must be at least 1")
 	}
+	if req.ExchangeRate < 0 {
+		return response.BadRequest(c, "exchange_rate tidak boleh negatif")
+	}
+	if req.DueDate != "" {
+		if _, err := repository.ParseDate(req.DueDate); err != nil {
+			return response.BadRequest(c, "format due_date tidak valid (gunakan YYYY-MM-DD)")
+		}
+	}
 
-	bill, err := h.svc.CreateBill(c.Context(), claims.OrgID, req)
+	bill, err := h.svc.CreateBill(c.Context(), claims.OrgID, req, c.Get("Authorization"))
 	if err != nil {
+		if errors.Is(err, repository.ErrVendorNotFound) {
+			return response.BadRequest(c, "vendor_id tidak ditemukan untuk organisasi ini")
+		}
+		if errors.Is(err, service.ErrPackageNotFound) {
+			return response.BadRequest(c, "package_id tidak ditemukan untuk organisasi ini")
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, bill)
 }
 
 func (h *VendorHandler) GetBill(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid bill id")
@@ -159,7 +199,10 @@ func (h *VendorHandler) GetBill(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) UpdateBill(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid bill id")
@@ -169,31 +212,57 @@ func (h *VendorHandler) UpdateBill(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
+	if req.Amount != nil && *req.Amount < 1 {
+		return response.BadRequest(c, "amount must be at least 1")
+	}
+	if req.ExchangeRate != nil && *req.ExchangeRate <= 0 {
+		return response.BadRequest(c, "exchange_rate harus lebih dari 0")
+	}
+	if req.DueDate != nil && *req.DueDate != "" {
+		if _, err := repository.ParseDate(*req.DueDate); err != nil {
+			return response.BadRequest(c, "format due_date tidak valid (gunakan YYYY-MM-DD)")
+		}
+	}
 	if req.Status != nil && !isValidBillStatus(*req.Status) {
 		return response.BadRequest(c, "status must be one of: belum_bayar, sebagian, lunas")
 	}
 
 	bill, err := h.svc.UpdateBill(c.Context(), id, claims.OrgID, req)
 	if err != nil {
+		if errors.Is(err, repository.ErrBillNotFound) {
+			return response.NotFound(c, "vendor bill not found")
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, bill)
 }
 
 func (h *VendorHandler) DeleteBill(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid bill id")
 	}
 	if err := h.svc.DeleteBill(c.Context(), id, claims.OrgID); err != nil {
-		return response.NotFound(c, "vendor bill not found")
+		if errors.Is(err, repository.ErrBillNotFound) {
+			return response.NotFound(c, "vendor bill not found")
+		}
+		if strings.Contains(err.Error(), "foreign key") || strings.Contains(err.Error(), "violates") {
+			return response.Conflict(c, "cannot delete bill: has associated payments")
+		}
+		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "vendor bill deleted"})
 }
 
 func (h *VendorHandler) ListBills(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	var vendorID *uuid.UUID
 	if vid := c.Query("vendor_id"); vid != "" {
 		parsed, err := uuid.Parse(vid)
@@ -220,7 +289,10 @@ func (h *VendorHandler) ListBills(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) GetOverdueBills(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	bills, err := h.svc.GetOverdueBills(c.Context(), claims.OrgID)
 	if err != nil {
 		return response.Internal(c, err)
@@ -229,7 +301,10 @@ func (h *VendorHandler) GetOverdueBills(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) GetBillsDueSoon(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	days, _ := strconv.Atoi(c.Query("days", "7"))
 	bills, err := h.svc.GetBillsDueSoon(c.Context(), claims.OrgID, days)
 	if err != nil {
@@ -239,7 +314,10 @@ func (h *VendorHandler) GetBillsDueSoon(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) GetDebtSummary(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	var vendorID *uuid.UUID
 	if vid := c.Query("vendor_id"); vid != "" {
 		parsed, err := uuid.Parse(vid)
@@ -256,7 +334,10 @@ func (h *VendorHandler) GetDebtSummary(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) GetPackageBillSummary(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	packageID, err := uuid.Parse(c.Params("pkgId"))
 	if err != nil {
 		return response.BadRequest(c, "invalid package id")
@@ -271,7 +352,10 @@ func (h *VendorHandler) GetPackageBillSummary(c *fiber.Ctx) error {
 // --- Vendor Payments ---
 
 func (h *VendorHandler) CreatePayment(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 
 	var req model.CreatePaymentRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -283,19 +367,31 @@ func (h *VendorHandler) CreatePayment(c *fiber.Ctx) error {
 	if req.PaymentDate == "" {
 		return response.BadRequest(c, "payment_date is required")
 	}
+	if _, err := repository.ParseDate(req.PaymentDate); err != nil {
+		return response.BadRequest(c, "format payment_date tidak valid (gunakan YYYY-MM-DD)")
+	}
 	if req.Amount < 1 {
 		return response.BadRequest(c, "amount must be at least 1")
+	}
+	if req.ExchangeRate < 0 {
+		return response.BadRequest(c, "exchange_rate tidak boleh negatif")
 	}
 
 	payment, err := h.svc.CreatePayment(c.Context(), claims.OrgID, req)
 	if err != nil {
+		if errors.Is(err, repository.ErrBillNotFound) {
+			return response.NotFound(c, "vendor bill not found")
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, payment)
 }
 
 func (h *VendorHandler) GetPayment(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid payment id")
@@ -309,7 +405,10 @@ func (h *VendorHandler) GetPayment(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) DeletePayment(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return response.BadRequest(c, "invalid payment id")
@@ -321,7 +420,10 @@ func (h *VendorHandler) DeletePayment(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) ListPaymentsByBill(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	billID, err := uuid.Parse(c.Params("billId"))
 	if err != nil {
 		return response.BadRequest(c, "invalid bill id")
@@ -335,7 +437,10 @@ func (h *VendorHandler) ListPaymentsByBill(c *fiber.Ctx) error {
 }
 
 func (h *VendorHandler) ListPaymentsByVendor(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*sharedAuth.Claims)
+	claims, ok := sharedMW.GetClaims(c)
+	if !ok {
+		return response.Unauthorized(c, "unauthorized")
+	}
 	vendorID, err := uuid.Parse(c.Params("vendorId"))
 	if err != nil {
 		return response.BadRequest(c, "invalid vendor id")

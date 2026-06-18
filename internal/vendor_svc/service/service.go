@@ -3,24 +3,31 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/shared/events"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 	"github.com/jamaah-in/v2/internal/shared/outbox"
 	"github.com/jamaah-in/v2/internal/vendor_svc/model"
 	"github.com/jamaah-in/v2/internal/vendor_svc/repository"
 )
 
 type VendorService struct {
-	repo *repository.VendorRepo
+	repo        *repository.VendorRepo
+	packageAddr string
+	httpc       *httpclient.Client
 }
 
-var ErrVendorNotFound = repository.ErrVendorNotFound
+var (
+	ErrVendorNotFound  = repository.ErrVendorNotFound
+	ErrPackageNotFound = errors.New("package not found for this organization")
+)
 
-func NewVendorService(repo *repository.VendorRepo) *VendorService {
-	return &VendorService{repo: repo}
+func NewVendorService(repo *repository.VendorRepo, packageAddr string) *VendorService {
+	return &VendorService{repo: repo, packageAddr: packageAddr, httpc: httpclient.New()}
 }
 
 // --- Vendor Master ---
@@ -112,7 +119,23 @@ func (s *VendorService) ListVendors(ctx context.Context, orgID uuid.UUID, vendor
 
 // --- Vendor Bills ---
 
-func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req model.CreateBillRequest) (*model.VendorBill, error) {
+func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req model.CreateBillRequest, authToken string) (*model.VendorBill, error) {
+	// The vendor must belong to the caller's org — authoritative, not
+	// best-effort. vendor_bills.vendor_id has no org-scoped FK, so without this
+	// a foreign-org vendor_id would be accepted and later leak that vendor's
+	// name/type into this org's bill reads via the (un-org-scoped) JOIN.
+	vendor, err := s.repo.GetVendorByID(ctx, req.VendorID, orgID)
+	if err != nil {
+		return nil, err // ErrVendorNotFound
+	}
+
+	// The package lives in package-service (separate DB) — no local FK can scope
+	// it by org. Confirm it belongs to the caller's org so a bill can't be
+	// attached to a foreign-org package_id and contaminate package debt rollups.
+	if err := s.validatePackage(ctx, req.PackageID, authToken); err != nil {
+		return nil, err
+	}
+
 	if req.Currency == "" {
 		req.Currency = "IDR"
 	}
@@ -143,13 +166,9 @@ func (s *VendorService) CreateBill(ctx context.Context, orgID uuid.UUID, req mod
 	}
 
 	// vendor.bill.created → Dr Beban / Cr Hutang Vendor at the IDR-converted
-	// amount (GL is IDR). Vendor name is best-effort.
+	// amount (GL is IDR).
 	amountIDR := int64(float64(req.Amount) * req.ExchangeRate)
-	vendorName := ""
-	if v, verr := s.repo.GetVendorByID(ctx, req.VendorID, orgID); verr == nil && v != nil {
-		vendorName = v.Name
-	}
-	payload, _ := json.Marshal(map[string]any{"amount": amountIDR, "vendor_name": vendorName})
+	payload, _ := json.Marshal(map[string]any{"amount": amountIDR, "vendor_name": vendor.Name})
 	evt := outbox.Event{
 		OrgID:         orgID,
 		AggregateType: "vendor_bill",
@@ -227,6 +246,9 @@ func (s *VendorService) GetBillsDueSoon(ctx context.Context, orgID uuid.UUID, wi
 	if withinDays < 1 {
 		withinDays = 7
 	}
+	if withinDays > 365 {
+		withinDays = 365
+	}
 	return s.repo.GetBillsDueSoon(ctx, orgID, withinDays)
 }
 
@@ -254,8 +276,11 @@ func (s *VendorService) CreatePayment(ctx context.Context, orgID uuid.UUID, req 
 	}
 
 	paymentDate, err := repository.ParseDate(req.PaymentDate)
-	if err != nil || paymentDate == nil {
+	if err != nil {
 		return nil, err
+	}
+	if paymentDate == nil {
+		return nil, errors.New("payment_date is required")
 	}
 
 	p := &model.VendorPayment{
@@ -340,6 +365,21 @@ func (s *VendorService) ListPaymentsByVendor(ctx context.Context, vendorID, orgI
 	}
 	offset := (page - 1) * limit
 	return s.repo.ListPaymentsByVendor(ctx, vendorID, orgID, offset, limit)
+}
+
+// validatePackage confirms the package belongs to the caller's org by fetching
+// it from package-service with the caller's own (org-scoped) token: a foreign or
+// missing package returns 404 there, surfaced here as ErrPackageNotFound, which
+// blocks a cross-org bill. If package-service isn't configured (dev/test) or no
+// token is present, it no-ops — mirroring jamaah-service's seat reservation.
+func (s *VendorService) validatePackage(ctx context.Context, packageID uuid.UUID, authToken string) error {
+	if s.packageAddr == "" || authToken == "" {
+		return nil
+	}
+	if _, err := s.httpc.GetRaw(ctx, s.packageAddr, "/api/v1/packages/"+packageID.String(), authToken); err != nil {
+		return ErrPackageNotFound
+	}
+	return nil
 }
 
 func strPtr(s string) *string {
