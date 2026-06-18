@@ -158,16 +158,21 @@ func main() {
 	analytics := app.Group("/api/v1/analytics", authMW, sharedMW.RequireStaff)
 	analytics.Get("/dashboard", jamaahHandler.GetAnalyticsDashboard)
 
-	itineraries := app.Group("/api/v1/itineraries", authMW)
+	// Operational/admin surfaces below carry org PII (manifests, rooming,
+	// prospective-jamaah registrations). They must be staff-only — without
+	// RequireStaff, any authenticated user including an external agent or a
+	// jamaah-portal token could reach them. The jamaah portal (/portal) and B2B
+	// agent portal (/b2b) have their own scoped endpoints and don't use these.
+	itineraries := app.Group("/api/v1/itineraries", authMW, sharedMW.RequireStaff)
 	itineraries.Get("/:groupId", jamaahHandler.GetItinerary)
 	itineraries.Post("/:groupId", jamaahHandler.CreateItinerary)
 	itineraries.Put("/:groupId/:itemId", jamaahHandler.UpdateItinerary)
 	itineraries.Delete("/:groupId/:itemId", jamaahHandler.DeleteItinerary)
 
-	documents := app.Group("/api/v1/documents", authMW)
+	documents := app.Group("/api/v1/documents", authMW, sharedMW.RequireStaff)
 	documents.Get("/:groupId/:type", jamaahHandler.GetDocumentUrl)
 
-	rooming := app.Group("/api/v1/rooming", authMW)
+	rooming := app.Group("/api/v1/rooming", authMW, sharedMW.RequireStaff)
 	rooming.Get("/group/:groupId", jamaahHandler.ListRooms)
 	rooming.Post("/group/:groupId", jamaahHandler.CreateRoom)
 	rooming.Delete("/:roomId", jamaahHandler.DeleteRoom)
@@ -176,14 +181,14 @@ func main() {
 	rooming.Post("/assign", jamaahHandler.AssignMemberToRoom)
 	rooming.Post("/unassign/:memberId", jamaahHandler.UnassignMember)
 
-	shared := app.Group("/api/v1/shared", authMW)
+	shared := app.Group("/api/v1/shared", authMW, sharedMW.RequireStaff)
 	shared.Post("/groups/:groupId/share", jamaahHandler.ShareGroup)
 	shared.Delete("/groups/:groupId/share", jamaahHandler.RevokeShare)
 
 	sharedPub := app.Group("/api/v1/shared")
 	sharedPub.Post("/manifest/:token", jamaahHandler.GetSharedManifest)
 
-	groups := app.Group("/api/v1/groups", authMW)
+	groups := app.Group("/api/v1/groups", authMW, sharedMW.RequireStaff)
 	groups.Get("/", jamaahHandler.ListGroups)
 	groups.Post("/", jamaahHandler.CreateGroup)
 	groups.Get("/:groupId", jamaahHandler.GetGroup)
@@ -202,8 +207,9 @@ func main() {
 	regPublic.Get("/:token", jamaahHandler.PublicRegistrationInfo)
 	regPublic.Post("/:token", jamaahHandler.PublicRegistrationSubmit)
 
-	// Registration — admin endpoints (auth required)
-	registration := app.Group("/api/v1/registration", authMW)
+	// Registration — admin endpoints (staff only: they expose prospective-jamaah
+	// PII and create profiles on approval)
+	registration := app.Group("/api/v1/registration", authMW, sharedMW.RequireStaff)
 	registration.Post("/generate", jamaahHandler.GenerateLink)
 	registration.Get("/link/:groupId", jamaahHandler.GetActiveLink)
 	registration.Delete("/link/:groupId", jamaahHandler.RevokeLink)

@@ -105,6 +105,38 @@ func (r *JamaahRepo) ApprovePendingRegistration(ctx context.Context, id, orgID, 
 	return err
 }
 
+// ApprovePendingTx creates the jamaah profile and marks the pending registration
+// approved in one transaction, locking the pending row and re-checking its status
+// under the lock. This makes approval atomic + idempotent: the old flow ran
+// CreateProfile then the status UPDATE as two separate statements, so a failure
+// or concurrent approval could create a duplicate profile (and the status guard
+// was a TOCTOU check in the service).
+func (r *JamaahRepo) ApprovePendingTx(ctx context.Context, pendingID, orgID, reviewerID uuid.UUID, profile *model.JamaahProfile) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	if err := tx.QueryRow(ctx, `SELECT status FROM pending_registrations WHERE id = $1 AND org_id = $2 FOR UPDATE`, pendingID, orgID).Scan(&status); err != nil {
+		return fmt.Errorf("pending registration not found")
+	}
+	if status != "pending" {
+		return fmt.Errorf("registration already %s", status)
+	}
+	if err := insertProfile(ctx, tx, profile); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE pending_registrations SET status = 'approved', jamaah_id = $3, reviewed_by = $4, reviewed_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND org_id = $2
+	`, pendingID, orgID, profile.ID, reviewerID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *JamaahRepo) RejectPendingRegistration(ctx context.Context, id, orgID, reviewerID uuid.UUID) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE pending_registrations SET status = 'rejected', reviewed_by = $3, reviewed_at = NOW(), updated_at = NOW()

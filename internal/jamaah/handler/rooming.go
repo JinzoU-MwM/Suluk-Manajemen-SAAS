@@ -83,31 +83,35 @@ func (h *JamaahHandler) ClearAutoRooming(c *fiber.Ctx) error {
 
 func (h *JamaahHandler) AssignMemberToRoom(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
-	roomID, err := uuid.Parse(c.Params("roomId"))
-	if err != nil {
-		return response.BadRequest(c, "invalid room id")
-	}
 	var req model.AssignMemberRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
-	memberID := req.MemberID
-	if memberID == "" {
-		memberID = c.Params("memberId")
+	// room_id comes from the body (the /assign route has no :roomId param — the
+	// old code read a non-existent param and always 400'd).
+	roomID, err := uuid.Parse(req.RoomID)
+	if err != nil {
+		return response.BadRequest(c, "invalid room id")
 	}
-	if err := h.svc.AssignMemberToRoom(c.Context(), claims.OrgID, roomID, memberID); err != nil {
+	if req.MemberID == "" {
+		return response.BadRequest(c, "member_id is required")
+	}
+	if err := h.svc.AssignMemberToRoom(c.Context(), claims.OrgID, roomID, req.MemberID); err != nil {
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"assigned": true})
 }
 
 func (h *JamaahHandler) UnassignMember(c *fiber.Ctx) error {
-	roomID, err := uuid.Parse(c.Params("roomId"))
-	if err != nil {
-		return response.BadRequest(c, "invalid room id")
-	}
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	// The route is /unassign/:memberId (member-only). Unassign removes the
+	// member's room assignment(s) within the caller's org — scoping by org_id
+	// closes the cross-org IDOR the old repo query had (no org filter).
 	memberID := c.Params("memberId")
-	if err := h.svc.UnassignMember(c.Context(), roomID, memberID); err != nil {
+	if memberID == "" {
+		return response.BadRequest(c, "member id is required")
+	}
+	if err := h.svc.UnassignMember(c.Context(), claims.OrgID, memberID); err != nil {
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"unassigned": true})
