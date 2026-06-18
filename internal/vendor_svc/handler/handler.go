@@ -159,6 +159,12 @@ func (h *VendorHandler) CreateBill(c *fiber.Ctx) error {
 	if req.Amount < 1 {
 		return response.BadRequest(c, "amount must be at least 1")
 	}
+	if req.Currency != "" {
+		req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
+		if !isValidCurrency(req.Currency) {
+			return response.BadRequest(c, "currency harus salah satu dari: IDR, USD")
+		}
+	}
 	if req.ExchangeRate < 0 {
 		return response.BadRequest(c, "exchange_rate tidak boleh negatif")
 	}
@@ -214,6 +220,12 @@ func (h *VendorHandler) UpdateBill(c *fiber.Ctx) error {
 	}
 	if req.Amount != nil && *req.Amount < 1 {
 		return response.BadRequest(c, "amount must be at least 1")
+	}
+	if req.Currency != nil {
+		*req.Currency = strings.ToUpper(strings.TrimSpace(*req.Currency))
+		if !isValidCurrency(*req.Currency) {
+			return response.BadRequest(c, "currency harus salah satu dari: IDR, USD")
+		}
 	}
 	if req.ExchangeRate != nil && *req.ExchangeRate <= 0 {
 		return response.BadRequest(c, "exchange_rate harus lebih dari 0")
@@ -370,6 +382,12 @@ func (h *VendorHandler) CreatePayment(c *fiber.Ctx) error {
 	if req.Amount < 1 {
 		return response.BadRequest(c, "amount must be at least 1")
 	}
+	if req.Currency != "" {
+		req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
+		if !isValidCurrency(req.Currency) {
+			return response.BadRequest(c, "currency harus salah satu dari: IDR, USD")
+		}
+	}
 	if req.ExchangeRate < 0 {
 		return response.BadRequest(c, "exchange_rate tidak boleh negatif")
 	}
@@ -454,6 +472,15 @@ func (h *VendorHandler) ListPaymentsByVendor(c *fiber.Ctx) error {
 
 func isValidVendorType(s string) bool {
 	for _, v := range model.ValidVendorTypes() {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidCurrency(s string) bool {
+	for _, v := range model.ValidCurrencies() {
 		if s == v {
 			return true
 		}

@@ -865,7 +865,6 @@
         >
           <option value="IDR">IDR</option>
           <option value="USD">USD</option>
-          <option value="SAR">SAR</option>
         </select>
       </div>
       <div class="flex flex-col gap-1">

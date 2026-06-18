@@ -14,6 +14,12 @@ func ValidBillStatuses() []string {
 	return []string{"belum_bayar", "sebagian", "lunas"}
 }
 
+// ValidCurrencies is the supported currency allowlist for bills and payments.
+// Starter set is IDR + USD; extend here to add more.
+func ValidCurrencies() []string {
+	return []string{"IDR", "USD"}
+}
+
 type Vendor struct {
 	ID                uuid.UUID `json:"id" db:"id"`
 	OrgID             uuid.UUID `json:"org_id" db:"org_id"`
