@@ -41,6 +41,12 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 	if req.PriceSnapshot < 1 {
 		return response.BadRequest(c, "price_snapshot must be at least 1")
 	}
+	if req.DiscountAmount < 0 || req.SurchargeAmount < 0 {
+		return response.BadRequest(c, "discount/surcharge tidak boleh negatif")
+	}
+	if req.DiscountAmount > req.PriceSnapshot {
+		return response.BadRequest(c, "diskon melebihi harga")
+	}
 	if req.PaymentScheme == "" {
 		return response.BadRequest(c, "payment_scheme is required")
 	}
@@ -123,6 +129,9 @@ func (h *InvoiceHandler) UpdateInvoice(c *fiber.Ctx) error {
 	var req model.UpdateInvoiceRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
+	}
+	if (req.DiscountAmount != nil && *req.DiscountAmount < 0) || (req.SurchargeAmount != nil && *req.SurchargeAmount < 0) {
+		return response.BadRequest(c, "discount/surcharge tidak boleh negatif")
 	}
 
 	inv, err := h.svc.UpdateInvoice(c.Context(), id, claims.OrgID, req)
@@ -212,6 +221,9 @@ func (h *InvoiceHandler) RecordPayment(c *fiber.Ctx) error {
 
 	payment, inv, err := h.svc.RecordPayment(c.Context(), claims.OrgID, claims.UserID, invoiceID, req)
 	if err != nil {
+		if errors.Is(err, repository.ErrOverpayment) || errors.Is(err, repository.ErrAlreadyCancelled) || errors.Is(err, repository.ErrAlreadyLunas) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.Created(c, fiber.Map{"payment": payment, "invoice": inv})
