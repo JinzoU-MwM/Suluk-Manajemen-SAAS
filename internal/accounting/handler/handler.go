@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/accounting/model"
+	"github.com/jamaah-in/v2/internal/accounting/repository"
 	"github.com/jamaah-in/v2/internal/accounting/service"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
 	"github.com/jamaah-in/v2/internal/shared/response"
@@ -50,6 +52,12 @@ func (h *Handler) CreateAccount(c *fiber.Ctx) error {
 	if req.Code == "" || req.Name == "" {
 		return response.BadRequest(c, "code dan name wajib diisi")
 	}
+	if len(req.Code) > 20 {
+		return response.BadRequest(c, "code maksimal 20 karakter")
+	}
+	if len(req.Name) > 120 {
+		return response.BadRequest(c, "name maksimal 120 karakter")
+	}
 	switch req.Type {
 	case model.TypeAsset, model.TypeLiability, model.TypeEquity, model.TypeRevenue, model.TypeExpense:
 	default:
@@ -57,7 +65,10 @@ func (h *Handler) CreateAccount(c *fiber.Ctx) error {
 	}
 	a := &model.Account{OrgID: claims.OrgID, Code: req.Code, Name: req.Name, Type: req.Type}
 	if err := h.svc.CreateAccount(c.Context(), a); err != nil {
-		return response.Conflict(c, err.Error())
+		if errors.Is(err, repository.ErrAccountExists) {
+			return response.Conflict(c, "kode akun sudah ada")
+		}
+		return response.Internal(c, err)
 	}
 	return response.Created(c, a)
 }

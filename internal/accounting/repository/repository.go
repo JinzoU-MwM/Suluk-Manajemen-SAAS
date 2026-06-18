@@ -17,6 +17,7 @@ var (
 	ErrUnbalanced     = errors.New("journal not balanced: sum(debit) != sum(credit)")
 	ErrEmptyJournal   = errors.New("journal has no lines")
 	ErrUnknownAccount = errors.New("account code not found in org COA")
+	ErrAccountExists  = errors.New("account code already exists")
 )
 
 type Repo struct {
@@ -29,30 +30,30 @@ func (r *Repo) Ping(ctx context.Context) error { return r.pool.Ping(ctx) }
 
 // ---- Chart of Accounts ----
 
-// CountAccounts reports how many COA rows an org has (used to decide seeding).
-func (r *Repo) CountAccounts(ctx context.Context, orgID uuid.UUID) (int, error) {
-	var n int
-	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM chart_of_accounts WHERE org_id=$1`, orgID).Scan(&n)
-	return n, err
-}
-
 // SeedAccounts bulk-inserts the standard COA for an org, skipping any code that
-// already exists (idempotent). Runs in one transaction.
-func (r *Repo) SeedAccounts(ctx context.Context, orgID uuid.UUID, accts []model.Account) error {
+// already exists (idempotent). Runs in one transaction and returns how many rows
+// were actually inserted — 0 means the org already had the full standard COA, >0
+// means new standard accounts were backfilled.
+func (r *Repo) SeedAccounts(ctx context.Context, orgID uuid.UUID, accts []model.Account) (int, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback(ctx)
+	inserted := 0
 	for _, a := range accts {
-		_, err := tx.Exec(ctx, `INSERT INTO chart_of_accounts (org_id, code, name, type, normal_balance)
+		tag, err := tx.Exec(ctx, `INSERT INTO chart_of_accounts (org_id, code, name, type, normal_balance)
 			VALUES ($1,$2,$3,$4,$5) ON CONFLICT (org_id, code) DO NOTHING`,
 			orgID, a.Code, a.Name, a.Type, a.NormalBalance)
 		if err != nil {
-			return fmt.Errorf("seed account %s: %w", a.Code, err)
+			return 0, fmt.Errorf("seed account %s: %w", a.Code, err)
 		}
+		inserted += int(tag.RowsAffected())
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return inserted, nil
 }
 
 func (r *Repo) ListAccounts(ctx context.Context, orgID uuid.UUID) ([]model.Account, error) {
@@ -82,7 +83,7 @@ func (r *Repo) CreateAccount(ctx context.Context, a *model.Account) error {
 		a.OrgID, a.Code, a.Name, a.Type, a.NormalBalance, a.ParentID, true).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		if isDuplicate(err) {
-			return fmt.Errorf("account code %s already exists", a.Code)
+			return fmt.Errorf("%w: %s", ErrAccountExists, a.Code)
 		}
 		return err
 	}

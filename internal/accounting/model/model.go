@@ -40,15 +40,15 @@ type Account struct {
 
 // JournalLine is one debit or credit posting against an account.
 type JournalLine struct {
-	ID         uuid.UUID `json:"id"`
-	JournalID  uuid.UUID `json:"journal_id"`
-	OrgID      uuid.UUID `json:"org_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	AccountCode string   `json:"account_code,omitempty"`
-	AccountName string   `json:"account_name,omitempty"`
-	Debit      int64     `json:"debit"`
-	Credit     int64     `json:"credit"`
-	Memo       string    `json:"memo"`
+	ID          uuid.UUID `json:"id"`
+	JournalID   uuid.UUID `json:"journal_id"`
+	OrgID       uuid.UUID `json:"org_id"`
+	AccountID   uuid.UUID `json:"account_id"`
+	AccountCode string    `json:"account_code,omitempty"`
+	AccountName string    `json:"account_name,omitempty"`
+	Debit       int64     `json:"debit"`
+	Credit      int64     `json:"credit"`
+	Memo        string    `json:"memo"`
 }
 
 // Journal is a balanced set of lines from a single source transaction/event.
@@ -80,13 +80,13 @@ type PostingLine struct {
 
 // TrialBalanceRow is one account's net debit/credit balance.
 type TrialBalanceRow struct {
-	AccountID   uuid.UUID `json:"account_id"`
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	Type        string    `json:"type"`
-	Debit       int64     `json:"debit"`
-	Credit      int64     `json:"credit"`
-	Balance     int64     `json:"balance"` // signed by normal balance
+	AccountID uuid.UUID `json:"account_id"`
+	Code      string    `json:"code"`
+	Name      string    `json:"name"`
+	Type      string    `json:"type"`
+	Debit     int64     `json:"debit"`
+	Credit    int64     `json:"credit"`
+	Balance   int64     `json:"balance"` // signed by normal balance
 }
 
 // StatementLine is an account's amount in a financial statement.

@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -154,5 +155,69 @@ func TestBuildPostingPayrollImbalanceRejected(t *testing.T) {
 	env := &events.Envelope{EventType: events.EventPayrollPosted, Payload: b}
 	if _, err := buildPosting(env); err == nil {
 		t.Fatal("expected error for imbalanced payroll, got nil")
+	}
+}
+
+// Every account code any posting template can emit MUST exist in StandardCOA —
+// otherwise EnsureCOA never seeds it and the journal is dropped at post time with
+// ErrUnknownAccount, silently understating the GL. This guards against adding a
+// new posting line without adding the account to the standard chart.
+func TestPostingAccountsCoveredByStandardCOA(t *testing.T) {
+	coa := map[string]bool{}
+	for _, a := range StandardCOA() {
+		coa[a.Code] = true
+	}
+	mk := func(eventType string, payload map[string]any) *events.Envelope {
+		b, _ := json.Marshal(payload)
+		return &events.Envelope{
+			EventType:  eventType,
+			OrgID:      "00000000-0000-0000-0000-000000000001",
+			OccurredAt: time.Now(),
+			Payload:    b,
+		}
+	}
+	samples := []*events.Envelope{
+		mk(events.EventInvoiceIssued, map[string]any{"total_amount": 1000, "invoice_number": "INV"}),
+		mk(events.EventPaymentReceived, map[string]any{"amount": 1000, "payment_method": "tunai", "invoice_number": "INV"}),
+		mk(events.EventPaymentReceived, map[string]any{"amount": 1000, "payment_method": "transfer", "invoice_number": "INV"}),
+		mk(events.EventOverpaymentReceived, map[string]any{"amount": 1000, "payment_method": "tunai", "invoice_number": "INV"}),
+		mk(events.EventRefundCompleted, map[string]any{"amount": 1000, "invoice_number": "INV"}),
+		mk(events.EventInvoiceCancelled, map[string]any{"amount": 1000, "invoice_number": "INV"}),
+		mk(events.EventVendorBillCreated, map[string]any{"amount": 1000, "vendor_name": "V"}),
+		mk(events.EventPayrollPosted, map[string]any{"gross": 1000, "tax": 100, "net": 900}),
+		mk(events.EventCommissionAccrued, map[string]any{"amount": 1000, "agent_name": "A"}),
+		mk(events.EventSavingsDeposited, map[string]any{"amount": 1000}),
+		mk(events.EventSavingsConverted, map[string]any{"amount": 1000}),
+		mk(events.EventPosCashSessionClosed, map[string]any{"difference": 1000}),
+		mk(events.EventPosCashSessionClosed, map[string]any{"difference": -1000}),
+	}
+	for _, env := range samples {
+		p, err := buildPosting(env)
+		if err != nil {
+			t.Fatalf("%s: buildPosting: %v", env.EventType, err)
+		}
+		for _, l := range p.lines {
+			if !coa[l.AccountCode] {
+				t.Errorf("%s emits account %q which is not in StandardCOA — EnsureCOA won't seed it, journal will be dropped", env.EventType, l.AccountCode)
+			}
+		}
+	}
+}
+
+// journalNo must not collide for two distinct events that share the same
+// (module, timestamp): a timestamp-only suffix used to collide and drop the
+// second journal via the UNIQUE(org_id, journal_no) constraint.
+func TestJournalNoNotTimestampDerived(t *testing.T) {
+	at := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	a := journalNo("invoice", at)
+	b := journalNo("invoice", at)
+	if a == b {
+		t.Fatalf("journalNo collided for identical (module, time): %s", a)
+	}
+	if !strings.HasPrefix(a, "JRN-invoice-20260618-") {
+		t.Errorf("unexpected journalNo format: %s", a)
+	}
+	if len(a) > 40 {
+		t.Errorf("journalNo %q exceeds journal_no VARCHAR(40)", a)
 	}
 }

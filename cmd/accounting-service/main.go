@@ -106,20 +106,23 @@ func main() {
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 	finRole := sharedMW.RequireRole("owner", "admin", "finance")
 
-	coa := app.Group("/api/v1/coa", authMW)
+	// The whole accounting API exposes org financial data (COA, journals, GL,
+	// statements) — gate every route to finance roles, not just any authenticated
+	// user. Without this, role=agent/jamaah could read the org's full books.
+	coa := app.Group("/api/v1/coa", authMW, finRole)
 	coa.Get("/", h.ListAccounts)
-	coa.Post("/", finRole, h.CreateAccount)
+	coa.Post("/", h.CreateAccount)
 
-	journals := app.Group("/api/v1/journals", authMW)
+	journals := app.Group("/api/v1/journals", authMW, finRole)
 	journals.Get("/", h.ListJournals)
 	journals.Get("/:id", h.GetJournal)
 
-	reports := app.Group("/api/v1/reports", authMW)
+	reports := app.Group("/api/v1/reports", authMW, finRole)
 	reports.Get("/trial-balance", h.TrialBalance)
 	reports.Get("/neraca", h.BalanceSheet)
 	reports.Get("/laba-rugi", h.IncomeStatement)
 	reports.Get("/ledger/:accountId", h.GeneralLedger)
-	reports.Get("/insights", finRole, h.Insights) // AI accounting copilot
+	reports.Get("/insights", h.Insights) // AI accounting copilot
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

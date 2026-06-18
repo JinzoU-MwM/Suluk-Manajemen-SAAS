@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,23 +35,23 @@ func (s *Service) WithAI(c *ai.Client) *Service {
 	return s
 }
 
-// EnsureCOA seeds the standard chart of accounts for an org on first use.
-// Idempotent (SeedAccounts uses ON CONFLICT DO NOTHING); cached per process.
+// EnsureCOA upserts the standard chart of accounts for an org on first use.
+// It always runs SeedAccounts (idempotent: ON CONFLICT DO NOTHING) rather than
+// only when the org has zero accounts — this BACKFILLS accounts added to
+// StandardCOA after an org was first seeded. Without it, a posting referencing a
+// newly-added account would fail with ErrUnknownAccount and the journal would be
+// dropped, silently understating the org's GL. Cached per process so it runs at
+// most once per org per process.
 func (s *Service) EnsureCOA(ctx context.Context, orgID uuid.UUID) error {
 	if _, ok := s.seeded.Load(orgID); ok {
 		return nil
 	}
-	n, err := s.repo.CountAccounts(ctx, orgID)
+	inserted, err := s.repo.SeedAccounts(ctx, orgID, StandardCOA())
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		if err := s.repo.SeedAccounts(ctx, orgID, StandardCOA()); err != nil {
-			return err
-		}
-		if s.log != nil {
-			s.log.Infow("seeded standard COA", "org_id", orgID)
-		}
+	if inserted > 0 && s.log != nil {
+		s.log.Infow("seeded standard COA", "org_id", orgID, "accounts_added", inserted)
 	}
 	s.seeded.Store(orgID, struct{}{})
 	return nil
@@ -102,8 +103,14 @@ func journalNo(module string, t time.Time) string {
 	if t.IsZero() {
 		t = time.Now()
 	}
-	// short suffix keeps it unique within (org, journal_no) without a sequence table
-	return fmt.Sprintf("JRN-%s-%s-%04d", module, t.Format("20060102"), t.Nanosecond()/100000)
+	// Random 48-bit suffix guarantees uniqueness within (org, journal_no) without
+	// a sequence table. A timestamp-derived suffix collided when two distinct
+	// same-module events shared a 100µs window, failing the UNIQUE(org_id,
+	// journal_no) constraint and dropping the journal. Idempotency for the SAME
+	// event is handled separately via source_event_id, so a non-deterministic
+	// journal_no is safe here. 12 hex chars keeps it within journal_no's VARCHAR(40).
+	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	return fmt.Sprintf("JRN-%s-%s-%s", module, t.Format("20060102"), suffix)
 }
 
 // ---- COA passthrough ----
