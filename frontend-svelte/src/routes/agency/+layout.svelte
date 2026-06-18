@@ -7,6 +7,7 @@
   import { page } from "$app/stores";
   import { LayoutDashboard, Wallet, Network, UserCircle, LogOut, Menu, Users } from "lucide-svelte";
   import { session, logoutAndRedirect } from "$lib/stores/session.svelte.js";
+  import SplashScreen from "$lib/components/SplashScreen.svelte";
 
   let { children } = $props();
   let ready = $state(false);
@@ -38,7 +39,7 @@
 </script>
 
 {#if !ready}
-  <div class="flex min-h-screen items-center justify-center text-slate-500">Memuat…</div>
+  <SplashScreen />
 {:else}
   <div class="agency-shell">
     <aside class="agency-side" class:agency-side-open={sidebarOpen}>

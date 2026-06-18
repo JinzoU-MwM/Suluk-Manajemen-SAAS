@@ -7,6 +7,7 @@
   import { page } from "$app/stores";
   import { LayoutDashboard, FileText, BadgeCheck, Wallet, UserCircle, LogOut, Menu } from "lucide-svelte";
   import { session, logoutAndRedirect } from "$lib/stores/session.svelte.js";
+  import SplashScreen from "$lib/components/SplashScreen.svelte";
 
   let { children } = $props();
   let ready = $state(false);
@@ -31,7 +32,7 @@
 </script>
 
 {#if !ready}
-  <div class="flex min-h-screen items-center justify-center text-slate-500">Memuat…</div>
+  <SplashScreen />
 {:else}
   <div class="portal-shell">
     <aside class="portal-side" class:portal-side-open={sidebarOpen}>

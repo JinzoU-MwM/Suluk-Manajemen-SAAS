@@ -9,6 +9,7 @@
   import MobileLogin from "$lib/mobile/screens/MobileLogin.svelte";
   import MobileProGate from "$lib/mobile/screens/MobileProGate.svelte";
   import UpgradeModal from "$lib/components/UpgradeModal.svelte";
+  import SplashScreen from "$lib/components/SplashScreen.svelte";
   import { session } from "$lib/stores/session.svelte.js";
 
   let ready = $state(false);
@@ -38,10 +39,10 @@
 <Seo title="Suluk App" description="Aplikasi mobile Suluk." path="/mobile" robots="noindex,nofollow" />
 
 {#if !ready}
-  <div class="min-h-screen flex items-center justify-center" style="background:#0F3D2E;color:#fff">Memuat…</div>
+  <SplashScreen />
 {:else if session.user}
   {#if !session.subLoaded}
-    <div class="min-h-screen flex items-center justify-center" style="background:#0F3D2E;color:#fff">Memuat…</div>
+    <SplashScreen />
   {:else if !session.isPro}
     <MobileProGate
       user={session.user}
