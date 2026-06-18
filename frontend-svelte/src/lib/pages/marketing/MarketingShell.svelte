@@ -5,8 +5,22 @@
 -->
 <script>
   import "../../styles/marketing.css";
+  import { onDestroy } from "svelte";
+  import { afterNavigate } from "$app/navigation";
   import LandingNav from "$lib/components/LandingNav.svelte";
+  import { initScrollReveals } from "$lib/anim/scrollReveal.js";
   let { onNav = () => {}, onGoToApp = () => {}, onHome = () => {}, children } = $props();
+
+  // Re-run on-scroll reveals for the page body on first load and after each
+  // marketing-page navigation (this shell persists across them). Reduced-motion
+  // and no-JS are handled inside initScrollReveals.
+  let rootEl;
+  let cleanup = () => {};
+  afterNavigate(() => {
+    cleanup();
+    cleanup = initScrollReveals(rootEl);
+  });
+  onDestroy(() => cleanup());
 
   const FOOT_FITUR = [
     { slug: "fitur-invoice", label: "Invoice" },
@@ -23,7 +37,7 @@
   ];
 </script>
 
-<div class="gp">
+<div class="gp" bind:this={rootEl}>
   <LandingNav />
 
   {@render children?.()}
