@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/jamaah-in/v2/internal/invoice/model"
 	"github.com/jamaah-in/v2/internal/shared/outbox"
 )
@@ -90,5 +92,29 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 	inv.AmountPaid = newPaid
 	inv.AmountRemaining = newRemaining
 	inv.Status = newStatus
+	return tx.Commit(ctx)
+}
+
+// CancelInvoiceTx marks an invoice cancelled and, when evt is non-nil, emits a
+// GL reversal event in the same transaction.
+func (r *InvoiceRepo) CancelInvoiceTx(ctx context.Context, id, orgID uuid.UUID, reason string, evt *outbox.Event) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `UPDATE invoices SET status='batal', cancelled_at=NOW(), cancelled_reason=$3, updated_at=NOW() WHERE id=$1 AND org_id=$2 AND status != 'batal'`, id, orgID, reason)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrAlreadyCancelled
+	}
+	if evt != nil {
+		if err := outbox.Insert(ctx, tx, *evt); err != nil {
+			return err
+		}
+	}
 	return tx.Commit(ctx)
 }

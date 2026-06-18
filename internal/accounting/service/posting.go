@@ -123,6 +123,24 @@ func buildPosting(env *events.Envelope) (*posting, error) {
 			},
 		}, nil
 
+	case events.EventInvoiceCancelled:
+		var p paymentPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			return nil, fmt.Errorf("decode invoice-cancelled payload: %w", err)
+		}
+		if p.Amount <= 0 {
+			return nil, fmt.Errorf("cancelled amount must be > 0")
+		}
+		memo := "Pembatalan invoice " + p.InvoiceNumber
+		return &posting{
+			module:      "invoice",
+			description: memo,
+			lines: []model.PostingLine{
+				{AccountCode: AccPendapatanPaket, Debit: p.Amount, Memo: memo},
+				{AccountCode: AccPiutangJemaah, Credit: p.Amount, Memo: memo},
+			},
+		}, nil
+
 	case events.EventVendorBillCreated:
 		var p vendorBillPayload
 		if err := json.Unmarshal(env.Payload, &p); err != nil {

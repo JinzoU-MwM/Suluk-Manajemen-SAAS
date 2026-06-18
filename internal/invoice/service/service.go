@@ -183,7 +183,29 @@ func (s *InvoiceService) UpdateInvoice(ctx context.Context, id, orgID uuid.UUID,
 }
 
 func (s *InvoiceService) CancelInvoice(ctx context.Context, id, orgID uuid.UUID, reason string) error {
-	return s.repo.CancelInvoice(ctx, id, orgID, reason)
+	inv, err := s.repo.GetInvoiceByID(ctx, id, orgID)
+	if err != nil {
+		return err
+	}
+	// On cancel, reverse the uncollected receivable + unearned revenue
+	// (Dr Pendapatan / Cr Piutang for the remaining balance). Collected amounts
+	// are returned via the separate refund flow.
+	var evt *outbox.Event
+	if inv.Status != string(model.InvoiceStatusBatal) && inv.AmountRemaining > 0 {
+		payload, _ := json.Marshal(map[string]any{
+			"amount":         inv.AmountRemaining,
+			"invoice_number": inv.InvoiceNumber,
+		})
+		evt = &outbox.Event{
+			OrgID:         orgID,
+			AggregateType: "invoice",
+			AggregateID:   id,
+			EventType:     events.EventInvoiceCancelled,
+			Payload:       payload,
+			OccurredAt:    time.Now(),
+		}
+	}
+	return s.repo.CancelInvoiceTx(ctx, id, orgID, reason, evt)
 }
 
 func (s *InvoiceService) CreatePaymentSchedules(ctx context.Context, orgID, invoiceID uuid.UUID, req model.CreatePaymentScheduleRequest) ([]model.PaymentSchedule, error) {
