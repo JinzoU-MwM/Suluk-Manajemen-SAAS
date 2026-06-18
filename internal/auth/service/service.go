@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +49,7 @@ func (s *AuthService) WithEmail(c *email.Client) *AuthService {
 }
 
 func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (*model.User, *model.Organization, *sharedAuth.TokenPair, error) {
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("hash password: %w", err)
@@ -120,9 +122,15 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 	return user, org, tokens, nil
 }
 
+// dummyBcryptHash equalizes login timing on an unknown email so there is no
+// user-enumeration oracle (bcrypt runs whether or not the user exists).
+var dummyBcryptHash, _ = bcrypt.GenerateFromPassword([]byte("timing-equalizer"), bcrypt.DefaultCost)
+
 func (s *AuthService) Login(ctx context.Context, req model.LoginRequest) (*model.User, *model.Organization, *sharedAuth.TokenPair, error) {
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	user, err := s.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
+		_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(req.Password))
 		return nil, nil, nil, fmt.Errorf("invalid credentials")
 	}
 
@@ -218,8 +226,8 @@ func (s *AuthService) ProvisionAgentCredential(ctx context.Context, orgID, invit
 	if req.Email == "" || req.Password == "" || req.AgentID == "" {
 		return nil, fmt.Errorf("email, password, and agent_id are required")
 	}
-	if len(req.Password) < 6 {
-		return nil, fmt.Errorf("password minimal 6 karakter")
+	if len(req.Password) < 8 {
+		return nil, fmt.Errorf("password minimal 8 karakter")
 	}
 	agentID, err := uuid.Parse(req.AgentID)
 	if err != nil {
@@ -272,8 +280,8 @@ func (s *AuthService) ProvisionJamaahCredential(ctx context.Context, orgID, invi
 	if req.Email == "" || req.Password == "" || req.JamaahID == "" {
 		return nil, fmt.Errorf("email, password, and jamaah_id are required")
 	}
-	if len(req.Password) < 6 {
-		return nil, fmt.Errorf("password minimal 6 karakter")
+	if len(req.Password) < 8 {
+		return nil, fmt.Errorf("password minimal 8 karakter")
 	}
 	jamaahID, err := uuid.Parse(req.JamaahID)
 	if err != nil {
@@ -405,6 +413,9 @@ func (s *AuthService) checkSeatLimit(ctx context.Context, orgID uuid.UUID) error
 }
 
 func (s *AuthService) AddTeamMember(ctx context.Context, orgID, userID, addedBy uuid.UUID, role string) (*model.TeamMember, error) {
+	if !model.IsAssignableRole(role) {
+		return nil, fmt.Errorf("role tidak valid")
+	}
 	if err := s.checkSeatLimit(ctx, orgID); err != nil {
 		return nil, err
 	}
@@ -435,11 +446,14 @@ func (s *AuthService) RemoveTeamMember(ctx context.Context, orgID, userID uuid.U
 }
 
 func (s *AuthService) UpdateMemberRole(ctx context.Context, orgID, userID uuid.UUID, role string) error {
+	if !model.IsAssignableRole(role) {
+		return fmt.Errorf("role tidak valid")
+	}
 	member, err := s.repo.GetTeamMember(ctx, orgID, userID)
 	if err != nil {
 		return err
 	}
-	if member.Role == "owner" && role != "owner" {
+	if member.Role == "owner" {
 		return fmt.Errorf("cannot change owner role; transfer ownership first")
 	}
 	return s.repo.UpdateMemberRole(ctx, orgID, userID, role)
@@ -454,6 +468,9 @@ func (s *AuthService) ListUsersByOrg(ctx context.Context, orgID uuid.UUID) ([]mo
 }
 
 func (s *AuthService) InviteMember(ctx context.Context, orgID, invitedBy uuid.UUID, email, role string) (*model.TeamInvite, error) {
+	if !model.IsAssignableRole(role) {
+		return nil, fmt.Errorf("role tidak valid")
+	}
 	// Enforce the per-tier seat limit before provisioning a new invite.
 	if err := s.checkSeatLimit(ctx, orgID); err != nil {
 		return nil, err
@@ -489,6 +506,16 @@ func (s *AuthService) AcceptInvite(ctx context.Context, token string, userID uui
 		return nil, fmt.Errorf("invite has expired")
 	}
 
+	// The invite is bound to a specific email: the accepting account must match,
+	// so a leaked/forwarded token can't be redeemed by another (incl. portal) user.
+	caller, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+	if !strings.EqualFold(strings.TrimSpace(caller.Email), strings.TrimSpace(invite.Email)) {
+		return nil, fmt.Errorf("invite is for a different email address")
+	}
+
 	member := &model.TeamMember{
 		ID:     uuid.New(),
 		OrgID:  invite.OrgID,
@@ -514,8 +541,8 @@ func (s *AuthService) GetNotifications(ctx context.Context, orgID, userID uuid.U
 	return s.repo.GetUserNotifications(ctx, orgID, userID, 50)
 }
 
-func (s *AuthService) MarkNotificationRead(ctx context.Context, id, userID uuid.UUID) error {
-	return s.repo.MarkNotificationRead(ctx, id, userID)
+func (s *AuthService) MarkNotificationRead(ctx context.Context, id, orgID, userID uuid.UUID) error {
+	return s.repo.MarkNotificationRead(ctx, id, orgID, userID)
 }
 
 func (s *AuthService) MarkAllNotificationsRead(ctx context.Context, orgID, userID uuid.UUID) error {
@@ -570,17 +597,24 @@ func (s *AuthService) DeleteAccount(ctx context.Context, userID uuid.UUID, passw
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return fmt.Errorf("password is incorrect")
 	}
-	_ = s.repo.DeleteRefreshToken(ctx, hashToken(""))
+	_ = s.repo.DeleteRefreshTokensByUser(ctx, userID)
 	return s.repo.DeleteUser(ctx, userID)
 }
 
 func (s *AuthService) VerifyEmail(ctx context.Context, email, otp string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return fmt.Errorf("user not found")
 	}
 	if user.EmailVerified {
 		return nil
+	}
+	// Cap verify attempts per email to defeat brute-force of the 6-digit OTP.
+	if s.redis != nil {
+		if n, rerr := s.redis.RateLimit(ctx, "otp:verify:"+email, 10, 15*time.Minute); rerr == nil && n > 10 {
+			return fmt.Errorf("terlalu banyak percobaan, coba lagi nanti")
+		}
 	}
 	valid, err := s.repo.ConsumeOtp(ctx, email, otp)
 	if err != nil {
@@ -593,6 +627,12 @@ func (s *AuthService) VerifyEmail(ctx context.Context, email, otp string) error 
 }
 
 func (s *AuthService) ResendOtp(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if s.redis != nil {
+		if n, rerr := s.redis.RateLimit(ctx, "otp:resend:"+email, 5, 15*time.Minute); rerr == nil && n > 5 {
+			return nil
+		}
+	}
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return fmt.Errorf("user not found")
@@ -609,6 +649,7 @@ func (s *AuthService) ResendOtp(ctx context.Context, email string) error {
 }
 
 func (s *AuthService) ForgotPassword(ctx context.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		// Don't reveal whether the email exists
@@ -623,6 +664,7 @@ func (s *AuthService) ForgotPassword(ctx context.Context, email string) error {
 }
 
 func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPassword string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
 	if len(newPassword) < 8 {
 		return fmt.Errorf("password must be at least 8 characters")
 	}
