@@ -9,6 +9,7 @@
   import Topbar from "$lib/components/Topbar.svelte";
   import UpgradeModal from "$lib/components/UpgradeModal.svelte";
   import SupportChatBubble from "$lib/components/SupportChatBubble.svelte";
+  import SplashScreen from "$lib/components/SplashScreen.svelte";
   import { session, navigate } from "$lib/stores/session.svelte.js";
 
   let { children } = $props();
@@ -52,7 +53,7 @@
 </script>
 
 {#if !ready}
-  <div class="min-h-screen flex items-center justify-center text-slate-500">Memuat…</div>
+  <SplashScreen />
 {:else}
   <div class="suluk-shell">
     <Sidebar
