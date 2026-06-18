@@ -326,7 +326,7 @@ func (h *AuthHandler) MarkNotificationRead(c *fiber.Ctx) error {
 	if err != nil {
 		return response.BadRequest(c, "invalid notification id")
 	}
-	if err := h.svc.MarkNotificationRead(c.Context(), id, claims.UserID); err != nil {
+	if err := h.svc.MarkNotificationRead(c.Context(), id, claims.OrgID, claims.UserID); err != nil {
 		return response.NotFound(c, "notification not found")
 	}
 	return response.OK(c, fiber.Map{"message": "notification marked as read"})

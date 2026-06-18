@@ -29,6 +29,19 @@ func ValidRoles() []string {
 	return []string{"owner", "admin", "finance", "cs", "viewer", "agent", "jamaah"}
 }
 
+// IsAssignableRole reports whether a role may be granted via team management
+// (invite / add-member / update-role). Excludes "owner" (use a dedicated
+// ownership transfer) and "agent"/"jamaah" (provisioned via their own
+// credential endpoints, never via team management).
+func IsAssignableRole(role string) bool {
+	switch role {
+	case "admin", "editor", "finance", "cs", "viewer":
+		return true
+	default:
+		return false
+	}
+}
+
 type MemberStatus string
 
 const (

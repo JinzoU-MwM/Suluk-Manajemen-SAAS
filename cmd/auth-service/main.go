@@ -190,7 +190,7 @@ func main() {
 	team.Post("/join/:token", authHandler.AcceptInvite)
 	team.Delete("/invites/:inviteId", authHandler.CancelInvite)
 
-	app.Post("/api/v1/invite/accept", sharedMW.AuthMiddleware(jwtManager), authHandler.AcceptInvite)
+	app.Post("/api/v1/invite/accept", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff, authHandler.AcceptInvite)
 
 	go func() {
 		if err := app.Listen(fmt.Sprintf(":%d", cfg.Server.Port)); err != nil {

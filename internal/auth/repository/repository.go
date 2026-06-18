@@ -384,10 +384,10 @@ func (r *AuthRepo) GetUserNotifications(ctx context.Context, orgID, userID uuid.
 	return notifications, count, nil
 }
 
-func (r *AuthRepo) MarkNotificationRead(ctx context.Context, id, userID uuid.UUID) error {
+func (r *AuthRepo) MarkNotificationRead(ctx context.Context, id, orgID, userID uuid.UUID) error {
 	result, err := r.pool.Exec(ctx,
-		`UPDATE notifications SET is_read = TRUE WHERE id = $1 AND (user_id IS NULL OR user_id = $2)`,
-		id, userID,
+		`UPDATE notifications SET is_read = TRUE WHERE id = $1 AND org_id = $2 AND (user_id IS NULL OR user_id = $3)`,
+		id, orgID, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("mark notification read: %w", err)
