@@ -61,6 +61,12 @@ func (s *Service) GetAccount(ctx context.Context, orgID, id uuid.UUID) (*model.S
 // Deposit records a savings deposit and emits savings.deposited
 // (Dr Kas/Bank, Cr Hutang Tabungan).
 func (s *Service) Deposit(ctx context.Context, orgID, userID, accountID uuid.UUID, req model.DepositRequest) (*model.SavingsAccount, error) {
+	// Defense-in-depth: the handler already rejects amount < 1, but guard here too
+	// — a non-positive amount would decrement the balance via the deposit path,
+	// bypassing the withdrawal/overdraw checks.
+	if req.Amount <= 0 {
+		return nil, repository.ErrInvalidAmount
+	}
 	method := req.Method
 	if method == "" {
 		method = "tunai"

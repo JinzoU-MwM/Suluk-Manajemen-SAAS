@@ -57,9 +57,15 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	if req.JamaahID == "" {
 		return response.BadRequest(c, "jamaah_id wajib diisi")
 	}
+	if _, perr := uuid.Parse(req.JamaahID); perr != nil {
+		return response.BadRequest(c, "jamaah_id tidak valid")
+	}
+	if req.TargetAmount < 0 {
+		return response.BadRequest(c, "target_amount tidak boleh negatif")
+	}
 	a, err := h.svc.CreateAccount(c.Context(), claims.OrgID, req)
 	if err != nil {
-		return response.BadRequest(c, err.Error())
+		return response.Internal(c, err)
 	}
 	return response.Created(c, a)
 }
