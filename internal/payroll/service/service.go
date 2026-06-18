@@ -3,10 +3,18 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/jamaah-in/v2/internal/payroll/model"
 	"github.com/jamaah-in/v2/internal/payroll/repository"
 	"github.com/jamaah-in/v2/internal/shared/events"
+)
+
+var (
+	// ErrSlipExists blocks double-running payroll for the same employee+period.
+	ErrSlipExists = errors.New("salary slip already exists for this employee and period")
+	// ErrInvalidAmount rejects non-positive money amounts.
+	ErrInvalidAmount = errors.New("amount must be greater than 0")
 )
 
 type PayrollService struct {
@@ -99,6 +107,16 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 		return nil, err
 	}
 
+	// Block double-running payroll for the same period: a second slip would emit
+	// another payroll.posted event and double-book the salary expense + cash-out.
+	exists, err := s.repo.SlipExistsForPeriod(ctx, orgID, req.EmployeeID, req.Period)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, ErrSlipExists
+	}
+
 	gross := emp.BaseSalary + emp.Allowance
 	pph21 := int64(float64(gross) * emp.Pph21Rate / 100)
 	bpjs := emp.BpjsTk + emp.BpjsKes
@@ -109,6 +127,12 @@ func (s *PayrollService) CreateSalarySlip(ctx context.Context, orgID string, req
 	if sum, serr := s.repo.AttendanceSummary(ctx, orgID, req.EmployeeID, req.Period); serr == nil && sum.UnpaidDays > 0 {
 		perDay := emp.BaseSalary / model.WorkingDaysPerMonth
 		deduction = int64(sum.UnpaidDays) * perDay
+	}
+	// Cap the deduction at gross so the journal's gross (= gross - deduction) can
+	// never go negative, which the accounting consumer would reject (dropping the
+	// GL entry silently).
+	if deduction > gross {
+		deduction = gross
 	}
 
 	net := gross - pph21 - bpjs - deduction
@@ -150,6 +174,14 @@ func (s *PayrollService) FinalizeSlip(ctx context.Context, id, orgID string) err
 }
 
 func (s *PayrollService) CreateAdvance(ctx context.Context, orgID string, req model.CreateAdvanceRequest) (*model.Advance, error) {
+	if req.Amount <= 0 {
+		return nil, ErrInvalidAmount
+	}
+	// The employee must belong to the caller's org (authoritative) — otherwise an
+	// advance could be booked against a foreign-org employee_id.
+	if _, err := s.repo.GetEmployee(ctx, req.EmployeeID, orgID); err != nil {
+		return nil, err // ErrEmployeeNotFound
+	}
 	a := &model.Advance{
 		OrgID:      orgID,
 		EmployeeID: req.EmployeeID,
@@ -173,7 +205,7 @@ func (s *PayrollService) RepayAdvance(ctx context.Context, id, orgID string, req
 	if req.SalarySlipID != "" {
 		slipID = &req.SalarySlipID
 	}
-	return s.repo.RepayAdvance(ctx, id, req.Amount, slipID)
+	return s.repo.RepayAdvance(ctx, id, orgID, req.Amount, slipID)
 }
 
 func (s *PayrollService) GetPayrollSummary(ctx context.Context, orgID string) (*model.PayrollSummary, error) {
