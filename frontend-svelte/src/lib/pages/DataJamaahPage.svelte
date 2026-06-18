@@ -10,12 +10,14 @@
     Loader2,
     Plane,
     Search,
+    Sparkles,
     UserPlus,
     UsersRound,
     X,
   } from "lucide-svelte";
   import { ApiService } from "../services/api.js";
-  import { mapError } from "../services/toast.svelte.js";
+  import { mapError, showToast } from "../services/toast.svelte.js";
+  import SlideDrawer from "../components/SlideDrawer.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Pager from "../components/Pager.svelte";
   import PageHeader from "../components/PageHeader.svelte";
@@ -42,6 +44,56 @@
   let selectedGroup = $derived(
     groups.find((group) => String(group.id) === String(selectedGroupId)) || null,
   );
+
+  // --- Manual input (alternative to the AI Scanner) ---
+  const emptyManual = {
+    nama: "",
+    gender: "",
+    no_hp: "",
+    no_identitas: "",
+    no_paspor: "",
+    tanggal_lahir: "",
+    tempat_lahir: "",
+    alamat: "",
+    email: "",
+  };
+  let showManual = $state(false);
+  let savingManual = $state(false);
+  let manual = $state({ ...emptyManual });
+
+  function openManual() {
+    manual = { ...emptyManual };
+    showManual = true;
+  }
+
+  async function saveManual() {
+    if (!manual.nama.trim()) {
+      showToast("Nama wajib diisi", "warning");
+      return;
+    }
+    if (!selectedGroupId) {
+      showToast("Pilih grup keberangkatan terlebih dahulu", "warning");
+      return;
+    }
+    savingManual = true;
+    try {
+      // 1) Create the jamaah profile (stores the full data).
+      const profile = await ApiService.createProfile({ ...manual, lead_source: "walk_in" });
+      // 2) Link the new profile to the selected group so it shows in this list.
+      if (profile?.id) {
+        await ApiService.addGroupMembers(selectedGroupId, [
+          { member_id: profile.id, name: manual.nama.trim(), phone: manual.no_hp.trim() },
+        ]);
+      }
+      showToast("Jamaah berhasil ditambahkan", "success");
+      showManual = false;
+      await loadMembers();
+    } catch (e) {
+      showToast(mapError(e.message), "error");
+    } finally {
+      savingManual = false;
+    }
+  }
 
   // Documents a member can hold (drives checklist + completeness filter).
   function docList(member) {
@@ -176,9 +228,14 @@
     subtitle="Kelola seluruh data calon jamaah dari setiap grup keberangkatan."
   >
     {#snippet actions()}
-      <Button variant="primary" icon={UserPlus} onclick={() => onNavigate("scanner")}>
-        Tambah via Scanner
-      </Button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <Button variant="ghost" icon={Sparkles} onclick={() => onNavigate("scanner")}>
+          Scan AI
+        </Button>
+        <Button variant="primary" icon={UserPlus} onclick={openManual}>
+          Input Manual
+        </Button>
+      </div>
     {/snippet}
   </PageHeader>
 
@@ -307,6 +364,87 @@
     {/if}
   </Card>
 </div>
+
+<!-- Manual input modal -->
+<SlideDrawer open={showManual} title="Input Jamaah Manual" width="600px" onClose={() => (showManual = false)}>
+  <form onsubmit={(e) => { e.preventDefault(); saveManual(); }}>
+    <div style="padding:22px 24px;display:flex;flex-direction:column;gap:15px">
+      <div style="font-size:12.5px;color:var(--c-muted)">
+        Ditambahkan ke grup: <strong style="color:var(--c-ink)">{selectedGroup?.name || "—"}</strong>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label for="m-nama" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">Nama Lengkap <span style="color:#dc2626">*</span></label>
+        <input id="m-nama" type="text" bind:value={manual.nama} placeholder="Nama sesuai paspor/identitas"
+          style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="m-gender" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">Jenis Kelamin</label>
+          <select id="m-gender" bind:value={manual.gender}
+            style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none">
+            <option value="">—</option>
+            <option value="L">Laki-laki</option>
+            <option value="P">Perempuan</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="m-hp" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">No. HP</label>
+          <input id="m-hp" type="tel" bind:value={manual.no_hp} placeholder="08…"
+            style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="m-nik" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">No. Identitas (NIK)</label>
+          <input id="m-nik" type="text" bind:value={manual.no_identitas}
+            style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="m-paspor" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">No. Paspor</label>
+          <input id="m-paspor" type="text" bind:value={manual.no_paspor}
+            style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="m-tlahir" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">Tempat Lahir</label>
+          <input id="m-tlahir" type="text" bind:value={manual.tempat_lahir}
+            style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="m-dlahir" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">Tanggal Lahir</label>
+          <input id="m-dlahir" type="date" bind:value={manual.tanggal_lahir}
+            style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label for="m-email" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">Email</label>
+        <input id="m-email" type="email" bind:value={manual.email}
+          style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none" />
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label for="m-alamat" style="font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c-faint)">Alamat</label>
+        <textarea id="m-alamat" bind:value={manual.alamat} rows="2"
+          style="width:100%;padding:11px 14px;font-size:13.5px;color:var(--c-ink);background:var(--c-bg);border:1px solid var(--c-line);border-radius:var(--radius);outline:none;resize:vertical"></textarea>
+      </div>
+    </div>
+
+    <div style="padding:16px 24px;border-top:1px solid var(--c-line);display:flex;gap:10px;justify-content:flex-end;background:var(--c-bg)">
+      <button type="button" onclick={() => (showManual = false)}
+        style="padding:10px 18px;font-size:13.5px;font-weight:700;color:var(--c-muted);background:transparent;border:1px solid var(--c-line);border-radius:var(--radius);cursor:pointer">Batal</button>
+      <button type="submit" disabled={savingManual}
+        style="padding:10px 20px;font-size:13.5px;font-weight:700;color:#fff;background:var(--c-primary);border:none;border-radius:var(--radius);cursor:pointer;opacity:{savingManual ? 0.7 : 1}">
+        {savingManual ? "Menyimpan…" : "Simpan Jamaah"}
+      </button>
+    </div>
+  </form>
+</SlideDrawer>
 
 <!-- Detail Drawer (Suluk design) -->
 {#if selected}
