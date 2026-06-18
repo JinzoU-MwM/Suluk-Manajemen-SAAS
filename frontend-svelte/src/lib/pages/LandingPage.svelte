@@ -366,7 +366,7 @@
         <div><h4>Akun</h4><ul><li><button class="lp-foot-link" onclick={() => onGoToLogin()}>Masuk</button></li><li><button class="lp-foot-link" onclick={() => onGoToRegister()}>Daftar Gratis</button></li></ul></div>
       </div>
       <div class="lp-footer-bottom">
-        <div>© 2026 Suluk — PT Suluk Mitra Barokah. Hak cipta dilindungi.</div>
+        <div>© 2026 Jamnas — PT Jaminan Nasional Indonesia. Hak cipta dilindungi.</div>
         <div>Dibuat dengan ❤️ untuk travel umrah &amp; haji Indonesia</div>
       </div>
     </div>

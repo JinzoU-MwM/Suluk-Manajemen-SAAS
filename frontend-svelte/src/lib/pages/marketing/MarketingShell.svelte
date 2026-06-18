@@ -61,7 +61,7 @@
         </div>
       </div>
       <div class="gp-footer-bottom">
-        <div>© 2026 Suluk — PT Suluk Mitra Barokah.</div>
+        <div>© 2026 Jamnas — PT Jaminan Nasional Indonesia. Hak cipta dilindungi.</div>
         <div>Dibuat untuk travel umrah &amp; haji Indonesia</div>
       </div>
     </div>
