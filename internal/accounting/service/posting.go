@@ -101,6 +101,28 @@ func buildPosting(env *events.Envelope) (*posting, error) {
 			},
 		}, nil
 
+	case events.EventOverpaymentReceived:
+		var p paymentPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			return nil, fmt.Errorf("decode overpayment payload: %w", err)
+		}
+		if p.Amount <= 0 {
+			return nil, fmt.Errorf("overpayment amount must be > 0")
+		}
+		cashAcc := AccBank
+		if p.PaymentMethod == "tunai" || p.PaymentMethod == "cash" {
+			cashAcc = AccKas
+		}
+		memo := "Kelebihan bayar (titipan) invoice " + p.InvoiceNumber
+		return &posting{
+			module:      "invoice",
+			description: memo,
+			lines: []model.PostingLine{
+				{AccountCode: cashAcc, Debit: p.Amount, Memo: memo},
+				{AccountCode: AccTitipanJemaah, Credit: p.Amount, Memo: memo},
+			},
+		}, nil
+
 	case events.EventRefundCompleted:
 		var p paymentPayload
 		if err := json.Unmarshal(env.Payload, &p); err != nil {

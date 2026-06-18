@@ -14,6 +14,7 @@ const (
 	AccHutangGaji        = "2103" // Hutang Gaji
 	AccHutangPajak       = "2104" // Hutang Pajak (PPh/BPJS)
 	AccHutangTabungan    = "2201" // Hutang Tabungan Jemaah
+	AccTitipanJemaah     = "2202" // Hutang Titipan/Uang Muka Jemaah (kelebihan bayar)
 	AccModal             = "3101" // Modal Disetor
 	AccSaldoAwal         = "3901" // Saldo Awal (opening balance equity)
 	AccPendapatanPaket   = "4101" // Pendapatan Paket
@@ -44,6 +45,7 @@ func StandardCOA() []model.Account {
 		a(AccHutangGaji, "Hutang Gaji", model.TypeLiability),
 		a(AccHutangPajak, "Hutang Pajak", model.TypeLiability),
 		a(AccHutangTabungan, "Hutang Tabungan Jemaah", model.TypeLiability),
+		a(AccTitipanJemaah, "Hutang Titipan Jemaah", model.TypeLiability),
 		a(AccModal, "Modal Disetor", model.TypeEquity),
 		a(AccSaldoAwal, "Saldo Awal", model.TypeEquity),
 		a(AccPendapatanPaket, "Pendapatan Paket", model.TypeRevenue),
