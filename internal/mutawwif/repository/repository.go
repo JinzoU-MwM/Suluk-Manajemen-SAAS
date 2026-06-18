@@ -131,7 +131,7 @@ func (r *MutawwifRepo) ListByGroup(ctx context.Context, orgID, groupID uuid.UUID
 	rows, err := r.pool.Query(ctx, `
 		SELECT a.id, a.org_id, a.guide_id, a.group_id, a.role, a.assigned_at, a.created_at,
 		       g.name, g.type, g.phone
-		FROM guide_assignments a JOIN guides g ON g.id = a.guide_id
+		FROM guide_assignments a JOIN guides g ON g.id = a.guide_id AND g.org_id = a.org_id
 		WHERE a.org_id = $1 AND a.group_id = $2 ORDER BY a.role, g.name`, orgID, groupID)
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func (r *MutawwifRepo) ListByGuide(ctx context.Context, orgID, guideID uuid.UUID
 	rows, err := r.pool.Query(ctx, `
 		SELECT a.id, a.org_id, a.guide_id, a.group_id, a.role, a.assigned_at, a.created_at,
 		       g.name, g.type, g.phone
-		FROM guide_assignments a JOIN guides g ON g.id = a.guide_id
+		FROM guide_assignments a JOIN guides g ON g.id = a.guide_id AND g.org_id = a.org_id
 		WHERE a.org_id = $1 AND a.guide_id = $2 ORDER BY a.assigned_at DESC`, orgID, guideID)
 	if err != nil {
 		return nil, err
