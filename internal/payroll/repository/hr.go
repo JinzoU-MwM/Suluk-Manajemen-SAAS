@@ -80,7 +80,7 @@ func (r *PayrollRepo) CreateLeave(ctx context.Context, l *model.LeaveRequest) er
 func (r *PayrollRepo) ListLeave(ctx context.Context, orgID, status string) ([]model.LeaveRequest, error) {
 	q := `SELECT l.id, l.org_id, l.employee_id, l.type, to_char(l.start_date,'YYYY-MM-DD'), to_char(l.end_date,'YYYY-MM-DD'),
 	             l.days, l.reason, l.status, l.decided_by, l.created_at, l.updated_at, e.name
-	      FROM leave_requests l JOIN employees e ON e.id = l.employee_id WHERE l.org_id = $1`
+	      FROM leave_requests l JOIN employees e ON e.id = l.employee_id AND e.org_id = l.org_id WHERE l.org_id = $1`
 	args := []any{orgID}
 	if status != "" && status != "all" {
 		args = append(args, status)

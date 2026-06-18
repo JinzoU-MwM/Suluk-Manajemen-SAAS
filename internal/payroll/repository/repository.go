@@ -2,12 +2,20 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jamaah-in/v2/internal/payroll/model"
+)
+
+var (
+	ErrEmployeeNotFound = errors.New("employee not found")
+	ErrAdvanceNotFound  = errors.New("advance not found")
+	ErrRepayInvalid     = errors.New("repayment amount must be greater than 0")
+	ErrRepayTooMuch     = errors.New("repayment exceeds remaining balance")
 )
 
 type PayrollRepo struct {
@@ -54,9 +62,19 @@ func (r *PayrollRepo) GetEmployee(ctx context.Context, id, orgID string) (*model
 		FROM employees WHERE id = $1 AND org_id = $2
 	`, id, orgID).Scan(&e.ID, &e.OrgID, &e.Name, &e.Position, &e.Type, &e.BaseSalary, &e.Allowance, &e.BpjsTk, &e.BpjsKes, &e.Pph21Rate, &e.Phone, &e.Email, &e.IsActive, &e.CreatedAt, &e.UpdatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("employee not found")
+		return nil, ErrEmployeeNotFound
 	}
 	return &e, nil
+}
+
+// SlipExistsForPeriod reports whether a salary slip already exists for this
+// employee in the given period — used to block double-running payroll (which
+// would emit a second payroll.posted event and double-book the GL).
+func (r *PayrollRepo) SlipExistsForPeriod(ctx context.Context, orgID, employeeID, period string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM salary_slips WHERE org_id=$1 AND employee_id=$2 AND period=$3)`,
+		orgID, employeeID, period).Scan(&exists)
+	return exists, err
 }
 
 func (r *PayrollRepo) UpdateEmployee(ctx context.Context, id, orgID string, updates map[string]interface{}) error {
@@ -88,7 +106,7 @@ func (r *PayrollRepo) ListSalarySlips(ctx context.Context, orgID, period string)
 		SELECT s.id, s.org_id, s.employee_id, s.period, s.base_salary, s.allowance, s.deductions,
 		       s.pph21_amount, s.bpjs_amount, s.advance_deduction, s.net_salary, s.package_id, s.status, s.notes, s.created_at, s.updated_at,
 		       e.name
-		FROM salary_slips s JOIN employees e ON s.employee_id = e.id
+		FROM salary_slips s JOIN employees e ON s.employee_id = e.id AND e.org_id = s.org_id
 		WHERE s.org_id = $1
 	`
 	args := []interface{}{orgID}
@@ -131,7 +149,7 @@ func (r *PayrollRepo) CreateAdvance(ctx context.Context, a *model.Advance) error
 func (r *PayrollRepo) ListAdvances(ctx context.Context, orgID string) ([]model.Advance, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT a.id, a.org_id, a.employee_id, a.amount, a.remaining, a.reason, a.status, a.created_at, a.updated_at, e.name
-		FROM advances a JOIN employees e ON a.employee_id = e.id
+		FROM advances a JOIN employees e ON a.employee_id = e.id AND e.org_id = a.org_id
 		WHERE a.org_id = $1 ORDER BY a.created_at DESC
 	`, orgID)
 	if err != nil {
@@ -149,26 +167,36 @@ func (r *PayrollRepo) ListAdvances(ctx context.Context, orgID string) ([]model.A
 	return result, rows.Err()
 }
 
-func (r *PayrollRepo) RepayAdvance(ctx context.Context, advanceID string, amount int64, slipID *string) error {
+func (r *PayrollRepo) RepayAdvance(ctx context.Context, advanceID, orgID string, amount int64, slipID *string) error {
+	if amount <= 0 {
+		return ErrRepayInvalid
+	}
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `INSERT INTO advance_repayments (advance_id, amount, salary_slip_id) VALUES ($1,$2,$3)`, advanceID, amount, slipID)
-	if err != nil {
-		return err
+	// Lock + org-scope the advance, then validate the balance BEFORE inserting the
+	// repayment. The old code had no org filter (cross-org IDOR) and inserted the
+	// repayment row before the remaining>=amount guard (orphan row on over-repay).
+	var remaining int64
+	if err := tx.QueryRow(ctx, `SELECT remaining FROM advances WHERE id=$1 AND org_id=$2 FOR UPDATE`, advanceID, orgID).Scan(&remaining); err != nil {
+		return ErrAdvanceNotFound
+	}
+	if amount > remaining {
+		return ErrRepayTooMuch
 	}
 
-	_, err = tx.Exec(ctx, `
+	if _, err := tx.Exec(ctx, `INSERT INTO advance_repayments (advance_id, amount, salary_slip_id) VALUES ($1,$2,$3)`, advanceID, amount, slipID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
 		UPDATE advances SET remaining = remaining - $1, status = CASE WHEN remaining - $1 <= 0 THEN 'settled' ELSE status END, updated_at = NOW()
-		WHERE id = $2 AND remaining >= $1
-	`, amount, advanceID)
-	if err != nil {
+		WHERE id = $2 AND org_id = $3
+	`, amount, advanceID, orgID); err != nil {
 		return err
 	}
-
 	return tx.Commit(ctx)
 }
 
@@ -176,11 +204,11 @@ func (r *PayrollRepo) GetAdvance(ctx context.Context, id, orgID string) (*model.
 	var a model.Advance
 	err := r.pool.QueryRow(ctx, `
 		SELECT a.id, a.org_id, a.employee_id, a.amount, a.remaining, a.reason, a.status, a.created_at, a.updated_at, e.name
-		FROM advances a JOIN employees e ON a.employee_id = e.id
+		FROM advances a JOIN employees e ON a.employee_id = e.id AND e.org_id = a.org_id
 		WHERE a.id = $1 AND a.org_id = $2
 	`, id, orgID).Scan(&a.ID, &a.OrgID, &a.EmployeeID, &a.Amount, &a.Remaining, &a.Reason, &a.Status, &a.CreatedAt, &a.UpdatedAt, &a.EmployeeName)
 	if err != nil {
-		return nil, fmt.Errorf("advance not found")
+		return nil, ErrAdvanceNotFound
 	}
 	return &a, nil
 }
