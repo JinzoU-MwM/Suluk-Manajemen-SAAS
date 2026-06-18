@@ -658,7 +658,7 @@
 
     <!-- Footer -->
     <p class="text-center text-xs text-slate-400 mt-6">
-      © 2026 Suluk · Otomatisasi Siskopatuh
+      © 2026 Jamnas — PT Jaminan Nasional Indonesia. Hak cipta dilindungi.
     </p>
   </div>
 </div>
