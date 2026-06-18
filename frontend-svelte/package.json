@@ -39,6 +39,7 @@
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
     "@neodrag/svelte": "^2.0.0",
+    "gsap": "^3.15.0",
     "lucide-svelte": "^0.563.0"
   }
 }
