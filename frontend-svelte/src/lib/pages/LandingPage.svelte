@@ -1,8 +1,14 @@
 <script>
+  import { onMount } from "svelte";
   import { PLANS } from "../config/pricing.js";
   import LandingNav from "../components/LandingNav.svelte";
+  import { initLandingMotion } from "../anim/landingMotion.js";
 
   let { onGoToLogin = () => {}, onGoToRegister = () => {}, onNavigate = () => {} } = $props();
+
+  let rootEl;
+
+  onMount(() => initLandingMotion(rootEl));
 
   function scrollTop(e) {
     e?.preventDefault();
@@ -49,7 +55,7 @@
   }
 </script>
 
-<div class="lp">
+<div class="lp" bind:this={rootEl}>
   <!-- NAV -->
   <LandingNav />
 
