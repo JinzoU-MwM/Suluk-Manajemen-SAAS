@@ -225,7 +225,7 @@
                 <div class="modal-header">
                     <h3 class="modal-title">
                         <Crown class="h-5 w-5 text-emerald-500" />
-                        Upgrade ke {tierMeta.name}
+                        {paymentStatus !== "paid" && offeredTiers.length === 0 ? "Hubungi Sales" : `Upgrade ke ${tierMeta.name}`}
                     </h3>
                     <button onclick={closeUpgradeModal} class="modal-close"
                         >x</button

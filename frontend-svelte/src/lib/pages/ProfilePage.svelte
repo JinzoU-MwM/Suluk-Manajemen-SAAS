@@ -1425,7 +1425,7 @@
         border: none;
         padding: 0;
         font-size: 0.78rem;
-        color: #94a3b8;
+        color: var(--c-muted);
         text-decoration: underline;
         cursor: pointer;
         align-self: flex-start;
@@ -1440,7 +1440,7 @@
     }
     .plan-confirm-text {
         font-size: 0.78rem;
-        color: #475569;
+        color: var(--c-muted);
         line-height: 1.4;
     }
     .plan-confirm-actions {
