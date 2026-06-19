@@ -62,6 +62,28 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
             return data;
         },
 
+        async cancelSubscription() {
+            const response = await apiFetch(`${API_URL}/subscription/cancel`, {
+                method: 'POST',
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            const data = unwrapData(await response.json());
+            cacheSet('sub:status', data, 20000);
+            return data;
+        },
+
+        async resumeSubscription() {
+            const response = await apiFetch(`${API_URL}/subscription/resume`, {
+                method: 'POST',
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            const data = unwrapData(await response.json());
+            cacheSet('sub:status', data, 20000);
+            return data;
+        },
+
         async upgradeToPro(paymentRef = null) {
             const response = await apiFetch(`${API_URL}/subscription/upgrade`, {
                 method: 'POST',
