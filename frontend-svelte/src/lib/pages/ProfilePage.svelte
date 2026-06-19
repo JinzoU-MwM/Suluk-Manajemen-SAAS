@@ -1075,8 +1075,8 @@
                     <Card>
                         <div class="section-head">
                             <div>
-                                <div class="section-title">Saluran Pengiriman</div>
-                                <div class="section-desc">Tampilan dan kanal pemberitahuan akun.</div>
+                                <div class="section-title">Tampilan</div>
+                                <div class="section-desc">Atur tampilan aplikasi.</div>
                             </div>
                         </div>
                         <div class="setting-list">

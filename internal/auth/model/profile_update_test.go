@@ -19,6 +19,12 @@ func TestApplyProfileUpdatePartial(t *testing.T) {
 	if u.AvatarColor != "blue" { // untouched
 		t.Fatalf("avatar = %q, want blue (unchanged)", u.AvatarColor)
 	}
+	if u.Phone != nil {
+		t.Fatalf("phone = %v, want nil (untouched)", u.Phone)
+	}
+	if u.Bio != nil {
+		t.Fatalf("bio = %v, want nil (untouched)", u.Bio)
+	}
 }
 
 func TestApplyProfileUpdateRejectsEmptyName(t *testing.T) {
@@ -29,12 +35,20 @@ func TestApplyProfileUpdateRejectsEmptyName(t *testing.T) {
 }
 
 func TestApplyProfileUpdateClampsAvatarColor(t *testing.T) {
-	u := &User{AvatarColor: "blue"}
+	u := &User{AvatarColor: "rose"}
 	if err := ApplyProfileUpdate(u, ProfileUpdate{AvatarColor: sp("neon")}); err != nil {
 		t.Fatalf("err = %v", err)
 	}
 	if u.AvatarColor != "blue" {
 		t.Fatalf("avatar = %q, want blue (clamped)", u.AvatarColor)
+	}
+
+	u2 := &User{AvatarColor: "blue"}
+	if err := ApplyProfileUpdate(u2, ProfileUpdate{AvatarColor: sp("emerald")}); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if u2.AvatarColor != "emerald" {
+		t.Fatalf("avatar = %q, want emerald (valid color preserved)", u2.AvatarColor)
 	}
 }
 

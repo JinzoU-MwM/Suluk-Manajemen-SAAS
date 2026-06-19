@@ -53,25 +53,25 @@ const (
 )
 
 type User struct {
-	ID            uuid.UUID `json:"id" db:"id"`
-	Email         string    `json:"email" db:"email"`
-	Name          string    `json:"name" db:"name"`
-	PasswordHash  string    `json:"-" db:"password_hash"`
-	EmailVerified bool      `json:"email_verified" db:"email_verified"`
-	Phone            *string `json:"phone,omitempty" db:"phone"`
-	PhoneVerified    bool    `json:"phone_verified" db:"phone_verified"`
-	City             *string `json:"city,omitempty" db:"city"`
-	Bio              *string `json:"bio,omitempty" db:"bio"`
-	AvatarColor      string  `json:"avatar_color" db:"avatar_color"`
-	NotifyUsageLimit bool    `json:"notify_usage_limit" db:"notify_usage_limit"`
-	NotifyExpiry     bool    `json:"notify_expiry" db:"notify_expiry"`
-	Role             string  `json:"role" db:"role"`
-	IsActive      bool       `json:"is_active" db:"is_active"`
-	IsSuperAdmin  bool       `json:"is_super_admin" db:"is_super_admin"`
-	AgentID       *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
-	JamaahID      *uuid.UUID `json:"jamaah_id,omitempty" db:"jamaah_id"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
+	ID               uuid.UUID  `json:"id" db:"id"`
+	Email            string     `json:"email" db:"email"`
+	Name             string     `json:"name" db:"name"`
+	PasswordHash     string     `json:"-" db:"password_hash"`
+	EmailVerified    bool       `json:"email_verified" db:"email_verified"`
+	Phone            *string    `json:"phone,omitempty" db:"phone"`
+	PhoneVerified    bool       `json:"phone_verified" db:"phone_verified"`
+	City             *string    `json:"city,omitempty" db:"city"`
+	Bio              *string    `json:"bio,omitempty" db:"bio"`
+	AvatarColor      string     `json:"avatar_color" db:"avatar_color"`
+	NotifyUsageLimit bool       `json:"notify_usage_limit" db:"notify_usage_limit"`
+	NotifyExpiry     bool       `json:"notify_expiry" db:"notify_expiry"`
+	Role             string     `json:"role" db:"role"`
+	IsActive         bool       `json:"is_active" db:"is_active"`
+	IsSuperAdmin     bool       `json:"is_super_admin" db:"is_super_admin"`
+	AgentID          *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
+	JamaahID         *uuid.UUID `json:"jamaah_id,omitempty" db:"jamaah_id"`
+	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type Organization struct {

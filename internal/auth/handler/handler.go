@@ -465,10 +465,10 @@ func sanitizeUser(u *model.User) fiber.Map {
 
 func sanitizeUserMap(u *model.User) fiber.Map {
 	m := fiber.Map{
-		"id":             u.ID,
-		"email":          u.Email,
-		"name":           u.Name,
-		"email_verified": u.EmailVerified,
+		"id":                 u.ID,
+		"email":              u.Email,
+		"name":               u.Name,
+		"email_verified":     u.EmailVerified,
 		"phone":              u.Phone,
 		"phone_verified":     u.PhoneVerified,
 		"city":               u.City,
@@ -477,12 +477,12 @@ func sanitizeUserMap(u *model.User) fiber.Map {
 		"notify_usage_limit": u.NotifyUsageLimit,
 		"notify_expiry":      u.NotifyExpiry,
 		"role":               u.Role,
-		"is_active":      u.IsActive,
-		"is_super_admin": u.IsSuperAdmin,
-		"agent_id":       u.AgentID,
-		"jamaah_id":      u.JamaahID,
-		"created_at":     u.CreatedAt,
-		"updated_at":     u.UpdatedAt,
+		"is_active":          u.IsActive,
+		"is_super_admin":     u.IsSuperAdmin,
+		"agent_id":           u.AgentID,
+		"jamaah_id":          u.JamaahID,
+		"created_at":         u.CreatedAt,
+		"updated_at":         u.UpdatedAt,
 	}
 	return m
 }
