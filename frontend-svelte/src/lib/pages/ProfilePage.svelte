@@ -23,7 +23,6 @@
         Sun,
         BarChart3,
         LogOut,
-        Image as ImageIcon,
         ChevronRight,
         Sparkles,
         Loader2,
@@ -117,7 +116,7 @@
 
     // Edit profile (Profil tab)
     let editing = $state(false);
-    let editName = $state("");
+    let editForm = $state({ name: "", phone: "", city: "", bio: "" });
     let savingProfile = $state(false);
     let profileMsg = $state({ type: "", text: "" });
 
@@ -170,7 +169,7 @@
                 ApiService.getActivity().catch(() => ({ activities: [] })),
             ]);
             profile = me;
-            editName = me.name;
+            editForm = { name: me.name || "", phone: me.phone || "", city: me.city || "", bio: me.bio || "" };
             ApiService.getOrganization().then((o) => { org = o; }).catch(() => {});
             selectedColor = me.avatar_color || "blue";
             notifyUsageLimit =
@@ -219,19 +218,21 @@
     }
 
     async function saveProfile() {
-        if (!editName.trim()) return;
+        if (!editForm.name.trim()) return;
         savingProfile = true;
         profileMsg = { type: "", text: "" };
         try {
-            await ApiService.updateProfile({ name: editName.trim() });
-            profile.name = editName.trim();
+            const updated = await ApiService.updateProfile({
+                name: editForm.name.trim(),
+                phone: editForm.phone.trim(),
+                city: editForm.city.trim(),
+                bio: editForm.bio.trim(),
+            });
+            profile = updated;
             const stored = JSON.parse(localStorage.getItem("user") || "{}");
-            stored.name = editName.trim();
+            stored.name = updated.name;
             localStorage.setItem("user", JSON.stringify(stored));
-            profileMsg = {
-                type: "success",
-                text: "Profil berhasil diperbarui!",
-            };
+            profileMsg = { type: "success", text: "Profil berhasil diperbarui!" };
             editing = false;
         } catch (e) {
             profileMsg = { type: "error", text: e.message };
@@ -241,7 +242,7 @@
     }
 
     function cancelEdit() {
-        editName = profile?.name || "";
+        editForm = { name: profile?.name || "", phone: profile?.phone || "", city: profile?.city || "", bio: profile?.bio || "" };
         profileMsg = { type: "", text: "" };
         editing = false;
     }
@@ -447,15 +448,6 @@
                                     {profile.name?.charAt(0)?.toUpperCase() || "U"}
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                class="summary-avatar-cam"
-                                title="Ubah foto"
-                                aria-label="Ubah foto profil"
-                                onclick={() => (tab = "profil")}
-                            >
-                                <ImageIcon size={14} />
-                            </button>
                         </div>
                         <div class="summary-name">{profile.name}</div>
                         <div class="summary-role">{roleLabel(profile.role)}</div>
@@ -504,6 +496,12 @@
                                     </div>
                                 </div>
                             </div>
+
+                            {#if subscription?.expires_at && subscription?.status !== "expired"}
+                                <div class="plan-expiry">Berlaku hingga {formatDate(subscription.expires_at)}</div>
+                            {:else if subscription?.status === "expired"}
+                                <div class="plan-expiry plan-expiry-danger">Langganan kedaluwarsa</div>
+                            {/if}
 
                             {#if !pro && subscription?.usage_limit}
                                 <div class="plan-usage">
@@ -554,7 +552,7 @@
                 </Card>
 
                 {#if user?.is_super_admin}
-                    <a href="/#/super-admin" class="superadmin-link">
+                    <a href="/super-admin" class="superadmin-link">
                         <Shield size={16} />
                         <span>Super Admin Dashboard</span>
                     </a>
@@ -580,7 +578,7 @@
                                         size="sm"
                                         icon={Check}
                                         onclick={saveProfile}
-                                        disabled={savingProfile || !editName.trim()}
+                                        disabled={savingProfile || !editForm.name.trim()}
                                     >
                                         {savingProfile ? "Menyimpan…" : "Simpan"}
                                     </Button>
@@ -605,7 +603,7 @@
                                     <input
                                         id="f-name"
                                         type="text"
-                                        bind:value={editName}
+                                        bind:value={editForm.name}
                                         class="field-input"
                                         placeholder="Nama lengkap"
                                     />
@@ -629,18 +627,20 @@
                             <!-- Telepon -->
                             <div class="field">
                                 <span class="field-label">No. Telepon</span>
-                                <div class="field-view">
-                                    <Phone size={16} class="field-ic" />
-                                    {profile.phone || "—"}
-                                </div>
+                                {#if editing}
+                                    <input class="field-input" type="tel" bind:value={editForm.phone} placeholder="cth. 0812-3456-7890" />
+                                {:else}
+                                    <div class="field-view"><Phone size={16} class="field-ic" />{profile.phone || "—"}</div>
+                                {/if}
                             </div>
                             <!-- Kota -->
                             <div class="field">
                                 <span class="field-label">Kota</span>
-                                <div class="field-view">
-                                    <MapPin size={16} class="field-ic" />
-                                    {profile.city || "—"}
-                                </div>
+                                {#if editing}
+                                    <input class="field-input" bind:value={editForm.city} placeholder="cth. Bandung" />
+                                {:else}
+                                    <div class="field-view"><MapPin size={16} class="field-ic" />{profile.city || "—"}</div>
+                                {/if}
                             </div>
                             <!-- Bergabung -->
                             <div class="field">
@@ -653,7 +653,11 @@
                             <!-- Bio (full) -->
                             <div class="field field-full">
                                 <span class="field-label">Bio</span>
-                                <div class="field-bio">{profile.bio || "—"}</div>
+                                {#if editing}
+                                    <input class="field-input" bind:value={editForm.bio} placeholder="Ceritakan sedikit tentang Anda" />
+                                {:else}
+                                    <div class="field-bio">{profile.bio || "—"}</div>
+                                {/if}
                             </div>
                         </div>
 
@@ -850,25 +854,6 @@
                                     aria-label="Toggle 2FA"
                                     disabled
                                     title="Segera hadir"
-                                >
-                                    <span class="toggle-knob"></span>
-                                </button>
-                            </div>
-                            <div class="setting-row">
-                                <div class="setting-icon"><Bell size={19} /></div>
-                                <div class="setting-text">
-                                    <div class="setting-title">Notifikasi Login Mencurigakan</div>
-                                    <div class="setting-desc">
-                                        Kirim peringatan email saat ada login tak dikenal.
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onclick={() => (notifyExpiry = !notifyExpiry)}
-                                    class="toggle {notifyExpiry ? 'toggle-on' : ''}"
-                                    role="switch"
-                                    aria-checked={notifyExpiry}
-                                    aria-label="Toggle notifikasi login"
                                 >
                                     <span class="toggle-knob"></span>
                                 </button>
@@ -1096,23 +1081,6 @@
                         </div>
                         <div class="setting-list">
                             <div class="setting-row">
-                                <div class="setting-icon"><Mail size={19} /></div>
-                                <div class="setting-text">
-                                    <div class="setting-title">Email</div>
-                                    <div class="setting-desc">Ringkasan dan peringatan ke email Anda.</div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onclick={() => (notifyExpiry = !notifyExpiry)}
-                                    class="toggle {notifyExpiry ? 'toggle-on' : ''}"
-                                    role="switch"
-                                    aria-checked={notifyExpiry}
-                                    aria-label="Toggle Email"
-                                >
-                                    <span class="toggle-knob"></span>
-                                </button>
-                            </div>
-                            <div class="setting-row">
                                 <div class="setting-icon">
                                     {#if darkMode}<Sun size={19} />{:else}<Moon size={19} />{/if}
                                 </div>
@@ -1287,21 +1255,6 @@
         font-size: 32px;
         font-weight: 800;
     }
-    .summary-avatar-cam {
-        position: absolute;
-        right: 2px;
-        bottom: 2px;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        background: var(--c-primary);
-        color: #fff;
-        border: 3px solid var(--c-surface);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-    }
     .summary-name {
         font-size: 18.5px;
         font-weight: 800;
@@ -1401,6 +1354,8 @@
         color: var(--c-muted);
         font-weight: 600;
     }
+    .plan-expiry { font-size: 12px; color: var(--c-muted); font-weight: 600; }
+    .plan-expiry-danger { color: var(--c-danger); }
 
     /* ---- Nav card ---- */
     :global(.nav-card) {
