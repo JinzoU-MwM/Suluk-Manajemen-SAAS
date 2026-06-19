@@ -82,7 +82,7 @@
         name: addForm.name.trim(),
         category: addForm.category.trim(),
         unit: addForm.unit.trim(),
-        stock: Number(addForm.stock),
+        initial_stock: Number(addForm.stock),
         min_stock: Number(addForm.min_stock),
       });
       showToast("Item berhasil ditambahkan", "success");
@@ -146,10 +146,15 @@
 
   async function submitAdjust() {
     if (!adjustTarget) return;
+    const delta = Number(adjustQty) - adjustTarget.stock;
+    if (delta === 0) {
+      showToast("Tidak ada perubahan stok", "info");
+      return;
+    }
     adjustBusy = true;
     try {
       await ApiService.adjustItem(adjustTarget.id, {
-        stock: Number(adjustQty),
+        delta,
         note: adjustNote.trim(),
       });
       showToast(`Stok ${adjustTarget.name} berhasil disesuaikan`, "success");
