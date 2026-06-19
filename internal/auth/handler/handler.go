@@ -107,15 +107,11 @@ func (h *AuthHandler) GetMe(c *fiber.Ctx) error {
 func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 
-	var req struct {
-		Name  string `json:"name"`
-		Phone string `json:"phone"`
-	}
-	if err := c.BodyParser(&req); err != nil {
+	var in model.ProfileUpdate
+	if err := c.BodyParser(&in); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
-
-	user, err := h.svc.UpdateUser(c.Context(), claims.UserID, req.Name, req.Phone)
+	user, err := h.svc.UpdateUser(c.Context(), claims.UserID, in)
 	if err != nil {
 		return response.Internal(c, err)
 	}

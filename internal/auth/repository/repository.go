@@ -121,8 +121,11 @@ func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.Use
 }
 
 func (r *AuthRepo) UpdateUser(ctx context.Context, user *model.User) error {
-	query := `UPDATE users SET name = $2, phone = $3, updated_at = NOW() WHERE id = $1`
-	result, err := r.pool.Exec(ctx, query, user.ID, user.Name, user.Phone)
+	query := `UPDATE users SET name = $2, phone = $3, city = $4, bio = $5,
+	          avatar_color = $6, notify_usage_limit = $7, notify_expiry = $8,
+	          updated_at = NOW() WHERE id = $1`
+	result, err := r.pool.Exec(ctx, query, user.ID, user.Name, user.Phone,
+		user.City, user.Bio, user.AvatarColor, user.NotifyUsageLimit, user.NotifyExpiry)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}

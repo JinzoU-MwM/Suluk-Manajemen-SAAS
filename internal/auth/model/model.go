@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -325,4 +327,58 @@ type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresAt    int64  `json:"expires_at"`
+}
+
+// ProfileUpdate carries the user-editable profile fields. A nil pointer means
+// "leave unchanged" (partial update).
+type ProfileUpdate struct {
+	Name             *string `json:"name"`
+	Phone            *string `json:"phone"`
+	City             *string `json:"city"`
+	Bio              *string `json:"bio"`
+	AvatarColor      *string `json:"avatar_color"`
+	NotifyUsageLimit *bool   `json:"notify_usage_limit"`
+	NotifyExpiry     *bool   `json:"notify_expiry"`
+}
+
+var avatarColors = map[string]bool{
+	"emerald": true, "blue": true, "purple": true, "rose": true,
+	"amber": true, "cyan": true, "indigo": true, "slate": true,
+}
+
+// ApplyProfileUpdate applies the non-nil fields of in onto u, with validation.
+func ApplyProfileUpdate(u *User, in ProfileUpdate) error {
+	if in.Name != nil {
+		n := strings.TrimSpace(*in.Name)
+		if n == "" {
+			return errors.New("name is required")
+		}
+		u.Name = n
+	}
+	if in.Phone != nil {
+		p := strings.TrimSpace(*in.Phone)
+		u.Phone = &p
+	}
+	if in.City != nil {
+		c := strings.TrimSpace(*in.City)
+		u.City = &c
+	}
+	if in.Bio != nil {
+		b := strings.TrimSpace(*in.Bio)
+		u.Bio = &b
+	}
+	if in.AvatarColor != nil {
+		c := strings.TrimSpace(*in.AvatarColor)
+		if !avatarColors[c] {
+			c = "blue"
+		}
+		u.AvatarColor = c
+	}
+	if in.NotifyUsageLimit != nil {
+		u.NotifyUsageLimit = *in.NotifyUsageLimit
+	}
+	if in.NotifyExpiry != nil {
+		u.NotifyExpiry = *in.NotifyExpiry
+	}
+	return nil
 }
