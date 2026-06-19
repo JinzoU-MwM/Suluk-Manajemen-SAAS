@@ -84,10 +84,14 @@ func (r *AuthRepo) CreateAgentUserTx(ctx context.Context, user *model.User, memb
 
 func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified,
+		city, bio, COALESCE(avatar_color,'blue'), COALESCE(notify_usage_limit,TRUE), COALESCE(notify_expiry,TRUE),
+		role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE id = $1`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
+		&u.Phone, &u.PhoneVerified,
+		&u.City, &u.Bio, &u.AvatarColor, &u.NotifyUsageLimit, &u.NotifyExpiry,
+		&u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
