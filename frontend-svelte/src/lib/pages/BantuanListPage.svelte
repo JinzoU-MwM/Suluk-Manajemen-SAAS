@@ -1,7 +1,8 @@
 <script>
   // Halaman daftar Pusat Bantuan, dipakai ulang oleh ketiga area (app/portal/
   // agency). `area` menentukan konten — helper hanya membaca array area itu,
-  // sehingga panduan antar-area tidak pernah bercampur.
+  // sehingga panduan antar-area tidak pernah bercampur. Gaya mengikuti idiom
+  // halaman aplikasi: PageHeader + utilitas Tailwind skala brand.
   import { Search } from "lucide-svelte";
   import PageHeader from "$lib/components/PageHeader.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
@@ -18,12 +19,15 @@
     agency: "Panduan mengelola lead, memantau jaringan, dan mencairkan komisi Anda.",
   };
 
+  // /app tidak punya padding konten (pages mengisinya sendiri); /portal & /agency
+  // sudah dipadati 24px oleh layout-nya.
+  let outerPad = $derived(area === "app" ? "p-4 lg:p-8" : "p-1 lg:p-2");
+
   let query = $state("");
   let searching = $derived(query.trim() !== "");
   let results = $derived(searching ? searchGuides(area, query) : []);
   let categories = $derived(getCategories(area));
 
-  // Tampilkan "Memulai" lebih dulu, sisanya menurut abjad.
   let categoryNames = $derived(
     Object.keys(categories).sort(
       (a, b) =>
@@ -37,19 +41,17 @@
   }
 </script>
 
-<div class="bantuan">
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-6 {outerPad}">
   <PageHeader kicker="Bantuan" title="Pusat Bantuan" subtitle={SUBTITLE[area] ?? ""} />
 
-  <div class="bantuan-search">
-    <HelpSearch bind:value={query} />
-  </div>
+  <HelpSearch bind:value={query} />
 
   {#if searching}
-    <p class="bantuan-count" aria-live="polite">
+    <p class="-mt-1 text-[13px] text-slate-500" aria-live="polite">
       {results.length} hasil untuk “{query.trim()}”
     </p>
     {#if results.length > 0}
-      <div class="bantuan-list">
+      <div class="flex flex-col gap-2.5">
         {#each results as guide (guide.slug)}
           <GuideCard {guide} href={hrefFor(guide.slug)} showCategory />
         {/each}
@@ -63,9 +65,9 @@
     {/if}
   {:else}
     {#each categoryNames as category (category)}
-      <section class="bantuan-group">
-        <h2 class="bantuan-group-title">{category}</h2>
-        <div class="bantuan-list">
+      <section class="flex flex-col gap-3">
+        <h2 class="font-serif text-lg font-bold text-slate-800">{category}</h2>
+        <div class="flex flex-col gap-2.5">
           {#each categories[category] as guide (guide.slug)}
             <GuideCard {guide} href={hrefFor(guide.slug)} />
           {/each}
@@ -74,31 +76,3 @@
     {/each}
   {/if}
 </div>
-
-<style>
-  .bantuan {
-    max-width: 820px;
-  }
-  .bantuan-search {
-    margin-bottom: 22px;
-  }
-  .bantuan-count {
-    font-size: 13.5px;
-    color: var(--c-muted);
-    margin: 0 0 14px;
-  }
-  .bantuan-group {
-    margin-bottom: 26px;
-  }
-  .bantuan-group-title {
-    font-family: var(--font-serif, "Playfair Display", Georgia, serif);
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--c-ink);
-    margin: 0 0 12px;
-  }
-  .bantuan-list {
-    display: grid;
-    gap: 12px;
-  }
-</style>

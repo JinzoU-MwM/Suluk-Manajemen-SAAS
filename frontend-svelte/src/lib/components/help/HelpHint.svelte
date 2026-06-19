@@ -24,56 +24,15 @@
   let slug = $derived(getGuideSlugForRoute(area, segment));
   let href = $derived(slug ? `${helpBase}/${slug}` : helpBase);
   let label = $derived(slug ? "Buka panduan halaman ini" : "Buka Pusat Bantuan");
+
+  const inlineCls =
+    "flex h-10 w-10 items-center justify-center rounded-[var(--radius)] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400";
+  const floatCls =
+    "fixed bottom-5 right-5 z-[60] flex h-12 w-12 items-center justify-center rounded-full bg-white text-primary-600 shadow-lg ring-1 ring-slate-200 transition-colors hover:bg-primary-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400";
 </script>
 
 {#if !onHelpPage}
-  <a
-    {href}
-    class="help-hint {floating ? 'help-hint-float' : 'help-hint-inline'}"
-    title={label}
-    aria-label={label}
-  >
+  <a {href} class={floating ? floatCls : inlineCls} title={label} aria-label={label}>
     <HelpCircle size={floating ? 22 : 20} aria-hidden="true" />
   </a>
 {/if}
-
-<style>
-  .help-hint {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--c-muted);
-    border-radius: var(--radius);
-    transition: background 0.14s, color 0.14s, border-color 0.14s;
-  }
-  .help-hint:focus-visible {
-    outline: 2px solid var(--c-primary);
-    outline-offset: 2px;
-  }
-  .help-hint-inline {
-    width: 40px;
-    height: 40px;
-  }
-  .help-hint-inline:hover {
-    background: var(--c-bg);
-    color: var(--c-ink);
-  }
-  .help-hint-float {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    z-index: 60;
-    width: 46px;
-    height: 46px;
-    border-radius: 999px;
-    color: var(--c-primary);
-    background: var(--c-surface);
-    border: 1px solid var(--c-line);
-    box-shadow: 0 6px 20px rgba(15, 61, 46, 0.14);
-  }
-  .help-hint-float:hover {
-    color: #fff;
-    background: var(--c-primary);
-    border-color: var(--c-primary);
-  }
-</style>

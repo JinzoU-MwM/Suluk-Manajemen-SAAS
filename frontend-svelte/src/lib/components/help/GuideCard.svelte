@@ -1,5 +1,6 @@
 <script>
-  // Kartu satu panduan di daftar Pusat Bantuan. Tautan ke halaman detail.
+  // Kartu satu panduan di daftar Pusat Bantuan. Gaya mengikuti item daftar
+  // standar aplikasi (rounded-xl, shadow-sm, ring slate, hover ring primary).
   import { ChevronRight } from "lucide-svelte";
 
   /**
@@ -12,64 +13,21 @@
   let { guide, href, showCategory = false } = $props();
 </script>
 
-<a class="guide-card" {href}>
-  <span class="guide-card-body">
+<a
+  {href}
+  class="group flex items-center justify-between gap-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200/60 transition-all hover:ring-primary-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+>
+  <span class="min-w-0 flex-1">
     {#if showCategory}
-      <span class="guide-card-cat">{guide.category}</span>
+      <span class="text-[11px] font-semibold uppercase tracking-wide text-primary-600">
+        {guide.category}
+      </span>
     {/if}
-    <span class="guide-card-title">{guide.title}</span>
-    <span class="guide-card-sum">{guide.summary}</span>
+    <span class="block text-[15px] font-semibold text-slate-800">{guide.title}</span>
+    <span class="mt-0.5 block text-[13px] leading-relaxed text-slate-500">{guide.summary}</span>
   </span>
-  <ChevronRight class="guide-card-chev" size={18} aria-hidden="true" />
+  <ChevronRight
+    class="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5"
+    aria-hidden="true"
+  />
 </a>
-
-<style>
-  .guide-card {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
-    border: 1px solid var(--c-line);
-    border-radius: var(--radius-lg);
-    background: var(--c-surface);
-    text-decoration: none;
-    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
-  }
-  .guide-card:hover {
-    border-color: color-mix(in srgb, var(--c-primary) 40%, var(--c-line));
-    box-shadow: 0 6px 18px rgba(15, 61, 46, 0.08);
-    transform: translateY(-1px);
-  }
-  .guide-card:focus-visible {
-    outline: 2px solid var(--c-primary);
-    outline-offset: 2px;
-  }
-  .guide-card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    min-width: 0;
-    flex: 1;
-  }
-  .guide-card-cat {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--c-primary);
-  }
-  .guide-card-title {
-    font-size: 15.5px;
-    font-weight: 700;
-    color: var(--c-ink);
-  }
-  .guide-card-sum {
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: var(--c-muted);
-  }
-  .guide-card :global(.guide-card-chev) {
-    flex-shrink: 0;
-    color: var(--c-faint);
-  }
-</style>
