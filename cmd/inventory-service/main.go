@@ -14,6 +14,7 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	sharedConfig "github.com/jamaah-in/v2/internal/shared/config"
 	sharedDB "github.com/jamaah-in/v2/internal/shared/database"
+	sharedEvents "github.com/jamaah-in/v2/internal/shared/events"
 	sharedHealth "github.com/jamaah-in/v2/internal/shared/health"
 	sharedLogger "github.com/jamaah-in/v2/internal/shared/logger"
 	sharedMW "github.com/jamaah-in/v2/internal/shared/middleware"
@@ -64,6 +65,20 @@ func main() {
 	inventorySvc := service.NewInventoryService(inventoryRepo)
 	inventoryHandler := handler.NewInventoryHandler(inventorySvc)
 
+	// Auto-deduct stock when a group departs (subscribe to group.departed).
+	var bus *sharedEvents.Bus
+	if b, berr := sharedEvents.Connect(cfg.NATS.Addr, logger); berr != nil {
+		logger.Errorf("event bus unavailable (auto-deduct disabled): %v", berr)
+	} else {
+		bus = b
+		defer bus.Close()
+		if serr := inventorySvc.StartConsumer(ctx, bus); serr != nil {
+			logger.Errorf("start inventory consumer: %v", serr)
+		} else {
+			logger.Info("inventory departure-deduct consumer started")
+		}
+	}
+
 	app := fiber.New(fiber.Config{
 		AppName:      "jamaah-inventory-service",
 		ReadTimeout:  10 * time.Second,
@@ -90,6 +105,17 @@ func main() {
 	api.Get("/members/:memberId/qr", inventoryHandler.GetMemberQR)
 	api.Post("/scan", inventoryHandler.Scan)
 	api.Get("/checkpoints/:packageId", inventoryHandler.GetCheckpoints)
+
+	// Stock monitoring (Phase 6)
+	api.Get("/items", inventoryHandler.ListItems)
+	api.Post("/items", inventoryHandler.CreateItem)
+	api.Patch("/items/:id", inventoryHandler.UpdateItem)
+	api.Delete("/items/:id", inventoryHandler.DeleteItem)
+	api.Post("/items/:id/restock", inventoryHandler.RestockItem)
+	api.Post("/items/:id/adjust", inventoryHandler.AdjustItem)
+	api.Get("/items/:id/movements", inventoryHandler.ListItemMovements)
+	api.Get("/kits/:packageId", inventoryHandler.GetKit)
+	api.Put("/kits/:packageId", inventoryHandler.SetKit)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
