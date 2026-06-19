@@ -26,9 +26,14 @@
   import Badge from "../components/ui/Badge.svelte";
   import Button from "../components/ui/Button.svelte";
   import ProgressBar from "../components/ui/ProgressBar.svelte";
+  import FilterTabs from "../components/ui/FilterTabs.svelte";
+  import StockTab from "./inventory/StockTab.svelte";
   import { ApiService } from "../services/api.js";
 
   let { isOpen = false, onClose, groups = [], isPro = false } = $props();
+
+  // Tab switcher: "distribusi" | "stok"
+  let tab = $state("distribusi");
 
   // State
   let selectedGroupId = $state(null);
@@ -262,6 +267,21 @@
         {/if}
       {/snippet}
     </PageHeader>
+
+    <FilterTabs
+      tabs={[
+        { value: "distribusi", label: "Distribusi" },
+        { value: "stok", label: "Stok" },
+      ]}
+      value={tab}
+      onChange={(v) => (tab = v)}
+    />
+
+    {#if tab === "stok"}
+      <StockTab {groups} />
+    {/if}
+
+    {#if tab === "distribusi"}
 
     <!-- Summary / forecast cards -->
     {#if forecast}
@@ -531,6 +551,8 @@
         {/if}
       </Card>
     {/if}
+
+    {/if}<!-- end tab === "distribusi" -->
   </div>
 {/if}
 
