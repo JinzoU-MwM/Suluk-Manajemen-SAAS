@@ -161,6 +161,8 @@ func main() {
 	subscription.Get("/trial-status", authHandler.GetTrialStatus)
 	subscription.Post("/activate-trial", authHandler.ActivateTrial)
 	subscription.Get("/pricing", authHandler.GetPricing)
+	subscription.Post("/cancel", authHandler.CancelSubscription)
+	subscription.Post("/resume", authHandler.ResumeSubscription)
 
 	// Service-to-service: payment webhook activates a paid plan. Guarded by
 	// X-Internal-Key inside the handler, so it is intentionally not behind AuthMiddleware.
