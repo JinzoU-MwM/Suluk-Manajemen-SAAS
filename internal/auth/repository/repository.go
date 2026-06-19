@@ -84,10 +84,14 @@ func (r *AuthRepo) CreateAgentUserTx(ctx context.Context, user *model.User, memb
 
 func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified,
+		city, bio, COALESCE(avatar_color,'blue'), COALESCE(notify_usage_limit,TRUE), COALESCE(notify_expiry,TRUE),
+		role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE id = $1`
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
+		&u.Phone, &u.PhoneVerified,
+		&u.City, &u.Bio, &u.AvatarColor, &u.NotifyUsageLimit, &u.NotifyExpiry,
+		&u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -101,10 +105,14 @@ func (r *AuthRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, 
 
 func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	u := &model.User{}
-	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified, role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified,
+		city, bio, COALESCE(avatar_color,'blue'), COALESCE(notify_usage_limit,TRUE), COALESCE(notify_expiry,TRUE),
+		role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE email = $1`
 	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
-		&u.Phone, &u.PhoneVerified, &u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
+		&u.Phone, &u.PhoneVerified,
+		&u.City, &u.Bio, &u.AvatarColor, &u.NotifyUsageLimit, &u.NotifyExpiry,
+		&u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == pgx.ErrNoRows {
@@ -117,8 +125,11 @@ func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.Use
 }
 
 func (r *AuthRepo) UpdateUser(ctx context.Context, user *model.User) error {
-	query := `UPDATE users SET name = $2, phone = $3, updated_at = NOW() WHERE id = $1`
-	result, err := r.pool.Exec(ctx, query, user.ID, user.Name, user.Phone)
+	query := `UPDATE users SET name = $2, phone = $3, city = $4, bio = $5,
+	          avatar_color = $6, notify_usage_limit = $7, notify_expiry = $8,
+	          updated_at = NOW() WHERE id = $1`
+	result, err := r.pool.Exec(ctx, query, user.ID, user.Name, user.Phone,
+		user.City, user.Bio, user.AvatarColor, user.NotifyUsageLimit, user.NotifyExpiry)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}

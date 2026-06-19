@@ -107,16 +107,15 @@ func (h *AuthHandler) GetMe(c *fiber.Ctx) error {
 func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 
-	var req struct {
-		Name  string `json:"name"`
-		Phone string `json:"phone"`
-	}
-	if err := c.BodyParser(&req); err != nil {
+	var in model.ProfileUpdate
+	if err := c.BodyParser(&in); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
-
-	user, err := h.svc.UpdateUser(c.Context(), claims.UserID, req.Name, req.Phone)
+	user, err := h.svc.UpdateUser(c.Context(), claims.UserID, in)
 	if err != nil {
+		if errors.Is(err, model.ErrNameRequired) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, sanitizeUser(user))
@@ -466,19 +465,24 @@ func sanitizeUser(u *model.User) fiber.Map {
 
 func sanitizeUserMap(u *model.User) fiber.Map {
 	m := fiber.Map{
-		"id":             u.ID,
-		"email":          u.Email,
-		"name":           u.Name,
-		"email_verified": u.EmailVerified,
-		"phone":          u.Phone,
-		"phone_verified": u.PhoneVerified,
-		"role":           u.Role,
-		"is_active":      u.IsActive,
-		"is_super_admin": u.IsSuperAdmin,
-		"agent_id":       u.AgentID,
-		"jamaah_id":      u.JamaahID,
-		"created_at":     u.CreatedAt,
-		"updated_at":     u.UpdatedAt,
+		"id":                 u.ID,
+		"email":              u.Email,
+		"name":               u.Name,
+		"email_verified":     u.EmailVerified,
+		"phone":              u.Phone,
+		"phone_verified":     u.PhoneVerified,
+		"city":               u.City,
+		"bio":                u.Bio,
+		"avatar_color":       u.AvatarColor,
+		"notify_usage_limit": u.NotifyUsageLimit,
+		"notify_expiry":      u.NotifyExpiry,
+		"role":               u.Role,
+		"is_active":          u.IsActive,
+		"is_super_admin":     u.IsSuperAdmin,
+		"agent_id":           u.AgentID,
+		"jamaah_id":          u.JamaahID,
+		"created_at":         u.CreatedAt,
+		"updated_at":         u.UpdatedAt,
 	}
 	return m
 }

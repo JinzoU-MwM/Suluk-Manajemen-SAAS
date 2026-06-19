@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,20 +53,25 @@ const (
 )
 
 type User struct {
-	ID            uuid.UUID `json:"id" db:"id"`
-	Email         string    `json:"email" db:"email"`
-	Name          string    `json:"name" db:"name"`
-	PasswordHash  string    `json:"-" db:"password_hash"`
-	EmailVerified bool      `json:"email_verified" db:"email_verified"`
-	Phone         *string   `json:"phone,omitempty" db:"phone"`
-	PhoneVerified bool      `json:"phone_verified" db:"phone_verified"`
-	Role          string     `json:"role" db:"role"`
-	IsActive      bool       `json:"is_active" db:"is_active"`
-	IsSuperAdmin  bool       `json:"is_super_admin" db:"is_super_admin"`
-	AgentID       *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
-	JamaahID      *uuid.UUID `json:"jamaah_id,omitempty" db:"jamaah_id"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
+	ID               uuid.UUID  `json:"id" db:"id"`
+	Email            string     `json:"email" db:"email"`
+	Name             string     `json:"name" db:"name"`
+	PasswordHash     string     `json:"-" db:"password_hash"`
+	EmailVerified    bool       `json:"email_verified" db:"email_verified"`
+	Phone            *string    `json:"phone,omitempty" db:"phone"`
+	PhoneVerified    bool       `json:"phone_verified" db:"phone_verified"`
+	City             *string    `json:"city,omitempty" db:"city"`
+	Bio              *string    `json:"bio,omitempty" db:"bio"`
+	AvatarColor      string     `json:"avatar_color" db:"avatar_color"`
+	NotifyUsageLimit bool       `json:"notify_usage_limit" db:"notify_usage_limit"`
+	NotifyExpiry     bool       `json:"notify_expiry" db:"notify_expiry"`
+	Role             string     `json:"role" db:"role"`
+	IsActive         bool       `json:"is_active" db:"is_active"`
+	IsSuperAdmin     bool       `json:"is_super_admin" db:"is_super_admin"`
+	AgentID          *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
+	JamaahID         *uuid.UUID `json:"jamaah_id,omitempty" db:"jamaah_id"`
+	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type Organization struct {
@@ -320,4 +327,60 @@ type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresAt    int64  `json:"expires_at"`
+}
+
+// ProfileUpdate carries the user-editable profile fields. A nil pointer means
+// "leave unchanged" (partial update).
+type ProfileUpdate struct {
+	Name             *string `json:"name"`
+	Phone            *string `json:"phone"`
+	City             *string `json:"city"`
+	Bio              *string `json:"bio"`
+	AvatarColor      *string `json:"avatar_color"`
+	NotifyUsageLimit *bool   `json:"notify_usage_limit"`
+	NotifyExpiry     *bool   `json:"notify_expiry"`
+}
+
+var ErrNameRequired = errors.New("name is required")
+
+var avatarColors = map[string]bool{
+	"emerald": true, "blue": true, "purple": true, "rose": true,
+	"amber": true, "cyan": true, "indigo": true, "slate": true,
+}
+
+// ApplyProfileUpdate applies the non-nil fields of in onto u, with validation.
+func ApplyProfileUpdate(u *User, in ProfileUpdate) error {
+	if in.Name != nil {
+		n := strings.TrimSpace(*in.Name)
+		if n == "" {
+			return ErrNameRequired
+		}
+		u.Name = n
+	}
+	if in.Phone != nil {
+		p := strings.TrimSpace(*in.Phone)
+		u.Phone = &p
+	}
+	if in.City != nil {
+		c := strings.TrimSpace(*in.City)
+		u.City = &c
+	}
+	if in.Bio != nil {
+		b := strings.TrimSpace(*in.Bio)
+		u.Bio = &b
+	}
+	if in.AvatarColor != nil {
+		c := strings.TrimSpace(*in.AvatarColor)
+		if !avatarColors[c] {
+			c = "blue"
+		}
+		u.AvatarColor = c
+	}
+	if in.NotifyUsageLimit != nil {
+		u.NotifyUsageLimit = *in.NotifyUsageLimit
+	}
+	if in.NotifyExpiry != nil {
+		u.NotifyExpiry = *in.NotifyExpiry
+	}
+	return nil
 }

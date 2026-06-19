@@ -327,14 +327,13 @@ func (s *AuthService) ProvisionJamaahCredential(ctx context.Context, orgID, invi
 	return user, nil
 }
 
-func (s *AuthService) UpdateUser(ctx context.Context, userID uuid.UUID, name, phone string) (*model.User, error) {
+func (s *AuthService) UpdateUser(ctx context.Context, userID uuid.UUID, in model.ProfileUpdate) (*model.User, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	user.Name = name
-	if phone != "" {
-		user.Phone = &phone
+	if err := model.ApplyProfileUpdate(user, in); err != nil {
+		return nil, err
 	}
 	if err := s.repo.UpdateUser(ctx, user); err != nil {
 		return nil, err

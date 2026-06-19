@@ -1,0 +1,6 @@
+ALTER TABLE users
+  DROP COLUMN IF EXISTS city,
+  DROP COLUMN IF EXISTS bio,
+  DROP COLUMN IF EXISTS avatar_color,
+  DROP COLUMN IF EXISTS notify_usage_limit,
+  DROP COLUMN IF EXISTS notify_expiry;

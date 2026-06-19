@@ -79,7 +79,9 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
                 body: JSON.stringify(updates),
             });
             if (!response.ok) throw new Error(await parseError(response));
-            return unwrapData(await response.json());
+            const data = unwrapData(await response.json());
+            cacheSet('auth:me', data, 30000);
+            return data;
         },
 
         async getOrganization() {
