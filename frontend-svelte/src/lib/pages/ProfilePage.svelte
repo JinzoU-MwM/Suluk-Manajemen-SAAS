@@ -247,6 +247,29 @@
         editing = false;
     }
 
+    async function confirmCancelSubscription() {
+        savingSub = true;
+        try {
+            subscription = await ApiService.cancelSubscription();
+            showCancelConfirm = false;
+        } catch (e) {
+            alert(e.message || "Gagal membatalkan langganan.");
+        } finally {
+            savingSub = false;
+        }
+    }
+
+    async function resumeSubscription() {
+        savingSub = true;
+        try {
+            subscription = await ApiService.resumeSubscription();
+        } catch (e) {
+            alert(e.message || "Gagal melanjutkan langganan.");
+        } finally {
+            savingSub = false;
+        }
+    }
+
     async function selectAvatarColor(color) {
         selectedColor = color;
         try {
@@ -369,6 +392,10 @@
         };
         return map[role] || role;
     }
+
+    let savingSub = $state(false);
+    let showCancelConfirm = $state(false);
+    let cancelAtPeriodEnd = $derived(!!subscription?.cancel_at_period_end);
 
     let planName = $derived(planMeta(subscription?.plan).name);
     let usagePercent = $derived(
@@ -497,10 +524,47 @@
                                 </div>
                             </div>
 
-                            {#if subscription?.expires_at && subscription?.status !== "expired"}
-                                <div class="plan-expiry">Berlaku hingga {formatDate(subscription.expires_at)}</div>
-                            {:else if subscription?.status === "expired"}
+                            {#if subscription?.status === "expired"}
                                 <div class="plan-expiry plan-expiry-danger">Langganan kedaluwarsa</div>
+                            {:else if cancelAtPeriodEnd && subscription?.expires_at}
+                                <div class="plan-expiry plan-expiry-danger">
+                                    Berakhir {formatDate(subscription.expires_at)} · tidak diperpanjang
+                                </div>
+                            {:else if subscription?.expires_at}
+                                <div class="plan-expiry">Berlaku hingga {formatDate(subscription.expires_at)}</div>
+                            {/if}
+
+                            {#if pro && subscription?.status !== "expired"}
+                                {#if cancelAtPeriodEnd}
+                                    <Button
+                                        variant="soft"
+                                        size="sm"
+                                        full
+                                        disabled={savingSub}
+                                        onclick={resumeSubscription}
+                                    >
+                                        {savingSub ? "Memproses…" : "Lanjutkan langganan"}
+                                    </Button>
+                                {:else if showCancelConfirm}
+                                    <div class="plan-confirm">
+                                        <div class="plan-confirm-text">
+                                            Anda tetap bisa memakai {planName} sampai
+                                            {formatDate(subscription?.expires_at)}, lalu paket turun ke Gratis.
+                                        </div>
+                                        <div class="plan-confirm-actions">
+                                            <Button variant="ghost" size="sm" onclick={() => (showCancelConfirm = false)}>
+                                                Batal
+                                            </Button>
+                                            <Button variant="danger" size="sm" disabled={savingSub} onclick={confirmCancelSubscription}>
+                                                {savingSub ? "Memproses…" : "Ya, batalkan"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                {:else}
+                                    <button type="button" class="plan-cancel-link" onclick={() => (showCancelConfirm = true)}>
+                                        Batalkan perpanjangan
+                                    </button>
+                                {/if}
                             {/if}
 
                             {#if !pro && subscription?.usage_limit}
@@ -521,7 +585,7 @@
                                     full
                                     onclick={onUpgradeRequest}
                                 >
-                                    Upgrade ke Pro
+                                    Upgrade paket
                                 </Button>
                                 {#if trialStatus?.can_activate}
                                     <Button variant="soft" size="sm" full onclick={onUpgradeRequest}>
@@ -1356,6 +1420,34 @@
     }
     .plan-expiry { font-size: 12px; color: var(--c-muted); font-weight: 600; }
     .plan-expiry-danger { color: var(--c-danger); }
+    .plan-cancel-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 0.78rem;
+        color: var(--c-muted);
+        text-decoration: underline;
+        cursor: pointer;
+        align-self: flex-start;
+    }
+    .plan-confirm {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.625rem;
+        border-radius: 0.625rem;
+        background: rgba(244, 63, 94, 0.06);
+    }
+    .plan-confirm-text {
+        font-size: 0.78rem;
+        color: var(--c-muted);
+        line-height: 1.4;
+    }
+    .plan-confirm-actions {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
 
     /* ---- Nav card ---- */
     :global(.nav-card) {

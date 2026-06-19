@@ -202,25 +202,27 @@ type LoginRequest struct {
 }
 
 type Subscription struct {
-	ID        uuid.UUID  `json:"id" db:"id"`
-	OrgID     uuid.UUID  `json:"org_id" db:"org_id"`
-	Plan      string     `json:"plan" db:"plan"`
-	Status    string     `json:"status" db:"status"`
-	StartsAt  time.Time  `json:"starts_at" db:"starts_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty" db:"expires_at"`
-	TrialUsed bool       `json:"trial_used" db:"trial_used"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at" db:"updated_at"`
+	ID                uuid.UUID  `json:"id" db:"id"`
+	OrgID             uuid.UUID  `json:"org_id" db:"org_id"`
+	Plan              string     `json:"plan" db:"plan"`
+	Status            string     `json:"status" db:"status"`
+	StartsAt          time.Time  `json:"starts_at" db:"starts_at"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty" db:"expires_at"`
+	TrialUsed         bool       `json:"trial_used" db:"trial_used"`
+	CancelAtPeriodEnd bool       `json:"cancel_at_period_end" db:"cancel_at_period_end"`
+	CreatedAt         time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type SubscriptionStatusResponse struct {
-	Plan      string     `json:"plan"`
-	Status    string     `json:"status"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	Rank      int        `json:"rank"`
-	MaxJamaah int        `json:"max_jamaah"`
-	MaxGroups int        `json:"max_groups"`
-	MaxUsers  int        `json:"max_users"`
+	Plan              string     `json:"plan"`
+	Status            string     `json:"status"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
+	Rank              int        `json:"rank"`
+	MaxJamaah         int        `json:"max_jamaah"`
+	MaxGroups         int        `json:"max_groups"`
+	MaxUsers          int        `json:"max_users"`
+	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
 }
 
 // ActivatePlanRequest is the body of the internal service-to-service

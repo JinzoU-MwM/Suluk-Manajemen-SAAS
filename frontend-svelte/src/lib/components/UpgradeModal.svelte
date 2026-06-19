@@ -2,17 +2,40 @@
     import { onMount, onDestroy } from "svelte";
     import { Crown, CheckCircle, Loader2 } from "lucide-svelte";
     import { ApiService } from "../services/api";
-    import { PLANS, planMeta, formatIDR } from "../config/pricing.js";
+    import { PLANS, planMeta, formatIDR, rankOf } from "../config/pricing.js";
 
     let { show = false, onClose, onSuccess, plan = "pro" } = $props();
 
     // Purchasable tiers shown in the modal selector.
     const purchasableTiers = PLANS.filter((p) => p.purchasable);
 
+    // Current plan rank: only tiers strictly above it are offered (no paid→lower-paid).
+    let currentRank = $state(0);
+    $effect(() => {
+        if (show) {
+            ApiService.getSubscriptionStatus()
+                .then((s) => { currentRank = rankOf(s?.plan); })
+                .catch(() => { currentRank = 0; });
+        }
+    });
+    let offeredTiers = $derived(purchasableTiers.filter((t) => rankOf(t.key) > currentRank));
+
+    // Reuse the landing-page sales WhatsApp constant (same number/message).
+    const SALES_WA =
+        "https://wa.me/6285159980404?text=" +
+        encodeURIComponent("Halo, saya tertarik dengan paket Enterprise Suluk.");
+
     // Upgrade — initial tier comes from the opener's `plan` prop (one-time default).
     // svelte-ignore state_referenced_locally
     let selectedTier = $state(plan && plan !== "gratis" ? plan : "pro"); // starter | pro | bisnis
     let selectedPlan = $state("monthly"); // monthly | annual (billing period)
+
+    // Snap selectedTier to the first offered tier when the current selection is no longer in the offered set.
+    $effect(() => {
+        if (offeredTiers.length && !offeredTiers.some((t) => t.key === selectedTier)) {
+            selectedTier = offeredTiers[0].key;
+        }
+    });
     let tierMeta = $derived(planMeta(selectedTier));
     let currentAmount = $derived(
         selectedPlan === "annual" ? tierMeta.annualPrice : tierMeta.monthlyPrice,
@@ -202,7 +225,7 @@
                 <div class="modal-header">
                     <h3 class="modal-title">
                         <Crown class="h-5 w-5 text-emerald-500" />
-                        Upgrade ke {tierMeta.name}
+                        {paymentStatus !== "paid" && offeredTiers.length === 0 ? "Hubungi Sales" : `Upgrade ke ${tierMeta.name}`}
                     </h3>
                     <button onclick={closeUpgradeModal} class="modal-close"
                         >x</button
@@ -234,11 +257,21 @@
                             </button>
                         </div>
                     {:else}
+                        {#if offeredTiers.length === 0}
+                            <div style="text-align:center; padding: 12px 0;">
+                                <p style="font-size:14px; color:#64748b; margin-bottom:12px;">
+                                    Anda sudah di paket tertinggi yang tersedia. Untuk Enterprise, hubungi tim sales kami.
+                                </p>
+                                <a href={SALES_WA} target="_blank" rel="noopener" class="wa-confirm-btn" style="background:#25d366;">
+                                    Hubungi Sales (Enterprise)
+                                </a>
+                            </div>
+                        {:else}
                         <!-- Tier selector -->
                         <div
                             style="display: flex; gap: 8px; margin-bottom: 12px;"
                         >
-                            {#each purchasableTiers as t}
+                            {#each offeredTiers as t}
                                 <button
                                     type="button"
                                     onclick={() => (selectedTier = t.key)}
@@ -412,6 +445,7 @@
                             Pembayaran diproses oleh Pakasir (QRIS / VA /
                             PayPal)
                         </p>
+                        {/if}
                     {/if}
                 </div>
             </div>

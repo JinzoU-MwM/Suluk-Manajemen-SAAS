@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"log"
 	"os"
 	"time"
@@ -69,6 +70,30 @@ func (h *AuthHandler) GetPricing(c *fiber.Ctx) error {
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"plans": plans})
+}
+
+func (h *AuthHandler) CancelSubscription(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	status, err := h.svc.CancelSubscription(c.Context(), claims.OrgID)
+	if err != nil {
+		if errors.Is(err, model.ErrNothingToCancel) {
+			return response.BadRequest(c, err.Error())
+		}
+		return response.Internal(c, err)
+	}
+	return response.OK(c, status)
+}
+
+func (h *AuthHandler) ResumeSubscription(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	status, err := h.svc.ResumeSubscription(c.Context(), claims.OrgID)
+	if err != nil {
+		if errors.Is(err, model.ErrNothingToResume) {
+			return response.BadRequest(c, err.Error())
+		}
+		return response.Internal(c, err)
+	}
+	return response.OK(c, status)
 }
 
 // ActivatePlanInternal is a service-to-service endpoint (NOT behind AuthMiddleware)

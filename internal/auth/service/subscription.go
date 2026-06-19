@@ -55,7 +55,9 @@ func (s *AuthService) GetSubscriptionStatus(ctx context.Context, orgID uuid.UUID
 		resp.Plan = plan.Normalize(sub.Plan)
 		return resp, nil
 	}
-	return statusResponse(sub.Plan, sub.Status, sub.ExpiresAt), nil
+	resp := statusResponse(sub.Plan, sub.Status, sub.ExpiresAt)
+	resp.CancelAtPeriodEnd = sub.CancelAtPeriodEnd
+	return resp, nil
 }
 
 // ActivatePlan sets the org's subscription to the given paid tier with an expiry
@@ -97,6 +99,7 @@ func (s *AuthService) ActivatePlan(ctx context.Context, orgID uuid.UUID, planNam
 	sub.Plan = planName
 	sub.Status = "active"
 	sub.ExpiresAt = &expiresAt
+	sub.CancelAtPeriodEnd = false // re-committing/renewing clears a pending cancel
 	if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
 		return time.Time{}, err
 	}
@@ -252,4 +255,38 @@ func (s *AuthService) GetPricing(ctx context.Context) ([]map[string]any, error) 
 		})
 	}
 	return out, nil
+}
+
+// CancelSubscription flags a paid, active subscription to not renew. The org
+// keeps its tier and limits until expires_at, after which the existing
+// auto-expire drops it to Gratis. Returns the refreshed status.
+func (s *AuthService) CancelSubscription(ctx context.Context, orgID uuid.UUID) (*model.SubscriptionStatusResponse, error) {
+	sub, err := s.repo.GetSubscription(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := model.CanCancelSubscription(sub, time.Now()); err != nil {
+		return nil, err
+	}
+	sub.CancelAtPeriodEnd = true
+	if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
+		return nil, err
+	}
+	return s.GetSubscriptionStatus(ctx, orgID)
+}
+
+// ResumeSubscription undoes a pending cancel-at-period-end (before expiry).
+func (s *AuthService) ResumeSubscription(ctx context.Context, orgID uuid.UUID) (*model.SubscriptionStatusResponse, error) {
+	sub, err := s.repo.GetSubscription(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := model.CanResumeSubscription(sub, time.Now()); err != nil {
+		return nil, err
+	}
+	sub.CancelAtPeriodEnd = false
+	if err := s.repo.UpdateSubscription(ctx, sub); err != nil {
+		return nil, err
+	}
+	return s.GetSubscriptionStatus(ctx, orgID)
 }
