@@ -559,53 +559,53 @@
 <SlideDrawer open={addOpen} title="Tambah Item Stok" onClose={() => (addOpen = false)}>
   <div class="flex flex-col gap-4 p-6">
     <div>
-      <label for="add-name" class="sk-label">Nama Item *</label>
+      <label for="add-name" class="mb-1 block text-[13px] font-medium text-slate-600">Nama Item *</label>
       <input
         id="add-name"
         bind:value={addForm.name}
         placeholder="cth. Koper 20 inch"
-        class="sk-input"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
       />
     </div>
     <div class="grid grid-cols-2 gap-4">
       <div>
-        <label for="add-category" class="sk-label">Kategori</label>
+        <label for="add-category" class="mb-1 block text-[13px] font-medium text-slate-600">Kategori</label>
         <input
           id="add-category"
           bind:value={addForm.category}
           placeholder="cth. Perlengkapan"
-          class="sk-input"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
       </div>
       <div>
-        <label for="add-unit" class="sk-label">Satuan</label>
+        <label for="add-unit" class="mb-1 block text-[13px] font-medium text-slate-600">Satuan</label>
         <input
           id="add-unit"
           bind:value={addForm.unit}
           placeholder="cth. pcs"
-          class="sk-input"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
       </div>
     </div>
     <div class="grid grid-cols-2 gap-4">
       <div>
-        <label for="add-stock" class="sk-label">Stok Awal</label>
+        <label for="add-stock" class="mb-1 block text-[13px] font-medium text-slate-600">Stok Awal</label>
         <input
           id="add-stock"
           type="number"
           min="0"
           bind:value={addForm.stock}
-          class="sk-input"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
       </div>
       <div>
-        <label for="add-min-stock" class="sk-label">Stok Minimum</label>
+        <label for="add-min-stock" class="mb-1 block text-[13px] font-medium text-slate-600">Stok Minimum</label>
         <input
           id="add-min-stock"
           type="number"
           min="0"
           bind:value={addForm.min_stock}
-          class="sk-input"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
       </div>
     </div>
@@ -640,22 +640,22 @@
 >
   <div class="flex flex-col gap-4 p-6">
     <div>
-      <label for="restock-qty" class="sk-label">Jumlah Ditambahkan *</label>
+      <label for="restock-qty" class="mb-1 block text-[13px] font-medium text-slate-600">Jumlah Ditambahkan *</label>
       <input
         id="restock-qty"
         type="number"
         min="1"
         bind:value={restockQty}
-        class="sk-input"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
       />
     </div>
     <div>
-      <label for="restock-note" class="sk-label">Catatan</label>
+      <label for="restock-note" class="mb-1 block text-[13px] font-medium text-slate-600">Catatan</label>
       <input
         id="restock-note"
         bind:value={restockNote}
         placeholder="Opsional"
-        class="sk-input"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
       />
     </div>
     <div class="flex justify-end gap-3 pt-2">
@@ -694,22 +694,22 @@
       >).
     </p>
     <div>
-      <label for="adjust-qty" class="sk-label">Stok Aktual *</label>
+      <label for="adjust-qty" class="mb-1 block text-[13px] font-medium text-slate-600">Stok Aktual *</label>
       <input
         id="adjust-qty"
         type="number"
         min="0"
         bind:value={adjustQty}
-        class="sk-input"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
       />
     </div>
     <div>
-      <label for="adjust-note" class="sk-label">Alasan Penyesuaian</label>
+      <label for="adjust-note" class="mb-1 block text-[13px] font-medium text-slate-600">Alasan Penyesuaian</label>
       <input
         id="adjust-note"
         bind:value={adjustNote}
         placeholder="cth. Rusak / kehilangan"
-        class="sk-input"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
       />
     </div>
     <div class="flex justify-end gap-3 pt-2">
@@ -791,32 +791,3 @@
     {/if}
   </div>
 </SlideDrawer>
-
-<style>
-  /* Shared form input + label helpers scoped to this component */
-  :global(.sk-label) {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--c-faint);
-  }
-  :global(.sk-input) {
-    display: block;
-    width: 100%;
-    border: 1px solid var(--c-line);
-    background: var(--c-surface);
-    border-radius: var(--radius);
-    padding: 9px 12px;
-    font-size: 13.5px;
-    color: var(--c-ink);
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  :global(.sk-input:focus) {
-    border-color: var(--c-primary);
-    box-shadow: 0 0 0 3px var(--c-primary-soft);
-  }
-</style>
