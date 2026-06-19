@@ -6,7 +6,7 @@
     LayoutDashboard, Users, UserCheck, ScanLine, Package, Briefcase,
     Building2, Receipt, BedDouble, FileSignature, Map, ClipboardList,
     Wallet, Truck, Banknote, Boxes, XCircle, Sparkles, X, BookOpen,
-    PiggyBank, Calculator, FileCheck, UserCog,
+    PiggyBank, Calculator, FileCheck, UserCog, HelpCircle,
   } from "lucide-svelte";
 
   let {
@@ -49,6 +49,9 @@
       { id: "payroll", label: "Payroll", icon: Banknote },
       { id: "inventory", label: "Inventaris", icon: Boxes },
       { id: "cancellation", label: "Pembatalan", icon: XCircle },
+    ] },
+    { group: "Lainnya", items: [
+      { id: "bantuan", label: "Pusat Bantuan", icon: HelpCircle },
     ] },
   ];
 

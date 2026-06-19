@@ -5,9 +5,10 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
-  import { LayoutDashboard, Wallet, Network, UserCircle, LogOut, Menu, Users } from "lucide-svelte";
+  import { LayoutDashboard, Wallet, Network, UserCircle, LogOut, Menu, Users, HelpCircle } from "lucide-svelte";
   import { session, logoutAndRedirect } from "$lib/stores/session.svelte.js";
   import SplashScreen from "$lib/components/SplashScreen.svelte";
+  import HelpHint from "$lib/components/help/HelpHint.svelte";
 
   let { children } = $props();
   let ready = $state(false);
@@ -19,6 +20,7 @@
     { href: "/agency/komisi", label: "Komisi Saya", icon: Wallet },
     { href: "/agency/jaringan", label: "Jaringan", icon: Network },
     { href: "/agency/profil", label: "Profil", icon: UserCircle },
+    { href: "/agency/bantuan", label: "Bantuan", icon: HelpCircle },
   ];
 
   let path = $derived($page.url.pathname);
@@ -77,6 +79,7 @@
         {@render children()}
       </main>
     </div>
+    <HelpHint area="agency" floating />
   </div>
 {/if}
 

@@ -181,6 +181,7 @@ const PAGE_PATHS = {
   payroll: "/app/payroll",
   export: "/app/export",
   stock: "/app/stock",
+  bantuan: "/app/bantuan",
   "super-admin": "/super-admin",
 };
 

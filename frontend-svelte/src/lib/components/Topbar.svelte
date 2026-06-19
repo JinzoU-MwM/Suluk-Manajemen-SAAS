@@ -2,6 +2,7 @@
   // Topbar — matches the Claude design app.jsx Topbar: page title + search + bell + user.
   import { Menu, Search, Bell, ChevronDown } from "lucide-svelte";
   import Avatar from "./Avatar.svelte";
+  import HelpHint from "$lib/components/help/HelpHint.svelte";
 
   let { currentPage = "dashboard", user = null, onMenu = () => {}, onProfile = () => {} } = $props();
 
@@ -12,6 +13,7 @@
     finance: "Keuangan", vendors: "Vendor", payroll: "Payroll", inventory: "Inventaris",
     stock: "Inventaris", cancellation: "Pembatalan", profile: "Profil Saya", team: "Tim & Organisasi",
     documents: "Dokumen", analytics: "Analytics", export: "Export Laporan",
+    bantuan: "Pusat Bantuan",
   };
 
   let title = $derived(TITLES[currentPage] || "Dashboard");
@@ -33,6 +35,8 @@
     <Search size={17} class="tb-search-ic" />
     <input placeholder="Cari jamaah, paket, invoice…" />
   </div>
+
+  <HelpHint area="app" />
 
   <button class="tb-bell" aria-label="Notifikasi">
     <Bell size={20} />

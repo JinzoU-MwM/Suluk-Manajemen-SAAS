@@ -5,9 +5,10 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
-  import { LayoutDashboard, FileText, BadgeCheck, Wallet, UserCircle, LogOut, Menu } from "lucide-svelte";
+  import { LayoutDashboard, FileText, BadgeCheck, Wallet, UserCircle, LogOut, Menu, HelpCircle } from "lucide-svelte";
   import { session, logoutAndRedirect } from "$lib/stores/session.svelte.js";
   import SplashScreen from "$lib/components/SplashScreen.svelte";
+  import HelpHint from "$lib/components/help/HelpHint.svelte";
 
   let { children } = $props();
   let ready = $state(false);
@@ -18,6 +19,7 @@
     { href: "/portal/dokumen", label: "Dokumen", icon: FileText },
     { href: "/portal/visa", label: "Visa", icon: BadgeCheck },
     { href: "/portal/profil", label: "Profil", icon: UserCircle },
+    { href: "/portal/bantuan", label: "Bantuan", icon: HelpCircle },
   ];
   let path = $derived($page.url.pathname);
 
@@ -61,6 +63,7 @@
       </header>
       <main class="portal-content">{@render children()}</main>
     </div>
+    <HelpHint area="portal" floating />
   </div>
 {/if}
 
