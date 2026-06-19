@@ -113,6 +113,9 @@ func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
 	}
 	user, err := h.svc.UpdateUser(c.Context(), claims.UserID, in)
 	if err != nil {
+		if errors.Is(err, model.ErrNameRequired) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, sanitizeUser(user))

@@ -341,6 +341,8 @@ type ProfileUpdate struct {
 	NotifyExpiry     *bool   `json:"notify_expiry"`
 }
 
+var ErrNameRequired = errors.New("name is required")
+
 var avatarColors = map[string]bool{
 	"emerald": true, "blue": true, "purple": true, "rose": true,
 	"amber": true, "cyan": true, "indigo": true, "slate": true,
@@ -351,7 +353,7 @@ func ApplyProfileUpdate(u *User, in ProfileUpdate) error {
 	if in.Name != nil {
 		n := strings.TrimSpace(*in.Name)
 		if n == "" {
-			return errors.New("name is required")
+			return ErrNameRequired
 		}
 		u.Name = n
 	}
