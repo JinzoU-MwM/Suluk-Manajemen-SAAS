@@ -398,6 +398,7 @@ services:
     environment:
       APP_ENV: production
       INVENTORY_SERVICE_PORT: "50059"
+      NATS_ADDR: nats://nats:4222
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah
