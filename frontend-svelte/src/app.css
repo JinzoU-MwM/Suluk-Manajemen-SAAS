@@ -427,6 +427,26 @@ button {
   background: var(--color-slate-400);
 }
 
+/* Dark sidebar rail: subtle scrollbar themed for the deep-green background so the
+   default light scrollbar doesn't show against it (keeps scroll affordance). */
+.sb-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+.sb-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sb-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sb-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+.sb-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* Focus states - remove default black outline on click, keep dashboard ring for keyboard */
 *:focus {
   outline: none;
