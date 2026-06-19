@@ -353,5 +353,89 @@ export function createGroupOpsApi({ cacheGet, cacheSet, cacheInvalidate }) {
             if (!response.ok) throw new Error(await parseError(response));
             return unwrapData(await response.json());
         },
+
+        // ── Stock monitoring (Task 8) ──
+        async listStockItems() {
+            const response = await apiFetch(`${API_URL}/inventory/items`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async createStockItem(body) {
+            const response = await apiFetch(`${API_URL}/inventory/items`, {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async updateStockItem(id, body) {
+            const response = await apiFetch(`${API_URL}/inventory/items/${id}`, {
+                method: 'PATCH',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async deleteStockItem(id) {
+            const response = await apiFetch(`${API_URL}/inventory/items/${id}`, {
+                method: 'DELETE',
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async restockItem(id, body) {
+            const response = await apiFetch(`${API_URL}/inventory/items/${id}/restock`, {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async adjustItem(id, body) {
+            const response = await apiFetch(`${API_URL}/inventory/items/${id}/adjust`, {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async getItemMovements(id) {
+            const response = await apiFetch(`${API_URL}/inventory/items/${id}/movements`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async getPackageKit(packageId) {
+            const response = await apiFetch(`${API_URL}/inventory/kits/${packageId}`, {
+                headers: authHeaders(),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
+        async setPackageKit(packageId, items) {
+            const response = await apiFetch(`${API_URL}/inventory/kits/${packageId}`, {
+                method: 'PUT',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ items }),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
     };
 }

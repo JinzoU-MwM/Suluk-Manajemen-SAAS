@@ -100,3 +100,84 @@ type UpdateOperationalRequest struct {
 	BajuSize string `json:"baju_size"`
 	FamilyID string `json:"family_id"`
 }
+
+// --- Stock monitoring (Phase 6) ---
+
+type StockItem struct {
+	ID        string    `json:"id"`
+	OrgID     string    `json:"org_id"`
+	Name      string    `json:"name"`
+	Category  string    `json:"category"`
+	Unit      string    `json:"unit"`
+	Stock     int       `json:"stock"`
+	MinStock  int       `json:"min_stock"`
+	InKit     bool      `json:"in_kit"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type StockMovement struct {
+	ID        string    `json:"id"`
+	ItemID    string    `json:"item_id"`
+	Delta     int       `json:"delta"`
+	Reason    string    `json:"reason"`
+	Note      string    `json:"note"`
+	GroupID   *string   `json:"group_id,omitempty"`
+	PackageID *string   `json:"package_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type PackageKitItem struct {
+	ItemID       string `json:"item_id"`
+	ItemName     string `json:"item_name"`
+	Unit         string `json:"unit"`
+	QtyPerJamaah int    `json:"qty_per_jamaah"`
+}
+
+// Deduction is one computed (item, quantity) to subtract — pure logic output.
+type Deduction struct {
+	ItemID string
+	Qty    int
+}
+
+// DepartedPayload is the group.departed event payload.
+type DepartedPayload struct {
+	GroupID     string `json:"group_id"`
+	PackageID   string `json:"package_id"`
+	MemberCount int    `json:"member_count"`
+	Status      string `json:"status"`
+}
+
+type CreateItemRequest struct {
+	Name         string `json:"name"`
+	Category     string `json:"category"`
+	Unit         string `json:"unit"`
+	MinStock     int    `json:"min_stock"`
+	InitialStock int    `json:"initial_stock"`
+}
+
+type UpdateItemRequest struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
+	Unit     string `json:"unit"`
+	MinStock int    `json:"min_stock"`
+}
+
+type RestockRequest struct {
+	Qty  int    `json:"qty"`
+	Note string `json:"note"`
+}
+
+type AdjustRequest struct {
+	Delta int    `json:"delta"`
+	Note  string `json:"note"`
+}
+
+type KitLine struct {
+	ItemID       string `json:"item_id"`
+	QtyPerJamaah int    `json:"qty_per_jamaah"`
+}
+
+type SetKitRequest struct {
+	Items []KitLine `json:"items"`
+}
