@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -21,6 +22,7 @@ func TestCanCancelSubscription(t *testing.T) {
 		{"active expired", &Subscription{Status: "active", ExpiresAt: &past}, false},
 		{"trial not cancelable", &Subscription{Status: "trial", ExpiresAt: &future}, false},
 		{"expired status", &Subscription{Status: "expired", ExpiresAt: &future}, false},
+		{"active future already cancelled", &Subscription{Status: "active", ExpiresAt: &future, CancelAtPeriodEnd: true}, false},
 	}
 	for _, c := range cases {
 		err := CanCancelSubscription(c.sub, now)
@@ -30,6 +32,23 @@ func TestCanCancelSubscription(t *testing.T) {
 		if !c.ok && err == nil {
 			t.Fatalf("%s: want error, got nil", c.name)
 		}
+	}
+}
+
+// An already-cancelled (still active, unexpired) sub must be rejected with a
+// distinct error, not the generic "nothing to cancel" -- so the API can tell the
+// user it is already set to cancel rather than implying no paid sub exists.
+func TestCanCancelSubscriptionAlreadyCanceledIsDistinct(t *testing.T) {
+	now := time.Now()
+	future := now.Add(24 * time.Hour)
+	sub := &Subscription{Status: "active", ExpiresAt: &future, CancelAtPeriodEnd: true}
+
+	err := CanCancelSubscription(sub, now)
+	if err == nil {
+		t.Fatal("want error for already-cancelled sub, got nil")
+	}
+	if errors.Is(err, ErrNothingToCancel) {
+		t.Fatal("want a distinct already-cancelled error, got ErrNothingToCancel")
 	}
 }
 

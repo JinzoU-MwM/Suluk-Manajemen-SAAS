@@ -76,7 +76,7 @@ func (h *AuthHandler) CancelSubscription(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	status, err := h.svc.CancelSubscription(c.Context(), claims.OrgID)
 	if err != nil {
-		if errors.Is(err, model.ErrNothingToCancel) {
+		if errors.Is(err, model.ErrNothingToCancel) || errors.Is(err, model.ErrAlreadyCanceled) {
 			return response.BadRequest(c, err.Error())
 		}
 		return response.Internal(c, err)
