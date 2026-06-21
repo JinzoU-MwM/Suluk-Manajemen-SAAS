@@ -109,7 +109,7 @@ func (h *PayrollHandler) ExportSlipPDF(c *fiber.Ctx) error {
 	pdf.Cell(0, 5, "Dokumen ini dibuat otomatis oleh sistem Suluk Travel Management.")
 
 	var buf bytes.Buffer
-	pdf.Output(&buf)
+	_ = pdf.Output(&buf)
 	c.Set("Content-Type", "application/pdf")
 	c.Set("Content-Disposition", `attachment; filename="slip_gaji.pdf"`)
 	return c.Send(buf.Bytes())

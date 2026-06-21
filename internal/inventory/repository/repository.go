@@ -219,7 +219,7 @@ func (r *InventoryRepo) RecordScanTx(ctx context.Context, m *model.MemberEquipme
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	now := time.Now()
 	switch checkpoint {

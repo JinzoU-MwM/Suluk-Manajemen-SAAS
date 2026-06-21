@@ -50,18 +50,18 @@ func generateSiskopatuhExcel(results []model.ScanResult) ([]byte, error) {
 	defer f.Close()
 
 	sheetName := "Siskopatuh"
-	f.SetSheetName("Sheet1", sheetName)
+	_ = f.SetSheetName("Sheet1", sheetName)
 
 	for i, colName := range siskopatuhColumns {
 		cell := fmt.Sprintf("%s1", columnLetter(i+1))
-		f.SetCellValue(sheetName, cell, colName)
+		_ = f.SetCellValue(sheetName, cell, colName)
 	}
 
 	style, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true, Color: "#FFFFFF"},
 		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"#2563EB"}},
 	})
-	f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
+	_ = f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
 
 	for i, sr := range results {
 		row := i + 2
@@ -72,14 +72,14 @@ func generateSiskopatuhExcel(results []model.ScanResult) ([]byte, error) {
 			cell := fmt.Sprintf("%s%d", columnLetter(j+1), row)
 			val := data[colName]
 			if val != "" {
-				f.SetCellValue(sheetName, cell, val)
+				_ = f.SetCellValue(sheetName, cell, val)
 			}
 		}
 	}
 
 	for i := 1; i <= len(siskopatuhColumns); i++ {
 		col := columnLetter(i)
-		f.SetColWidth(sheetName, col, col, 25)
+		_ = f.SetColWidth(sheetName, col, col, 25)
 	}
 
 	buf, err := f.WriteToBuffer()
@@ -242,18 +242,18 @@ func generateInlineSiskopatuhExcel(records []map[string]any) ([]byte, error) {
 	defer f.Close()
 
 	sheetName := "Siskopatuh"
-	f.SetSheetName("Sheet1", sheetName)
+	_ = f.SetSheetName("Sheet1", sheetName)
 
 	for i, colName := range siskopatuhColumns {
 		cell := fmt.Sprintf("%s1", columnLetter(i+1))
-		f.SetCellValue(sheetName, cell, colName)
+		_ = f.SetCellValue(sheetName, cell, colName)
 	}
 
 	style, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true, Color: "#FFFFFF"},
 		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"#2563EB"}},
 	})
-	f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
+	_ = f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
 
 	for i, rec := range records {
 		row := i + 2
@@ -262,14 +262,14 @@ func generateInlineSiskopatuhExcel(records []map[string]any) ([]byte, error) {
 		for j, colName := range siskopatuhColumns {
 			cell := fmt.Sprintf("%s%d", columnLetter(j+1), row)
 			if val := data[colName]; val != "" {
-				f.SetCellValue(sheetName, cell, val)
+				_ = f.SetCellValue(sheetName, cell, val)
 			}
 		}
 	}
 
 	for i := 1; i <= len(siskopatuhColumns); i++ {
 		col := columnLetter(i)
-		f.SetColWidth(sheetName, col, col, 25)
+		_ = f.SetColWidth(sheetName, col, col, 25)
 	}
 
 	buf, err := f.WriteToBuffer()

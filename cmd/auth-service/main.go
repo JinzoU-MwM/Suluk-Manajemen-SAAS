@@ -31,7 +31,7 @@ func main() {
 	cfg.Database.DBName = "jamaah_auth"
 	cfg.Server.Port = 50051
 	if p := os.Getenv("AUTH_SERVICE_PORT"); p != "" {
-		fmt.Sscan(p, &cfg.Server.Port)
+		_, _ = fmt.Sscan(p, &cfg.Server.Port)
 	}
 
 	cfg.Validate("INTERNAL_API_KEY")

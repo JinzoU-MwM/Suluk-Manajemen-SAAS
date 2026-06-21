@@ -127,7 +127,7 @@ func (r *JamaahRepo) TransitionDeparture(ctx context.Context, groupID, orgID uui
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	ct, err := tx.Exec(ctx, `UPDATE groups
 		SET departure_status = $3,
@@ -182,7 +182,7 @@ func (r *JamaahRepo) AddGroupMember(ctx context.Context, gm *model.GroupMember) 
 	if err != nil {
 		return err
 	}
-	r.pool.Exec(ctx, `UPDATE groups SET member_count = member_count + 1, updated_at = NOW() WHERE id = $1`, gm.GroupID)
+	_, _ = r.pool.Exec(ctx, `UPDATE groups SET member_count = member_count + 1, updated_at = NOW() WHERE id = $1`, gm.GroupID)
 	return nil
 }
 
@@ -218,7 +218,7 @@ func (r *JamaahRepo) DeleteGroupMember(ctx context.Context, groupID, memberID uu
 		return err
 	}
 	if result.RowsAffected() > 0 {
-		r.pool.Exec(ctx, `UPDATE groups SET member_count = GREATEST(member_count - 1, 0), updated_at = NOW() WHERE id = $1`, groupID)
+		_, _ = r.pool.Exec(ctx, `UPDATE groups SET member_count = GREATEST(member_count - 1, 0), updated_at = NOW() WHERE id = $1`, groupID)
 	}
 	return nil
 }

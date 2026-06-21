@@ -241,7 +241,7 @@ func (r *JamaahRepo) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	query := `UPDATE jamaah_package_registrations
 		SET pipeline_status = $4, dp_date = $5, lunas_date = $6, berangkat_date = $7,

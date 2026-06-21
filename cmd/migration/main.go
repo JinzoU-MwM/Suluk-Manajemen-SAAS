@@ -31,7 +31,7 @@ func main() {
 	migrationsDir := flag.String("migrations", "./migrations", "path to migrations directory")
 	flag.Parse()
 
-	servicesToMigrate := []string{}
+	var servicesToMigrate []string
 	if *service == "all" {
 		servicesToMigrate = services
 	} else {

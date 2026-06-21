@@ -31,12 +31,6 @@ func (r *AuthRepo) ListBranches(ctx context.Context, parentOrgID uuid.UUID) ([]s
 		return nil, err
 	}
 	defer rows.Close()
-	type Branch struct {
-		ID        uuid.UUID   `json:"id"`
-		Name      string      `json:"name"`
-		Slug      string      `json:"slug"`
-		CreatedAt interface{} `json:"created_at"`
-	}
 	var result []struct {
 		ID        uuid.UUID
 		Name      string
@@ -50,7 +44,7 @@ func (r *AuthRepo) ListBranches(ctx context.Context, parentOrgID uuid.UUID) ([]s
 			Slug      string
 			CreatedAt interface{}
 		}
-		rows.Scan(&b.ID, &b.Name, &b.Slug, &b.CreatedAt)
+		_ = rows.Scan(&b.ID, &b.Name, &b.Slug, &b.CreatedAt)
 		result = append(result, b)
 	}
 	return result, rows.Err()

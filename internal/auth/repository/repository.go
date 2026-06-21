@@ -51,7 +51,7 @@ func (r *AuthRepo) CreateAgentUserTx(ctx context.Context, user *model.User, memb
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = tx.QueryRow(ctx, `
 		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id, jamaah_id)
@@ -618,8 +618,8 @@ func (r *AuthRepo) ConsumePasswordResetCode(ctx context.Context, email, code str
 
 // Startup cleanup
 func (r *AuthRepo) RunStartupCleanup(ctx context.Context) {
-	r.CleanExpiredTokens(ctx)
-	r.CleanExpiredInvites(ctx)
+	_ = r.CleanExpiredTokens(ctx)
+	_ = r.CleanExpiredInvites(ctx)
 }
 
 // Schedule periodic cleanup

@@ -86,7 +86,7 @@ func (r *InvoiceRepo) CloseSessionTx(ctx context.Context, orgID, sessionID uuid.
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var opening int64
 	var status string

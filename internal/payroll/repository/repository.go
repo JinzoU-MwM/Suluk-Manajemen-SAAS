@@ -175,7 +175,7 @@ func (r *PayrollRepo) RepayAdvance(ctx context.Context, advanceID, orgID string,
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Lock + org-scope the advance, then validate the balance BEFORE inserting the
 	// repayment. The old code had no org filter (cross-org IDOR) and inserted the

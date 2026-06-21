@@ -239,7 +239,7 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 			return
 		}
 		var r invoiceSummaryResponse
-		json.Unmarshal(data, &r)
+		_ = json.Unmarshal(data, &r)
 		invCh <- invoiceResult{sum: r}
 	}()
 
@@ -252,7 +252,7 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 		var v struct {
 			TotalOutstandingIDR int64 `json:"total_outstanding_idr"`
 		}
-		json.Unmarshal(data, &v)
+		_ = json.Unmarshal(data, &v)
 		vendSumCh <- vendorSumResult{outstanding: v.TotalOutstandingIDR}
 	}()
 
@@ -277,7 +277,7 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 			OverdueFollowUps   []any `json:"overdue_follow_ups"`
 			IncompleteDocs     []any `json:"incomplete_docs"`
 		}
-		json.Unmarshal(data, &al)
+		_ = json.Unmarshal(data, &al)
 		alertsCh <- alertsResult{
 			passportSoon:    len(al.PassportExpiring30) + len(al.PassportExpiring90),
 			overdueFollowUp: len(al.OverdueFollowUps),
@@ -292,7 +292,7 @@ func (s *FinanceService) GetOwnerDashboard(ctx context.Context, orgID uuid.UUID,
 			return
 		}
 		var bills []any
-		json.Unmarshal(data, &bills)
+		_ = json.Unmarshal(data, &bills)
 		vendDueCh <- vendorDueResult{count: len(bills)}
 	}()
 
@@ -619,14 +619,6 @@ func expenseCategoryTotals(expenses []model.TripExpense) map[string]int64 {
 		out[normalizeExpenseCategory(expense)] += expense.AmountIDR
 	}
 	return out
-}
-
-func sumCategoryTotals(categories map[string]int64) int64 {
-	var total int64
-	for _, amount := range categories {
-		total += amount
-	}
-	return total
 }
 
 func buildCostBreakdown(projected, actual map[string]int64) []model.CostBreakdown {

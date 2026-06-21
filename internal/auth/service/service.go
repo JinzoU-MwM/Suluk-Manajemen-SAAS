@@ -109,7 +109,7 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 		return nil, nil, nil, err
 	}
 
-	s.repo.CreateAuditLog(ctx, &model.AuditLog{
+	_ = s.repo.CreateAuditLog(ctx, &model.AuditLog{
 		ID:       uuid.New(),
 		OrgID:    &org.ID,
 		UserID:   &userID,
@@ -172,7 +172,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*s
 	}
 
 	if rt.ExpiresAt.Before(time.Now()) {
-		s.repo.DeleteRefreshToken(ctx, hash)
+		_ = s.repo.DeleteRefreshToken(ctx, hash)
 		return nil, fmt.Errorf("refresh token expired")
 	}
 
@@ -191,7 +191,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*s
 		role = member.Role
 	}
 
-	s.repo.DeleteRefreshToken(ctx, hash)
+	_ = s.repo.DeleteRefreshToken(ctx, hash)
 
 	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID, user.JamaahID)
 	if err != nil {
@@ -261,7 +261,7 @@ func (s *AuthService) ProvisionAgentCredential(ctx context.Context, orgID, invit
 	if err := s.repo.CreateAgentUserTx(ctx, user, member); err != nil {
 		return nil, err
 	}
-	s.repo.CreateAuditLog(ctx, &model.AuditLog{
+	_ = s.repo.CreateAuditLog(ctx, &model.AuditLog{
 		ID:       uuid.New(),
 		OrgID:    &orgID,
 		UserID:   &invitedBy,
@@ -315,7 +315,7 @@ func (s *AuthService) ProvisionJamaahCredential(ctx context.Context, orgID, invi
 	if err := s.repo.CreateAgentUserTx(ctx, user, member); err != nil {
 		return nil, err
 	}
-	s.repo.CreateAuditLog(ctx, &model.AuditLog{
+	_ = s.repo.CreateAuditLog(ctx, &model.AuditLog{
 		ID:       uuid.New(),
 		OrgID:    &orgID,
 		UserID:   &invitedBy,
@@ -383,7 +383,7 @@ func (s *AuthService) CreateOrganization(ctx context.Context, userID uuid.UUID, 
 		Role:   "owner",
 		Status: "active",
 	}
-	s.repo.AddTeamMember(ctx, member)
+	_ = s.repo.AddTeamMember(ctx, member)
 
 	return org, nil
 }
@@ -501,7 +501,7 @@ func (s *AuthService) AcceptInvite(ctx context.Context, token string, userID uui
 		return nil, fmt.Errorf("invite is no longer valid")
 	}
 	if time.Now().After(invite.ExpiresAt) {
-		s.repo.UpdateInviteStatus(ctx, token, "expired")
+		_ = s.repo.UpdateInviteStatus(ctx, token, "expired")
 		return nil, fmt.Errorf("invite has expired")
 	}
 
@@ -526,7 +526,7 @@ func (s *AuthService) AcceptInvite(ctx context.Context, token string, userID uui
 		return nil, err
 	}
 
-	s.repo.UpdateInviteStatus(ctx, token, "accepted")
+	_ = s.repo.UpdateInviteStatus(ctx, token, "accepted")
 	return member, nil
 }
 
@@ -723,13 +723,13 @@ func hashToken(token string) string {
 
 func generateToken(length int) string {
 	b := make([]byte, length)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)[:length]
 }
 
 func generateNumericCode(digits int) string {
 	b := make([]byte, digits)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	for i := range b {
 		b[i] = b[i]%10 + '0'
 	}

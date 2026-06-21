@@ -120,7 +120,7 @@ func (r *JamaahRepo) TransitionVisaTx(ctx context.Context, t VisaTransition) err
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	ct, err := tx.Exec(ctx, `
 		UPDATE visa_applications SET

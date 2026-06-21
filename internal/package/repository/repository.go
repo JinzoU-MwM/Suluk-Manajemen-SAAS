@@ -131,7 +131,7 @@ func (r *PackageRepo) ListPackages(ctx context.Context, orgID uuid.UUID, status 
 	}
 
 	var total int
-	countArgs := args[:len(args)]
+	countArgs := args[:]
 	if err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -263,7 +263,7 @@ func (r *PackageRepo) ReserveSeat(ctx context.Context, id, orgID uuid.UUID, room
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	result, err := tx.Exec(ctx,
 		`UPDATE packages SET reserved_seats = reserved_seats + 1, updated_at = NOW()
@@ -306,7 +306,7 @@ func (r *PackageRepo) ReleaseSeat(ctx context.Context, id, orgID uuid.UUID, room
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	res, err := tx.Exec(ctx,
 		`UPDATE packages SET reserved_seats = GREATEST(reserved_seats - 1, 0), updated_at = NOW()
 		 WHERE id = $1 AND org_id = $2`, id, orgID)

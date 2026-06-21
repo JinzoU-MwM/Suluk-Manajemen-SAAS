@@ -157,7 +157,7 @@ func (r *AgentRepo) UpsertTiers(ctx context.Context, orgID string, tiers []model
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, `DELETE FROM commission_tiers WHERE org_id = $1`, orgID); err != nil {
 		return err
 	}

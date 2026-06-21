@@ -15,7 +15,7 @@ func (r *VendorRepo) CreateBillTx(ctx context.Context, b *model.VendorBill, evt 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	query := fmt.Sprintf(`INSERT INTO vendor_bills (%s) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		RETURNING amount_idr, paid_amount, created_at, updated_at`, billInsertCols)

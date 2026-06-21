@@ -132,13 +132,13 @@ func (r *AIOCRRepo) GetScanResult(ctx context.Context, id, orgID uuid.UUID) (*mo
 	}
 
 	if extractedData != nil {
-		json.Unmarshal(extractedData, &sr.ExtractedData)
+		_ = json.Unmarshal(extractedData, &sr.ExtractedData)
 	}
 	if normalizedData != nil {
-		json.Unmarshal(normalizedData, &sr.NormalizedData)
+		_ = json.Unmarshal(normalizedData, &sr.NormalizedData)
 	}
 	if validationErrors != nil {
-		json.Unmarshal(validationErrors, &sr.ValidationErrors)
+		_ = json.Unmarshal(validationErrors, &sr.ValidationErrors)
 	}
 
 	return sr, nil
@@ -166,13 +166,13 @@ func (r *AIOCRRepo) GetScanResultsByJob(ctx context.Context, orgID, jobID uuid.U
 			return nil, err
 		}
 		if extractedData != nil {
-			json.Unmarshal(extractedData, &sr.ExtractedData)
+			_ = json.Unmarshal(extractedData, &sr.ExtractedData)
 		}
 		if normalizedData != nil {
-			json.Unmarshal(normalizedData, &sr.NormalizedData)
+			_ = json.Unmarshal(normalizedData, &sr.NormalizedData)
 		}
 		if validationErrors != nil {
-			json.Unmarshal(validationErrors, &sr.ValidationErrors)
+			_ = json.Unmarshal(validationErrors, &sr.ValidationErrors)
 		}
 		results = append(results, sr)
 	}
@@ -219,7 +219,7 @@ func (r *AIOCRRepo) ListExportTemplates(ctx context.Context, orgID uuid.UUID) ([
 			return nil, err
 		}
 		if columnMapping != nil {
-			json.Unmarshal(columnMapping, &t.ColumnMapping)
+			_ = json.Unmarshal(columnMapping, &t.ColumnMapping)
 		}
 		templates = append(templates, t)
 	}
@@ -236,7 +236,6 @@ func (r *AIOCRRepo) DeleteExportTemplate(ctx context.Context, id, orgID uuid.UUI
 	}
 	return nil
 }
-
 
 func (r *AIOCRRepo) UpdateScanResultFailed(ctx context.Context, id, orgID uuid.UUID, errorMessage string) error {
 	_, err := r.pool.Exec(ctx,
@@ -260,7 +259,6 @@ func (r *AIOCRRepo) UpdateScanResultCompleted(ctx context.Context, id, orgID uui
 		id, orgID, docType, extractedJSON, normalizedJSON, valErrJSON, cacheHit, processingTimeMs)
 	return err
 }
-
 
 func (r *AIOCRRepo) GetCompletedScanResults(ctx context.Context, orgID uuid.UUID, packageID *uuid.UUID) ([]model.ScanResult, error) {
 	query := `SELECT sr.id, sr.scan_job_id, sr.org_id, sr.file_name, sr.file_url, sr.file_size, sr.file_hash,
@@ -296,13 +294,13 @@ func (r *AIOCRRepo) GetCompletedScanResults(ctx context.Context, orgID uuid.UUID
 			return nil, err
 		}
 		if extractedData != nil {
-			json.Unmarshal(extractedData, &sr.ExtractedData)
+			_ = json.Unmarshal(extractedData, &sr.ExtractedData)
 		}
 		if normalizedData != nil {
-			json.Unmarshal(normalizedData, &sr.NormalizedData)
+			_ = json.Unmarshal(normalizedData, &sr.NormalizedData)
 		}
 		if validationErrors != nil {
-			json.Unmarshal(validationErrors, &sr.ValidationErrors)
+			_ = json.Unmarshal(validationErrors, &sr.ValidationErrors)
 		}
 		results = append(results, sr)
 	}

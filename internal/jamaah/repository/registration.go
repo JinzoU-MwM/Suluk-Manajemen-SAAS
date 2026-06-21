@@ -116,7 +116,7 @@ func (r *JamaahRepo) ApprovePendingTx(ctx context.Context, pendingID, orgID, rev
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var status string
 	if err := tx.QueryRow(ctx, `SELECT status FROM pending_registrations WHERE id = $1 AND org_id = $2 FOR UPDATE`, pendingID, orgID).Scan(&status); err != nil {
