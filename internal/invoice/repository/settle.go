@@ -19,7 +19,7 @@ func (r *InvoiceRepo) SettleFromCredit(ctx context.Context, invoiceID, orgID uui
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var total, paid, remaining int64
 	var status string

@@ -33,7 +33,6 @@ func (r *JamaahRepo) ListRooms(ctx context.Context, orgID uuid.UUID, groupID *uu
 	if groupID != nil {
 		query += fmt.Sprintf(" AND group_id = $%d", argIdx)
 		args = append(args, *groupID)
-		argIdx++
 	}
 	query += " ORDER BY room_number"
 
@@ -165,7 +164,6 @@ func (r *JamaahRepo) GetRoomingSummary(ctx context.Context, orgID uuid.UUID, gro
 	if groupID != nil {
 		query += fmt.Sprintf(" AND group_id = $%d", argIdx)
 		args = append(args, *groupID)
-		argIdx++
 	}
 	var totalCapacity, totalRooms int
 	err := r.pool.QueryRow(ctx, query, args...).Scan(&totalCapacity, &totalRooms)
@@ -181,7 +179,7 @@ func (r *JamaahRepo) GetRoomingSummary(ctx context.Context, orgID uuid.UUID, gro
 		args2 = append(args2, *groupID)
 	}
 	var assignedCount int
-	r.pool.QueryRow(ctx, assignQuery, args2...).Scan(&assignedCount)
+	_ = r.pool.QueryRow(ctx, assignQuery, args2...).Scan(&assignedCount)
 
 	occupancyPct := 0
 	if totalCapacity > 0 {

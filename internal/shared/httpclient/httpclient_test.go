@@ -12,7 +12,7 @@ func addrOf(url string) string { return strings.TrimPrefix(url, "http://") }
 
 func TestGetJSON_UnwrapsData(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"success":true,"data":{"x":7}}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"x":7}}`))
 	}))
 	defer ts.Close()
 
@@ -35,7 +35,7 @@ func TestGetRaw_RetriesOn5xxThenSucceeds(t *testing.T) {
 			w.WriteHeader(500)
 			return
 		}
-		w.Write([]byte(`{"success":true,"data":[]}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
 	}))
 	defer ts.Close()
 

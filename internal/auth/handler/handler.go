@@ -91,7 +91,7 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	refreshToken := c.Get("X-Refresh-Token", "")
-	h.svc.Logout(c.Context(), refreshToken)
+	_ = h.svc.Logout(c.Context(), refreshToken)
 	return response.OK(c, fiber.Map{"message": "logged out"})
 }
 

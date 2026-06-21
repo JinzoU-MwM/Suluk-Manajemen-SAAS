@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	ErrRefundNotFound   = fmt.Errorf("refund not found")
-	ErrRefundNotPending = fmt.Errorf("refund not in pending status")
+	ErrRefundNotFound    = fmt.Errorf("refund not found")
+	ErrRefundNotPending  = fmt.Errorf("refund not in pending status")
 	ErrRefundExceedsPaid = fmt.Errorf("refund amount exceeds invoice paid amount")
-	ErrPolicyNotFound   = fmt.Errorf("refund policy not found")
+	ErrPolicyNotFound    = fmt.Errorf("refund policy not found")
 )
 
 func (r *InvoiceRepo) CreateRefund(ctx context.Context, ref *model.Refund) error {
@@ -119,7 +119,7 @@ func (r *InvoiceRepo) CompleteRefund(ctx context.Context, id, orgID uuid.UUID) e
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Confirm the refund is processed and capture its amount + invoice.
 	var invoiceID uuid.UUID
@@ -312,7 +312,7 @@ func (r *InvoiceRepo) CancelInvoiceWithRefund(ctx context.Context, invoiceID, or
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	result, err := tx.Exec(ctx, `
 		UPDATE invoices SET status = 'batal', amount_paid = amount_paid - $3, amount_remaining = total_amount - (amount_paid - $3),

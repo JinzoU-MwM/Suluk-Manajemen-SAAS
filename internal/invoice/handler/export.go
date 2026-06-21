@@ -87,7 +87,7 @@ func (h *InvoiceHandler) ExportInvoicePDF(c *fiber.Ctx) error {
 	pdf.Cell(0, 5, fmt.Sprintf("Dicetak: %s", inv.IssuedAt.Format("02 Jan 2006 15:04")))
 
 	var buf bytes.Buffer
-	pdf.Output(&buf)
+	_ = pdf.Output(&buf)
 
 	c.Set("Content-Type", "application/pdf")
 	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="invoice_%s.pdf"`, inv.InvoiceNumber))

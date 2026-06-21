@@ -48,7 +48,7 @@ func (r *AgentRepo) ListAgents(ctx context.Context, orgID, search string, page, 
 		baseWhere += " AND (a.name ILIKE $2 OR a.phone ILIKE $2 OR a.email ILIKE $2)"
 		args = append(args, "%"+search+"%")
 	}
-	r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agents a %s", baseWhere), args...).Scan(&total)
+	_ = r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agents a %s", baseWhere), args...).Scan(&total)
 
 	offset := (page - 1) * limit
 	baseArgCount := len(args)
@@ -173,7 +173,7 @@ func (r *AgentRepo) ListCommissions(ctx context.Context, orgID, agentID, status,
 		args = append(args, tierLevel)
 		argIdx++
 	}
-	r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agent_commissions c %s", baseWhere), args...).Scan(&total)
+	_ = r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM agent_commissions c %s", baseWhere), args...).Scan(&total)
 
 	offset := (page - 1) * limit
 	query := fmt.Sprintf(`

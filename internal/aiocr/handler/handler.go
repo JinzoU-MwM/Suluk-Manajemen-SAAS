@@ -78,7 +78,7 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 			return response.BadRequest(c, "gagal membuka file: "+fh.Filename)
 		}
 		data, readErr := io.ReadAll(f)
-		f.Close()
+		_ = f.Close()
 		if readErr != nil {
 			return response.Internal(c, readErr)
 		}

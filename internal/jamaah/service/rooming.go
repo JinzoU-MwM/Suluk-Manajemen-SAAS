@@ -132,7 +132,7 @@ func (s *JamaahService) AutoRooming(ctx context.Context, orgID, groupID uuid.UUI
 				rooms = append(rooms, *room)
 				roomID, _ := uuid.Parse(room.ID)
 				for j := i; j < i+capacity && j < len(list); j++ {
-					s.repo.AssignMemberToRoom(ctx, orgID, roomID, list[j].MemberID.String())
+					_ = s.repo.AssignMemberToRoom(ctx, orgID, roomID, list[j].MemberID.String())
 				}
 			}
 			roomNum++
@@ -157,7 +157,7 @@ func (s *JamaahService) ShareGroup(ctx context.Context, orgID, groupID uuid.UUID
 	_ = s.repo.RevokeSharedManifest(ctx, groupID, orgID)
 
 	b := make([]byte, 16)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	token := hex.EncodeToString(b)
 
 	gs := groupID.String()

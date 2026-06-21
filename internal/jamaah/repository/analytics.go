@@ -42,7 +42,7 @@ func (r *JamaahRepo) GetAnalyticsStats(ctx context.Context, orgID string,
 // received or completed (status diterima/selesai). Non-critical: returns 0 on error.
 func (r *JamaahRepo) GetDocumentRate(ctx context.Context, orgID string) float64 {
 	var rate float64
-	r.pool.QueryRow(ctx, `
+	_ = r.pool.QueryRow(ctx, `
 		SELECT COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE status IN ('diterima','selesai')) / NULLIF(COUNT(*), 0)), 0)::float8
 		FROM jamaah_documents WHERE org_id = $1`, orgID).Scan(&rate)
 	return rate
@@ -50,7 +50,7 @@ func (r *JamaahRepo) GetDocumentRate(ctx context.Context, orgID string) float64 
 
 func (r *JamaahRepo) GetPassportExpiringSoon(ctx context.Context, orgID string) int {
 	var count int
-	r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jamaah_profiles WHERE org_id = $1 AND tanggal_paspor IS NOT NULL AND tanggal_paspor <= NOW() + INTERVAL '90 days' AND tanggal_paspor > NOW()`, orgID).Scan(&count)
+	_ = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jamaah_profiles WHERE org_id = $1 AND tanggal_paspor IS NOT NULL AND tanggal_paspor <= NOW() + INTERVAL '90 days' AND tanggal_paspor > NOW()`, orgID).Scan(&count)
 	return count
 }
 
@@ -95,7 +95,7 @@ func (r *JamaahRepo) GetMonthlyTrend(ctx context.Context, orgID string) []Monthl
 
 func (r *JamaahRepo) GetTotalGroups(ctx context.Context, orgID string) int {
 	var count int
-	r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM groups WHERE org_id = $1`, orgID).Scan(&count)
+	_ = r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM groups WHERE org_id = $1`, orgID).Scan(&count)
 	return count
 }
 

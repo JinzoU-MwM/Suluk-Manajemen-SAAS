@@ -42,7 +42,7 @@ func (r *JamaahRepo) CreateProfileTx(ctx context.Context, p *model.JamaahProfile
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, lockClassJamaah, p.OrgID.String()); err != nil {
 		return err
@@ -70,7 +70,7 @@ func (r *JamaahRepo) CreateGroupTx(ctx context.Context, g *model.Group, maxGroup
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, lockClassGroup, g.OrgID.String()); err != nil {
 		return err

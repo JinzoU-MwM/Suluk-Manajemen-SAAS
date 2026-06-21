@@ -14,7 +14,7 @@ import (
 
 func (s *JamaahService) GenerateRegistrationLink(ctx context.Context, orgID, userID string, req model.GenerateLinkRequest) (*model.RegistrationLink, error) {
 	tokenBytes := make([]byte, 16)
-	rand.Read(tokenBytes)
+	_, _ = rand.Read(tokenBytes)
 	token := hex.EncodeToString(tokenBytes)
 
 	expiresIn := req.ExpiresInDays

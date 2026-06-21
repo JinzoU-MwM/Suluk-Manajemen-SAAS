@@ -42,7 +42,7 @@ func (r *InventoryRepo) CreateStockItem(ctx context.Context, orgID string, req m
 	if err != nil {
 		return model.StockItem{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var it model.StockItem
 	const ins = `
@@ -88,7 +88,7 @@ func (r *InventoryRepo) changeStock(ctx context.Context, orgID, itemID string, d
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	tag, err := tx.Exec(ctx,
 		`UPDATE inventory_items SET stock = stock + $3, updated_at=NOW() WHERE org_id=$1 AND id=$2`,
 		orgID, itemID, delta)
@@ -184,7 +184,7 @@ func (r *InventoryRepo) SetPackageKit(ctx context.Context, orgID, packageID stri
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err := tx.Exec(ctx, `DELETE FROM package_kit_items WHERE org_id=$1 AND package_id=$2`, orgID, packageID); err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (r *InventoryRepo) ApplyDepartureDeduction(ctx context.Context, orgID, grou
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	for _, d := range deductions {
 		var movementID string
 		err := tx.QueryRow(ctx,

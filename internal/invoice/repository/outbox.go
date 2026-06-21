@@ -18,7 +18,7 @@ func (r *InvoiceRepo) CreateInvoiceTx(ctx context.Context, inv *model.Invoice, e
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = tx.QueryRow(ctx, `INSERT INTO invoices (id, org_id, invoice_number, jamaah_id, package_id, registration_id,
 		room_type, price_snapshot, discount_amount, surcharge_amount, total_amount, amount_paid, amount_remaining,
@@ -48,7 +48,7 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Lock the invoice and recompute balances under the lock (prevents lost
 	// updates on concurrent payments); overpayment is booked to titipan.
@@ -128,7 +128,7 @@ func (r *InvoiceRepo) CancelInvoiceTx(ctx context.Context, id, orgID uuid.UUID, 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	tag, err := tx.Exec(ctx, `UPDATE invoices SET status='batal', cancelled_at=NOW(), cancelled_reason=$3, updated_at=NOW() WHERE id=$1 AND org_id=$2 AND status != 'batal'`, id, orgID, reason)
 	if err != nil {

@@ -63,7 +63,7 @@ func (cl *Client) GetRaw(ctx context.Context, addr, path, authToken string) (jso
 			continue // retry transient network errors
 		}
 		body, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if readErr != nil {
 			lastErr = readErr
 			continue
@@ -125,7 +125,7 @@ func (cl *Client) PostJSON(ctx context.Context, addr, path string, headers map[s
 			continue
 		}
 		respBody, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if readErr != nil {
 			lastErr = readErr
 			continue

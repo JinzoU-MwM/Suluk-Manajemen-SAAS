@@ -38,7 +38,8 @@ func TestNarrativeKeyDistinct(t *testing.T) {
 	if narrativeKey(o1, "p1") == narrativeKey(o1, "p2") {
 		t.Fatal("different prompts must produce different keys")
 	}
-	if narrativeKey(o1, "p") != narrativeKey(o1, "p") {
+	k1, k2 := narrativeKey(o1, "p"), narrativeKey(o1, "p")
+	if k1 != k2 {
 		t.Fatal("key must be stable for identical inputs")
 	}
 }

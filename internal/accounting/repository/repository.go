@@ -39,7 +39,7 @@ func (r *Repo) SeedAccounts(ctx context.Context, orgID uuid.UUID, accts []model.
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	inserted := 0
 	for _, a := range accts {
 		tag, err := tx.Exec(ctx, `INSERT INTO chart_of_accounts (org_id, code, name, type, normal_balance)
@@ -137,7 +137,7 @@ func (r *Repo) Post(ctx context.Context, in PostInput) (journalID uuid.UUID, pos
 	if err != nil {
 		return uuid.Nil, false, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Idempotency: claim the event first.
 	if in.SourceEventID != "" {

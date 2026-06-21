@@ -17,7 +17,7 @@ func (r *PayrollRepo) CreateSalarySlipTx(ctx context.Context, s *model.SalarySli
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO salary_slips (org_id, employee_id, period, base_salary, allowance, deductions, pph21_amount, bpjs_amount, advance_deduction, net_salary, package_id, status, notes)

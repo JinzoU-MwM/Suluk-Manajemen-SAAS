@@ -99,7 +99,7 @@ func (r *Repo) DepositTx(ctx context.Context, orgID, accountID uuid.UUID, d *mod
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// lock + verify account active
 	var status string
@@ -134,7 +134,7 @@ func (r *Repo) ConvertTx(ctx context.Context, orgID, accountID uuid.UUID, amount
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	var balance int64
 	var status string

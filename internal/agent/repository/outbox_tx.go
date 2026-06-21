@@ -34,7 +34,7 @@ func (r *AgentRepo) CreateCommissionCascadeTx(ctx context.Context, seller *model
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	if err := tx.QueryRow(ctx, insertCommissionSQL,
 		seller.OrgID, seller.AgentID, seller.JamaahID, seller.InvoiceID, seller.PackageID,

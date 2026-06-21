@@ -38,7 +38,7 @@ type JWTManager struct {
 }
 
 func NewJWTManager(privateKeyPath, publicKeyKeyPath string, accessTTL, refreshTTL time.Duration) (*JWTManager, error) {
-	privBytes, err := os.ReadFile(privateKeyPath)
+	privBytes, err := os.ReadFile(privateKeyPath) // #nosec G304 -- key path comes from trusted server config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("read private key: %w", err)
 	}
@@ -47,7 +47,7 @@ func NewJWTManager(privateKeyPath, publicKeyKeyPath string, accessTTL, refreshTT
 		return nil, fmt.Errorf("parse private key: %w", err)
 	}
 
-	pubBytes, err := os.ReadFile(publicKeyKeyPath)
+	pubBytes, err := os.ReadFile(publicKeyKeyPath) // #nosec G304 -- key path comes from trusted server config, not user input
 	if err != nil {
 		return nil, fmt.Errorf("read public key: %w", err)
 	}
