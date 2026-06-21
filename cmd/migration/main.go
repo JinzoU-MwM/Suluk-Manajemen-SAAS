@@ -84,7 +84,7 @@ func main() {
 			log.Fatalf("unknown direction: %s (use up or down)", *direction)
 		}
 
-		m.Close()
+		_, _ = m.Close()
 	}
 }
 
