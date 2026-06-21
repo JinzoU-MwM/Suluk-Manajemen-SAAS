@@ -19,6 +19,7 @@
   import { showToast, mapError } from '../services/toast.svelte.js';
   import { formatRupiah as formatIDR } from '../utils/formatting.js';
   import { ApiService } from '../services/api.js';
+  import { dragAutoScroll } from '../actions/dragAutoScroll.js';
 
   let { onNavigate, user = null } = $props();
 
@@ -496,7 +497,7 @@
 
   <!-- Kanban view -->
   {:else if viewMode === 'kanban'}
-    <div class="min-h-0 flex-1 overflow-x-auto px-6 py-5">
+    <div use:dragAutoScroll class="min-h-0 flex-1 overflow-x-auto px-6 py-5">
       <div class="flex h-full items-start gap-3.5">
         {#each kanbanCols as col}
           {@const colItems = cardsFor(col.id)}
