@@ -40,7 +40,7 @@ type ProcessDocumentsResult struct {
 // cacheMode is accepted for forward-compat with the UI's cache selector but is
 // not yet wired to the OCR cache table (every file is processed fresh).
 func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFile, cacheMode string) (*ProcessDocumentsResult, error) {
-	if s.gemini == nil {
+	if s.analyzer == nil {
 		return nil, ErrOCRUnavailable
 	}
 
@@ -56,7 +56,7 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 			mimeType = detectMimeType(f.FileName)
 		}
 
-		result, err := s.gemini.AnalyzeDocument(ctx, f.Data, mimeType)
+		result, err := s.analyzer.AnalyzeDocument(ctx, f.Data, mimeType)
 		if err != nil {
 			s.logger.Errorf("ocr analyze %s: %v", f.FileName, err)
 			res.FileResults = append(res.FileResults, SyncFileResult{

@@ -130,6 +130,9 @@ func NewGeminiClient(apiKey string) *GeminiClient {
 	}
 }
 
+// Available reports whether a usable Gemini client is configured (nil-safe).
+func (c *GeminiClient) Available() bool { return c != nil && c.apiKey != "" }
+
 var systemPrompts = map[string]string{
 	"auto": `Anda adalah sistem OCR untuk dokumen perjalanan Umroh/Haji Indonesia.
 Anda akan menerima gambar dokumen identitas (KTP, KK, Paspor, atau Visa).
@@ -170,7 +173,7 @@ Field yang mungkin (isi sesuai dokumen yang terlihat):
 Kembalikan HANYA JSON, tanpa teks lain. Jika tidak yakin suatu field, jangan sertakan field tersebut.`,
 }
 
-func (c *GeminiClient) AnalyzeDocument(ctx context.Context, imageData []byte, mimeType string) (*GeminiResult, error) {
+func (c *GeminiClient) AnalyzeDocument(ctx context.Context, imageData []byte, mimeType string) (*OCRResult, error) {
 	if c == nil {
 		return nil, fmt.Errorf("gemini client not configured (GEMINI_API_KEY missing)")
 	}
@@ -263,7 +266,7 @@ func (c *GeminiClient) AnalyzeDocument(ctx context.Context, imageData []byte, mi
 
 	text = cleanJSONString(text)
 
-	var result GeminiResult
+	var result OCRResult
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
 		return nil, fmt.Errorf("parse extracted data: %w", err)
 	}
@@ -271,7 +274,7 @@ func (c *GeminiClient) AnalyzeDocument(ctx context.Context, imageData []byte, mi
 	return &result, nil
 }
 
-type GeminiResult struct {
+type OCRResult struct {
 	DocType       string          `json:"doc_type"`
 	ExtractedData ExtractedFields `json:"extracted_data"`
 	Confidence    float64         `json:"confidence"`
