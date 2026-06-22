@@ -59,7 +59,7 @@ func (s *Service) GenerateInsights(ctx context.Context, orgID uuid.UUID, asOf ti
 		Metrics:     m,
 		Anomalies:   []model.Insight{},
 		Highlights:  []model.Insight{},
-		AIAvailable: s.ai.Available(),
+		AIAvailable: s.ai != nil && s.ai.Available(),
 	}
 
 	// ── Rule-based anomalies ──
@@ -103,7 +103,7 @@ func (s *Service) GenerateInsights(ctx context.Context, orgID uuid.UUID, asOf ti
 	// The prompt is fully derived from the numbers above, so an unchanged GL hits
 	// the cache and skips the Gemini call; changed numbers (or a new day) miss and
 	// regenerate. This keeps us well under free-tier rate limits.
-	if s.ai.Available() {
+	if s.ai != nil && s.ai.Available() {
 		prompt := insightPrompt(rep)
 		now := time.Now()
 		key := narrativeKey(orgID, prompt)

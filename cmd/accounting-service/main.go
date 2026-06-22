@@ -51,7 +51,7 @@ func main() {
 	logger.Info("connected to database")
 
 	repo := repository.NewRepo(pool)
-	svc := service.NewService(repo, logger).WithAI(ai.New(cfg.Gemini.APIKey))
+	svc := service.NewService(repo, logger).WithAI(ai.New(cfg))
 
 	if *backfill {
 		if err := runBackfill(ctx, cfg, svc, logger); err != nil {

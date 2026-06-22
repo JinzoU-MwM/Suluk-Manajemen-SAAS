@@ -19,7 +19,7 @@ import (
 type Service struct {
 	repo   *repository.Repo
 	log    *zap.SugaredLogger
-	ai     *ai.Client
+	ai     ai.Generator
 	narr   *narrativeCache // memoized AI narratives, keyed by (org, prompt fingerprint)
 	seeded sync.Map        // orgID -> struct{}: in-process cache so we don't re-check COA every event
 }
@@ -28,9 +28,10 @@ func NewService(repo *repository.Repo, log *zap.SugaredLogger) *Service {
 	return &Service{repo: repo, log: log, narr: newNarrativeCache(6*time.Hour, 512)}
 }
 
-// WithAI attaches an optional Gemini client for copilot narratives. A nil client
-// (no GEMINI_API_KEY) is fine — insights still return the rule-based findings.
-func (s *Service) WithAI(c *ai.Client) *Service {
+// WithAI attaches an optional text Generator for copilot narratives. A nil
+// generator (no key for the selected provider) is fine — insights still return
+// the rule-based findings.
+func (s *Service) WithAI(c ai.Generator) *Service {
 	s.ai = c
 	return s
 }

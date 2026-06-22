@@ -24,9 +24,9 @@ type Client struct {
 	httpc  *http.Client
 }
 
-// New returns a client, or nil when no key is configured. A nil client is safe:
+// newGemini returns a client, or nil when no key is configured. A nil client is safe:
 // callers should treat (nil → AI unavailable) as a graceful, non-fatal state.
-func New(apiKey string) *Client {
+func newGemini(apiKey string) *Client {
 	if apiKey == "" {
 		return nil
 	}
