@@ -79,9 +79,11 @@ func TestOpenCodeAnalyzePDFRasterizes(t *testing.T) {
 			} `json:"messages"`
 		}
 		_ = json.Unmarshal(body, &req)
-		for _, p := range req.Messages[0].Content {
-			if p.Type == "image_url" {
-				gotURL = p.ImageURL.URL
+		if len(req.Messages) > 0 {
+			for _, p := range req.Messages[0].Content {
+				if p.Type == "image_url" {
+					gotURL = p.ImageURL.URL
+				}
 			}
 		}
 		io.WriteString(w, `{"choices":[{"message":{"content":"{\"doc_type\":\"paspor\"}"}}]}`)
@@ -118,5 +120,9 @@ func TestNewAnalyzerSelectsProvider(t *testing.T) {
 	cfg.Gemini = config.GeminiConfig{APIKey: "g"}
 	if a := NewAnalyzer(cfg); a == nil || !a.Available() {
 		t.Error("gemini+key should be available")
+	}
+	cfg.Gemini = config.GeminiConfig{} // no key
+	if a := NewAnalyzer(cfg); a != nil {
+		t.Errorf("gemini without key should be nil, got %T", a)
 	}
 }
