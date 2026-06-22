@@ -60,8 +60,8 @@ func main() {
 	}
 
 	aiocrRepo := repository.NewAIOCRRepo(pool)
-	geminiClient := service.NewGeminiClient(cfg.Gemini.APIKey)
-	aiocrService := service.NewAIOCRService(aiocrRepo, geminiClient, logger)
+	analyzer := service.NewAnalyzer(cfg)
+	aiocrService := service.NewAIOCRService(aiocrRepo, analyzer, logger)
 	aiocrHandler := handler.NewAIOCRHandler(aiocrService)
 
 	app := fiber.New(fiber.Config{
