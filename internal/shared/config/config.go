@@ -17,6 +17,7 @@ type Config struct {
 	JWT      JWTConfig
 	Server   ServerConfig
 	Gemini   GeminiConfig
+	AI       AIConfig
 	Pakasir  PakasirConfig
 	Internal InternalConfig
 	Email    EmailConfig
@@ -100,6 +101,16 @@ type GeminiConfig struct {
 	APIKey string
 }
 
+// AIConfig selects and configures the AI provider for OCR + accounting insights.
+// Provider is "opencode" (default) or "gemini"; Gemini stays available for an
+// instant env-flip fallback.
+type AIConfig struct {
+	Provider        string
+	OpenCodeAPIKey  string
+	OpenCodeModel   string
+	OpenCodeBaseURL string
+}
+
 func Load() *Config {
 	return &Config{
 		App: AppConfig{
@@ -141,6 +152,12 @@ func Load() *Config {
 		Gemini: GeminiConfig{
 			APIKey: envOr("GEMINI_API_KEY", ""),
 		},
+		AI: AIConfig{
+			Provider:        normalizeProvider(envOr("AI_PROVIDER", "opencode")),
+			OpenCodeAPIKey:  envOr("OPENCODE_API_KEY", ""),
+			OpenCodeModel:   envOr("OPENCODE_MODEL", "gpt-5-nano"),
+			OpenCodeBaseURL: strings.TrimRight(envOr("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1"), "/"),
+		},
 		Pakasir: PakasirConfig{
 			APIKey:      envOr("PAKASIR_API_KEY", ""),
 			ProjectSlug: envOr("PAKASIR_PROJECT_SLUG", ""),
@@ -158,6 +175,17 @@ func Load() *Config {
 			SMTPUser:     envOr("SMTP_USER", ""),
 			SMTPPass:     envOr("SMTP_PASS", ""),
 		},
+	}
+}
+
+// normalizeProvider lowercases/trims the provider and falls back to "opencode"
+// for any unrecognized value.
+func normalizeProvider(p string) string {
+	switch strings.ToLower(strings.TrimSpace(p)) {
+	case "gemini":
+		return "gemini"
+	default:
+		return "opencode"
 	}
 }
 
