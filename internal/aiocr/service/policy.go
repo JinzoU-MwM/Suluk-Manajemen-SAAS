@@ -3,10 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/jamaah-in/v2/internal/shared/config"
 )
 
 // PolicyEntry is one person's row from a POLIS manifest, keyed by passport.
@@ -184,6 +187,51 @@ func rowPasporKey(row map[string]any) string {
 		return normPaspor(g.first("no_identitas"))
 	}
 	return ""
+}
+
+const policyPrompt = `Anda mengekstrak data dari SERTIFIKAT/POLIS asuransi perjalanan umrah Indonesia (grup).
+Dari teks dokumen, kembalikan HANYA JSON dengan bentuk:
+{
+  "asuransi": "<nama perusahaan asuransi / Pengelola>",
+  "tanggal_input_polis": "<tanggal terbit sertifikat, format yyyy-mm-dd>",
+  "peserta": [
+    {"no_identitas":"<nomor paspor/identitas>", "no_polis":"<nomor polis peserta>",
+     "tanggal_awal_polis":"<tanggal keberangkatan yyyy-mm-dd>", "tanggal_akhir_polis":"<tanggal kepulangan yyyy-mm-dd>"}
+  ]
+}
+Aturan: ambil daftar peserta dari tabel MANIFEST (kolom NO IDENTITAS, NO POLIS, TANGGAL KEBERANGKATAN, TANGGAL KEPULANGAN).
+no_identitas = nomor paspor/identitas peserta. Semua tanggal format yyyy-mm-dd. Jika ragu suatu field, kosongkan. Tanpa teks lain selain JSON.`
+
+// ExtractManifest implements PolicyExtractor using the OpenCode text chat API
+// (no vision — the document is parsed as text). The PDF text is capped so the
+// boilerplate per-person certificate pages after the manifest don't blow the
+// token budget; the cover, issue date, and manifest are early in the document.
+func (a *OpenCodeAnalyzer) ExtractManifest(ctx context.Context, pdfText string) (*PolicyManifest, error) {
+	if !a.Available() {
+		return nil, fmt.Errorf("opencode analyzer not configured (OPENCODE_API_KEY missing)")
+	}
+	if len(pdfText) > 60000 {
+		pdfText = pdfText[:60000]
+	}
+	content := []map[string]any{
+		{"type": "text", "text": policyPrompt + "\n\n=== TEKS DOKUMEN POLIS ===\n" + pdfText},
+	}
+	out, err := a.chat(ctx, content, 4096)
+	if err != nil {
+		return nil, err
+	}
+	return parsePolicyJSON(out)
+}
+
+// NewPolicyExtractor returns the configured PolicyExtractor, or nil when the
+// provider is not opencode or its key is empty (callers treat nil as "no policy
+// enrichment"). The key is checked before constructing, so a nil concrete
+// pointer is never wrapped into a non-nil interface.
+func NewPolicyExtractor(cfg *config.Config) PolicyExtractor {
+	if cfg.AI.Provider == "opencode" && cfg.AI.OpenCodeAPIKey != "" {
+		return NewOpenCodeAnalyzer(cfg.AI.OpenCodeAPIKey, cfg.AI.OpenCodeModel, cfg.AI.OpenCodeBaseURL)
+	}
+	return nil
 }
 
 // enrichRowsWithPolicy fills the five insurance keys on every jamaah row whose

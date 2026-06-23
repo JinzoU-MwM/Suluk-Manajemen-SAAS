@@ -98,25 +98,36 @@ func (a *OpenCodeAnalyzer) AnalyzeDocument(ctx context.Context, imageData []byte
 	}
 
 	dataURI := fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(imageData))
-	reqBody := map[string]any{
-		"model":       a.model,
-		"temperature": 0.1,
-		"max_tokens":  4096,
-		"messages": []map[string]any{{
-			"role": "user",
-			"content": []map[string]any{
-				{"type": "text", "text": systemPrompts["auto"]},
-				{"type": "image_url", "image_url": map[string]any{"url": dataURI}},
-			},
-		}},
+	content := []map[string]any{
+		{"type": "text", "text": systemPrompts["auto"]},
+		{"type": "image_url", "image_url": map[string]any{"url": dataURI}},
 	}
-	body, _ := json.Marshal(reqBody)
-
-	raw, err := a.post(ctx, body)
+	text, err := a.chat(ctx, content, 4096)
 	if err != nil {
 		return nil, err
 	}
+	var result OCRResult
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return nil, fmt.Errorf("parse extracted data: %w", err)
+	}
+	return &result, nil
+}
 
+// chat sends one user message (content blocks already built) and returns the
+// model's text reply (JSON fences stripped). Shared by vision OCR (image
+// content) and policy manifest extraction (text content).
+func (a *OpenCodeAnalyzer) chat(ctx context.Context, content []map[string]any, maxTokens int) (string, error) {
+	reqBody := map[string]any{
+		"model":       a.model,
+		"temperature": 0.1,
+		"max_tokens":  maxTokens,
+		"messages":    []map[string]any{{"role": "user", "content": content}},
+	}
+	body, _ := json.Marshal(reqBody)
+	raw, err := a.post(ctx, body)
+	if err != nil {
+		return "", err
+	}
 	var resp struct {
 		Choices []struct {
 			Message struct {
@@ -128,21 +139,15 @@ func (a *OpenCodeAnalyzer) AnalyzeDocument(ctx context.Context, imageData []byte
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("parse opencode response: %w", err)
+		return "", fmt.Errorf("parse opencode response: %w", err)
 	}
 	if resp.Error != nil {
-		return nil, fmt.Errorf("opencode api error: %s", resp.Error.Message)
+		return "", fmt.Errorf("opencode api error: %s", resp.Error.Message)
 	}
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("opencode returned no choices")
+		return "", fmt.Errorf("opencode returned no choices")
 	}
-
-	text := cleanJSONString(resp.Choices[0].Message.Content)
-	var result OCRResult
-	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		return nil, fmt.Errorf("parse extracted data: %w", err)
-	}
-	return &result, nil
+	return cleanJSONString(resp.Choices[0].Message.Content), nil
 }
 
 // post POSTs with Bearer auth, retrying on 429 / >=500 / network error (max 3).
