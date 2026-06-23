@@ -16,6 +16,7 @@ import (
 type AIOCRService struct {
 	repo     *repository.AIOCRRepo
 	analyzer DocumentAnalyzer
+	policy   PolicyExtractor
 	logger   *zap.SugaredLogger
 }
 
@@ -25,6 +26,13 @@ func NewAIOCRService(repo *repository.AIOCRRepo, analyzer DocumentAnalyzer, logg
 		analyzer: analyzer,
 		logger:   logger,
 	}
+}
+
+// WithPolicy attaches a POLIS manifest extractor (enables insurance-column
+// enrichment). Returns the receiver for chaining from main().
+func (s *AIOCRService) WithPolicy(p PolicyExtractor) *AIOCRService {
+	s.policy = p
+	return s
 }
 
 // Available reports whether OCR is configured (Gemini API key present).
