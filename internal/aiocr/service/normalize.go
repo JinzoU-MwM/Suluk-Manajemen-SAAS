@@ -58,10 +58,12 @@ func normalizeToSiskopatuh(data any, docType string) any {
 	if extracted.NoPaspor != "" {
 		normalized["no_paspor"] = extracted.NoPaspor
 	}
-	if extracted.NamaPaspor != "" {
-		normalized["nama_paspor"] = extracted.NamaPaspor
-	} else if extracted.Nama != "" {
+	// Nama Paspor mirrors Nama so the preview shows the same name the export will —
+	// Siskopatuh expects an identical name in the "Nama" and "Nama Paspor" columns.
+	if extracted.Nama != "" {
 		normalized["nama_paspor"] = extracted.Nama
+	} else if extracted.NamaPaspor != "" {
+		normalized["nama_paspor"] = extracted.NamaPaspor
 	}
 	if extracted.TempatLahir != "" {
 		normalized["tempat_lahir"] = extracted.TempatLahir

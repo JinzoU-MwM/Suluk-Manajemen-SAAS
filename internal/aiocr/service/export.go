@@ -31,7 +31,9 @@ var templateColumns = []templateColumn{
 		return normJenisIdentitas(g.first("jenis_identitas"), g.first("nik"), g.first("no_paspor"))
 	}},
 	{"No Identitas", func(g fieldGetter) string { return g.first("no_paspor", "no_identitas", "nik") }},
-	{"Nama Paspor", func(g fieldGetter) string { return g.first("nama_paspor") }},
+	// Nama Paspor must equal the Nama column — the template uses the same name for
+	// both. Resolve with the identical expression so they are always byte-identical.
+	{"Nama Paspor", func(g fieldGetter) string { return g.first("nama", "nama_paspor") }},
 	{"No Paspor", func(g fieldGetter) string { return g.first("no_paspor") }},
 	{"Tanggal Dikeluarkan Paspor(yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_paspor", "tanggal_terbit_paspor") }},
 	{"Kota Paspor", func(g fieldGetter) string { return g.first("kota_paspor") }},
