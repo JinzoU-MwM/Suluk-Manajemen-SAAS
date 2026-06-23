@@ -11,7 +11,9 @@ RUN CGO_ENABLED=0 go build -o /app/service ./cmd/${SERVICE}
 
 FROM alpine:3.19
 
-RUN apk --no-cache add ca-certificates tzdata
+ARG SERVICE
+RUN apk --no-cache add ca-certificates tzdata && \
+    if [ "$SERVICE" = "ai-ocr-service" ]; then apk --no-cache add poppler-utils; fi
 
 WORKDIR /app
 COPY --from=builder /app/service .

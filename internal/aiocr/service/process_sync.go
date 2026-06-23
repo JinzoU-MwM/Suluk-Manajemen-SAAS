@@ -5,9 +5,9 @@ import (
 	"errors"
 )
 
-// ErrOCRUnavailable is returned when no Gemini API key is configured, so the
+// ErrOCRUnavailable is returned when no AI provider is configured, so the
 // handler can surface a clean 503 instead of a generic 500.
-var ErrOCRUnavailable = errors.New("OCR tidak tersedia: GEMINI_API_KEY belum diatur")
+var ErrOCRUnavailable = errors.New("OCR tidak tersedia: AI provider belum dikonfigurasi (atur OPENCODE_API_KEY atau GEMINI_API_KEY)")
 
 // SyncFile is one uploaded document to OCR synchronously (bytes already read).
 type SyncFile struct {
@@ -32,7 +32,7 @@ type ProcessDocumentsResult struct {
 	FileResults        []SyncFileResult `json:"file_results"`
 }
 
-// ProcessDocumentsSync OCRs each uploaded file inline (Gemini → validate →
+// ProcessDocumentsSync OCRs each uploaded file inline (OCR → validate →
 // normalize) and returns jamaah-shaped records immediately. This is the
 // synchronous counterpart to the async CreateScanJob/worker path; the scanner
 // frontend was built against this synchronous contract.
@@ -40,7 +40,7 @@ type ProcessDocumentsResult struct {
 // cacheMode is accepted for forward-compat with the UI's cache selector but is
 // not yet wired to the OCR cache table (every file is processed fresh).
 func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFile, cacheMode string) (*ProcessDocumentsResult, error) {
-	if s.gemini == nil {
+	if s.analyzer == nil {
 		return nil, ErrOCRUnavailable
 	}
 
@@ -56,7 +56,7 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 			mimeType = detectMimeType(f.FileName)
 		}
 
-		result, err := s.gemini.AnalyzeDocument(ctx, f.Data, mimeType)
+		result, err := s.analyzer.AnalyzeDocument(ctx, f.Data, mimeType)
 		if err != nil {
 			s.logger.Errorf("ocr analyze %s: %v", f.FileName, err)
 			res.FileResults = append(res.FileResults, SyncFileResult{

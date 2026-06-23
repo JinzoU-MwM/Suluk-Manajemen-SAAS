@@ -14,22 +14,22 @@ import (
 )
 
 type AIOCRService struct {
-	repo   *repository.AIOCRRepo
-	gemini *GeminiClient
-	logger *zap.SugaredLogger
+	repo     *repository.AIOCRRepo
+	analyzer DocumentAnalyzer
+	logger   *zap.SugaredLogger
 }
 
-func NewAIOCRService(repo *repository.AIOCRRepo, gemini *GeminiClient, logger *zap.SugaredLogger) *AIOCRService {
+func NewAIOCRService(repo *repository.AIOCRRepo, analyzer DocumentAnalyzer, logger *zap.SugaredLogger) *AIOCRService {
 	return &AIOCRService{
-		repo:   repo,
-		gemini: gemini,
-		logger: logger,
+		repo:     repo,
+		analyzer: analyzer,
+		logger:   logger,
 	}
 }
 
 // Available reports whether OCR is configured (Gemini API key present).
 func (s *AIOCRService) Available() bool {
-	return s.gemini != nil
+	return s.analyzer != nil
 }
 
 func (s *AIOCRService) CreateScanJob(ctx context.Context, orgID, userID uuid.UUID, req model.CreateScanJobRequest) (*model.ScanJob, error) {

@@ -315,6 +315,10 @@ services:
       MINIO_BUCKET: jamaah-docs
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      AI_PROVIDER: ${AI_PROVIDER:-opencode}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-gpt-5-nano}
+      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-https://opencode.ai/zen/v1}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
@@ -513,7 +517,10 @@ services:
       NATS_ADDR: nats://nats:4222
       GEMINI_API_KEY: ${GEMINI_API_KEY:-} # optional — copilot adds AI narrative when set
       GEMINI_MODEL: ${GEMINI_MODEL:-} # optional — overrides default gemini-2.5-flash
-
+      AI_PROVIDER: ${AI_PROVIDER:-opencode}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-gpt-5-nano}
+      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-https://opencode.ai/zen/v1}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
