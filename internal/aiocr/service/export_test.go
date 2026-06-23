@@ -62,3 +62,26 @@ func TestExportMatchesJamaahTemplate(t *testing.T) {
 		t.Errorf("Asuransi should be blank, got %q", got)
 	}
 }
+
+func TestExportFillsInsuranceColumns(t *testing.T) {
+	records := []map[string]any{{
+		"nama": "LESTARI EKA CITRA", "no_paspor": "X2664222", "jenis_identitas": "PASPOR",
+		"asuransi": "ASURANSI ASKRIDA SYARIAH", "no_polis": "122015022600316-000043",
+		"tanggal_input_polis": "2026-06-17", "tanggal_awal_polis": "2026-07-01",
+		"tanggal_akhir_polis": "2026-07-09",
+	}}
+	data, err := generateInlineSiskopatuhExcel(records)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, _ := excelize.OpenReader(bytes.NewReader(data))
+	cell := func(c string) string { v, _ := f.GetCellValue("Sheet1", c); return v }
+	for c, want := range map[string]string{
+		"AA2": "ASURANSI ASKRIDA SYARIAH", "AB2": "122015022600316-000043",
+		"AC2": "2026-06-17", "AD2": "2026-07-01", "AE2": "2026-07-09", "AF2": "", // No BPJS blank
+	} {
+		if got := cell(c); got != want {
+			t.Errorf("insurance %s = %q, want %q", c, got, want)
+		}
+	}
+}

@@ -56,11 +56,11 @@ var templateColumns = []templateColumn{
 	{"Tanggal Akhir  Visa (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_visa_akhir") }},
 	// Insurance / BPJS columns are not on identity documents — left blank for
 	// the operator to fill in.
-	{"Asuransi", func(g fieldGetter) string { return "" }},
-	{"No Polis", func(g fieldGetter) string { return "" }},
-	{"Tanggal Input Polis (yyyy-mm-dd)", func(g fieldGetter) string { return "" }},
-	{"Tanggal Awal Polis (yyyy-mm-dd)", func(g fieldGetter) string { return "" }},
-	{"Tanggal Akhir Polis (yyyy-mm-dd)", func(g fieldGetter) string { return "" }},
+	{"Asuransi", func(g fieldGetter) string { return mapAsuransi(g.first("asuransi")) }},
+	{"No Polis", func(g fieldGetter) string { return g.first("no_polis") }},
+	{"Tanggal Input Polis (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_input_polis") }},
+	{"Tanggal Awal Polis (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_awal_polis") }},
+	{"Tanggal Akhir Polis (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_akhir_polis") }},
 	{"No BPJS", func(g fieldGetter) string { return "" }},
 }
 
