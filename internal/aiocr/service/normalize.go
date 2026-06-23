@@ -45,9 +45,14 @@ func normalizeToSiskopatuh(data any, docType string) any {
 	if extracted.Nama != "" {
 		normalized["nama"] = extracted.Nama
 	}
+	// Identity number = NIK for a KTP, but the PASSPORT NUMBER for a passport
+	// (a passport has no NIK). Matches template jamaah.xlsm columns D/E.
 	if extracted.NIK != "" {
 		normalized["no_identitas"] = extracted.NIK
-		normalized["jenis_identitas"] = "NIK"
+		normalized["jenis_identitas"] = "KTP"
+	} else if extracted.NoPaspor != "" {
+		normalized["no_identitas"] = extracted.NoPaspor
+		normalized["jenis_identitas"] = "Paspor"
 	}
 	if extracted.NoPaspor != "" {
 		normalized["no_paspor"] = extracted.NoPaspor
@@ -100,7 +105,7 @@ func normalizeToSiskopatuh(data any, docType string) any {
 		normalized["pekerjaan"] = extracted.Pekerjaan
 	}
 	if extracted.StatusPerkawinan != "" {
-		normalized["status_pernikahan"] = extracted.StatusPerkawinan
+		normalized["status_pernikahan"] = mapStatusNikah(extracted.StatusPerkawinan)
 	}
 	if extracted.Agama != "" {
 		normalized["agama"] = extracted.Agama

@@ -10,76 +10,144 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-var siskopatuhColumns = []string{
-	"No",
-	"NAMA LENGKAP",
-	"JENIS KELAMIN",
-	"TEMPAT LAHIR",
-	"TANGGAL LAHIR",
-	"ALAMAT",
-	"PROVINSI",
-	"KABUPATEN / KOTA",
-	"KECAMATAN",
-	"KELURAHAN",
-	"NO KTP / NIK",
-	"NO PASPOR",
-	"TANGGAL TERBIT PASPOR",
-	"TANGGAL EXPIRED PASPOR",
-	"TEMPAT TERBIT PASPOR",
-	"NO TELEPON",
-	"NO HP",
-	"EMAIL",
-	"KEWARGANEGARAAN",
-	"STATUS PERKAWINAN",
-	"PENDIDIKAN TERAKHIR",
-	"PEKERJAAN",
-	"GOLONGAN DARAH",
-	"NAMA AYAH",
-	"NO VISA",
-	"TANGGAL TERBIT VISA",
-	"TANGGAL EXPIRED VISA",
-	"PROVIDER VISA",
-	"UKURAN IHRAM / MUKENA",
-	"UKURAN BAJU",
-	"KONTAK DARURAT - NAMA",
-	"KONTAK DARURAT - TELEPON",
+// templateColumn is one column of the "template jamaah.xlsm" Siskopatuh upload
+// format. header is the EXACT spreadsheet header (must match the government
+// template verbatim — including spacing/casing); value derives the cell from a
+// scanned record.
+type templateColumn struct {
+	header string
+	value  func(g fieldGetter) string
 }
 
-func generateSiskopatuhExcel(results []model.ScanResult) ([]byte, error) {
+// templateColumns mirrors template jamaah.xlsm (Sheet1) header text + order
+// EXACTLY. Do not reword headers — Siskopatuh matches columns by header.
+var templateColumns = []templateColumn{
+	{"Title", func(g fieldGetter) string { return mapTitle(g.first("gender", "jenis_kelamin"), g.first("status_pernikahan", "status_perkawinan")) }},
+	{"Nama (Sesuai Dengan nama Pada Kartu Vaksin)", func(g fieldGetter) string { return g.first("nama", "nama_paspor") }},
+	{"Nama Ayah", func(g fieldGetter) string { return g.first("nama_ayah") }},
+	{"Jenis Identitas", func(g fieldGetter) string { return jenisIdentitas(g.first("nik", "no_identitas"), g.first("no_paspor")) }},
+	{"No Identitas", func(g fieldGetter) string { return g.first("no_paspor", "no_identitas", "nik") }},
+	{"Nama Paspor", func(g fieldGetter) string { return g.first("nama_paspor") }},
+	{"No Paspor", func(g fieldGetter) string { return g.first("no_paspor") }},
+	{"Tanggal Dikeluarkan Paspor(yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_paspor", "tanggal_terbit_paspor") }},
+	{"Kota Paspor", func(g fieldGetter) string { return g.first("kota_paspor") }},
+	{"Tempat Lahir", func(g fieldGetter) string { return g.first("tempat_lahir") }},
+	{"Tanggal Lahir(yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_lahir") }},
+	{"Alamat", func(g fieldGetter) string { return g.first("alamat") }},
+	{"Provinsi", func(g fieldGetter) string { return g.first("provinsi") }},
+	{"Kabupaten", func(g fieldGetter) string { return g.first("kabupaten") }},
+	{"Kecamatan", func(g fieldGetter) string { return g.first("kecamatan") }},
+	{"Kelurahan", func(g fieldGetter) string { return g.first("kelurahan") }},
+	{"No. Telepon", func(g fieldGetter) string { return g.first("no_telepon") }},
+	{"No Hp", func(g fieldGetter) string { return g.first("no_hp") }},
+	{"KewargaNegaraan", func(g fieldGetter) string { return g.first("kewarganegaraan") }},
+	{"Status Pernikahan", func(g fieldGetter) string { return mapStatusNikah(g.first("status_pernikahan", "status_perkawinan")) }},
+	{"Pendidikan", func(g fieldGetter) string { return g.first("pendidikan") }},
+	{"Pekerjaan", func(g fieldGetter) string { return g.first("pekerjaan") }},
+	{"Provider Visa", func(g fieldGetter) string { return g.first("provider_visa") }},
+	{"No Visa", func(g fieldGetter) string { return g.first("no_visa") }},
+	{"Tanggal Berlaku Visa (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_visa") }},
+	{"Tanggal Akhir  Visa (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_visa_akhir") }},
+	// Insurance / BPJS columns are not on identity documents — left blank for
+	// the operator to fill in.
+	{"Asuransi", func(g fieldGetter) string { return "" }},
+	{"No Polis", func(g fieldGetter) string { return "" }},
+	{"Tanggal Input Polis (yyyy-mm-dd)", func(g fieldGetter) string { return "" }},
+	{"Tanggal Awal Polis (yyyy-mm-dd)", func(g fieldGetter) string { return "" }},
+	{"Tanggal Akhir Polis (yyyy-mm-dd)", func(g fieldGetter) string { return "" }},
+	{"No BPJS", func(g fieldGetter) string { return "" }},
+}
+
+// fieldGetter reads string fields from a record map, trying key aliases in order
+// (records come in either the normalized OCR shape or the jamaah-member shape).
+type fieldGetter struct{ m map[string]any }
+
+func (g fieldGetter) first(keys ...string) string {
+	for _, k := range keys {
+		v, ok := g.m[k]
+		if !ok || v == nil {
+			continue
+		}
+		if s := strings.TrimSpace(fmt.Sprintf("%v", v)); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// jenisIdentitas: a passport's ID type is "Paspor", a KTP's is "KTP" (template
+// column D). Passport wins when a passport number is present.
+func jenisIdentitas(nik, noPaspor string) string {
+	if strings.TrimSpace(noPaspor) != "" {
+		return "Paspor"
+	}
+	if strings.TrimSpace(nik) != "" {
+		return "KTP"
+	}
+	return ""
+}
+
+// mapStatusNikah collapses KTP marital statuses to the template's two values:
+// MENIKAH / BELUM MENIKAH. Empty stays empty.
+func mapStatusNikah(s string) string {
+	t := strings.ToLower(strings.TrimSpace(s))
+	if t == "" {
+		return ""
+	}
+	if strings.Contains(t, "belum") || strings.Contains(t, "tidak") ||
+		strings.Contains(t, "cerai") || strings.Contains(t, "janda") || strings.Contains(t, "duda") {
+		return "BELUM MENIKAH"
+	}
+	if strings.Contains(t, "kawin") || strings.Contains(t, "nikah") {
+		return "MENIKAH"
+	}
+	return "BELUM MENIKAH"
+}
+
+// mapTitle derives the Siskopatuh title (template column A): TUAN for a male;
+// for a female, NYONYA when married else NONA.
+func mapTitle(gender, status string) string {
+	g := strings.ToLower(strings.TrimSpace(gender))
+	switch {
+	case g == "":
+		return ""
+	case strings.Contains(g, "perempuan") || strings.Contains(g, "wanita") || strings.Contains(g, "female") || g == "p":
+		if mapStatusNikah(status) == "MENIKAH" {
+			return "NYONYA"
+		}
+		return "NONA"
+	case strings.Contains(g, "laki") || strings.Contains(g, "pria") || strings.Contains(g, "male") || g == "l":
+		return "TUAN"
+	default:
+		return ""
+	}
+}
+
+// writeSiskopatuhTemplate writes the records as the template jamaah.xlsm format.
+func writeSiskopatuhTemplate(rows []fieldGetter) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
+	sheet := f.GetSheetName(0) // keep the default "Sheet1" — the gov template uses Sheet1
 
-	sheetName := "Siskopatuh"
-	_ = f.SetSheetName("Sheet1", sheetName)
-
-	for i, colName := range siskopatuhColumns {
-		cell := fmt.Sprintf("%s1", columnLetter(i+1))
-		_ = f.SetCellValue(sheetName, cell, colName)
+	for i, c := range templateColumns {
+		_ = f.SetCellValue(sheet, fmt.Sprintf("%s1", columnLetter(i+1)), c.header)
 	}
-
 	style, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true, Color: "#FFFFFF"},
 		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"#2563EB"}},
 	})
-	_ = f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
+	_ = f.SetCellStyle(sheet, "A1", fmt.Sprintf("%s1", columnLetter(len(templateColumns))), style)
 
-	for i, sr := range results {
-		row := i + 2
-		data := extractSiskopatuhRow(sr)
-		data["No"] = fmt.Sprintf("%d", i+1) // fill row number
-
-		for j, colName := range siskopatuhColumns {
-			cell := fmt.Sprintf("%s%d", columnLetter(j+1), row)
-			val := data[colName]
-			if val != "" {
-				_ = f.SetCellValue(sheetName, cell, val)
+	for r, g := range rows {
+		for i, c := range templateColumns {
+			if v := c.value(g); v != "" {
+				_ = f.SetCellValue(sheet, fmt.Sprintf("%s%d", columnLetter(i+1), r+2), v)
 			}
 		}
 	}
-
-	for i := 1; i <= len(siskopatuhColumns); i++ {
-		col := columnLetter(i)
-		_ = f.SetColWidth(sheetName, col, col, 25)
+	for i := range templateColumns {
+		col := columnLetter(i + 1)
+		_ = f.SetColWidth(sheet, col, col, 22)
 	}
 
 	buf, err := f.WriteToBuffer()
@@ -89,135 +157,57 @@ func generateSiskopatuhExcel(results []model.ScanResult) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func extractSiskopatuhRow(sr model.ScanResult) map[string]string {
-	row := map[string]string{}
-
-	data := sr.ExtractedData
-	if data == nil {
-		return row
+func generateSiskopatuhExcel(results []model.ScanResult) ([]byte, error) {
+	rows := make([]fieldGetter, len(results))
+	for i, sr := range results {
+		rows[i] = fieldGetter{scanResultMap(sr)}
 	}
+	return writeSiskopatuhTemplate(rows)
+}
 
-	extracted, ok := data.(map[string]any)
-	if !ok {
-		dataBytes, err := json.Marshal(data)
+func generateInlineSiskopatuhExcel(records []map[string]any) ([]byte, error) {
+	rows := make([]fieldGetter, len(records))
+	for i, rec := range records {
+		rows[i] = fieldGetter{rec}
+	}
+	return writeSiskopatuhTemplate(rows)
+}
+
+// scanResultMap flattens a scan result's extracted + normalized data into one
+// map the template columns can read (normalized values augment the raw ones).
+func scanResultMap(sr model.ScanResult) map[string]any {
+	m := map[string]any{}
+	merge := func(v any) {
+		if v == nil {
+			return
+		}
+		if mm, ok := v.(map[string]any); ok {
+			for k, val := range mm {
+				m[k] = val
+			}
+			return
+		}
+		b, err := json.Marshal(v)
 		if err != nil {
-			return row
+			return
 		}
-		var m map[string]any
-		if err := json.Unmarshal(dataBytes, &m); err != nil {
-			return row
-		}
-		extracted = m
-	}
-
-	// nama_paspor takes priority only when present; otherwise fall back to nama
-	namaPaspor, _ := extracted["nama_paspor"].(string)
-	nama, _ := extracted["nama"].(string)
-	if namaPaspor != "" {
-		row["NAMA LENGKAP"] = namaPaspor
-	} else if nama != "" {
-		row["NAMA LENGKAP"] = nama
-	}
-	if v, ok := extracted["no_paspor"].(string); ok {
-		row["NO PASPOR"] = v
-	}
-	if v, ok := extracted["nik"].(string); ok {
-		row["NO KTP / NIK"] = v
-	}
-	if v, ok := extracted["no_paspor"].(string); ok {
-		row["NO PASPOR"] = v
-	}
-	if v, ok := extracted["nama_paspor"].(string); ok {
-		row["NAMA LENGKAP"] = v
-	}
-	if v, ok := extracted["tempat_lahir"].(string); ok {
-		row["TEMPAT LAHIR"] = v
-	}
-	if v, ok := extracted["tanggal_lahir"].(string); ok {
-		row["TANGGAL LAHIR"] = v
-	}
-	if v, ok := extracted["jenis_kelamin"].(string); ok {
-		row["JENIS KELAMIN"] = mapGender(v)
-	}
-	if v, ok := extracted["alamat"].(string); ok {
-		row["ALAMAT"] = v
-	}
-	if v, ok := extracted["provinsi"].(string); ok {
-		row["PROVINSI"] = v
-	}
-	if v, ok := extracted["kabupaten"].(string); ok {
-		row["KABUPATEN / KOTA"] = v
-	}
-	if v, ok := extracted["kecamatan"].(string); ok {
-		row["KECAMATAN"] = v
-	}
-	if v, ok := extracted["kelurahan"].(string); ok {
-		row["KELURAHAN"] = v
-	}
-	if v, ok := extracted["no_telepon"].(string); ok {
-		row["NO TELEPON"] = v
-	}
-	if v, ok := extracted["no_hp"].(string); ok {
-		row["NO HP"] = v
-	}
-	if v, ok := extracted["kewarganegaraan"].(string); ok {
-		row["KEWARGANEGARAAN"] = v
-	}
-	if v, ok := extracted["status_perkawinan"].(string); ok {
-		row["STATUS PERKAWINAN"] = v
-	}
-	if v, ok := extracted["pendidikan"].(string); ok {
-		row["PENDIDIKAN TERAKHIR"] = v
-	}
-	if v, ok := extracted["pekerjaan"].(string); ok {
-		row["PEKERJAAN"] = v
-	}
-	if v, ok := extracted["golongan_darah"].(string); ok {
-		row["GOLONGAN DARAH"] = v
-	}
-	if v, ok := extracted["tanggal_paspor"].(string); ok {
-		row["TANGGAL TERBIT PASPOR"] = v
-	}
-	if v, ok := extracted["tanggal_expired"].(string); ok {
-		row["TANGGAL EXPIRED PASPOR"] = v
-	}
-	if v, ok := extracted["kota_paspor"].(string); ok {
-		row["TEMPAT TERBIT PASPOR"] = v
-	}
-	if v, ok := extracted["provider_visa"].(string); ok {
-		row["PROVIDER VISA"] = v
-	}
-	if v, ok := extracted["no_visa"].(string); ok {
-		row["NO VISA"] = v
-	}
-	if v, ok := extracted["tanggal_visa"].(string); ok {
-		row["TANGGAL TERBIT VISA"] = v
-	}
-	if v, ok := extracted["tanggal_visa_akhir"].(string); ok {
-		row["TANGGAL EXPIRED VISA"] = v
-	}
-
-	if normalized := sr.NormalizedData; normalized != nil {
-		if n, ok := normalized.(map[string]any); ok {
-			if v, ok := n["nama_ayah"].(string); ok && v != "" {
-				row["NAMA AYAH"] = v
+		var mm map[string]any
+		if json.Unmarshal(b, &mm) == nil {
+			for k, val := range mm {
+				m[k] = val
 			}
 		}
 	}
-
-	return row
+	merge(sr.ExtractedData)
+	merge(sr.NormalizedData)
+	return m
 }
 
-func mapGender(g string) string {
-	g = strings.ToLower(strings.TrimSpace(g))
-	switch g {
-	case "laki-laki", "laki", "laki2", "pria", "male", "lakilaki":
-		return "Laki-Laki"
-	case "perempuan", "wanita", "female", "cewek":
-		return "Perempuan"
-	default:
-		return g
-	}
+// ExportRecordsExcel builds a template jamaah.xlsm-format .xlsx from inline
+// records (the scanner preview rows or group members the UI sends to
+// /generate-excel).
+func (s *AIOCRService) ExportRecordsExcel(records []map[string]any) ([]byte, error) {
+	return generateInlineSiskopatuhExcel(records)
 }
 
 func columnLetter(n int) string {
@@ -228,152 +218,4 @@ func columnLetter(n int) string {
 		n /= 26
 	}
 	return result
-}
-
-// ExportRecordsExcel builds a Siskopatuh-format .xlsx from inline records (the
-// scanner preview rows or group members the UI sends to /generate-excel),
-// rather than re-querying scan results by package.
-func (s *AIOCRService) ExportRecordsExcel(records []map[string]any) ([]byte, error) {
-	return generateInlineSiskopatuhExcel(records)
-}
-
-func generateInlineSiskopatuhExcel(records []map[string]any) ([]byte, error) {
-	f := excelize.NewFile()
-	defer f.Close()
-
-	sheetName := "Siskopatuh"
-	_ = f.SetSheetName("Sheet1", sheetName)
-
-	for i, colName := range siskopatuhColumns {
-		cell := fmt.Sprintf("%s1", columnLetter(i+1))
-		_ = f.SetCellValue(sheetName, cell, colName)
-	}
-
-	style, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Color: "#FFFFFF"},
-		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"#2563EB"}},
-	})
-	_ = f.SetCellStyle(sheetName, "A1", fmt.Sprintf("%s1", columnLetter(len(siskopatuhColumns))), style)
-
-	for i, rec := range records {
-		row := i + 2
-		data := siskopatuhRowFromRecord(rec)
-		data["No"] = fmt.Sprintf("%d", i+1)
-		for j, colName := range siskopatuhColumns {
-			cell := fmt.Sprintf("%s%d", columnLetter(j+1), row)
-			if val := data[colName]; val != "" {
-				_ = f.SetCellValue(sheetName, cell, val)
-			}
-		}
-	}
-
-	for i := 1; i <= len(siskopatuhColumns); i++ {
-		col := columnLetter(i)
-		_ = f.SetColWidth(sheetName, col, col, 25)
-	}
-
-	buf, err := f.WriteToBuffer()
-	if err != nil {
-		return nil, fmt.Errorf("write excel: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-// siskopatuhRowFromRecord maps a record to Siskopatuh columns. It accepts both
-// the normalized OCR shape (no_identitas, gender, status_pernikahan, …) and the
-// jamaah member shape (nik, jenis_kelamin, status_perkawinan, …) via aliases.
-func siskopatuhRowFromRecord(rec map[string]any) map[string]string {
-	row := map[string]string{}
-	get := func(keys ...string) string {
-		for _, k := range keys {
-			if v, ok := rec[k].(string); ok && strings.TrimSpace(v) != "" {
-				return v
-			}
-		}
-		return ""
-	}
-
-	if v := get("nama_paspor", "nama"); v != "" {
-		row["NAMA LENGKAP"] = v
-	}
-	if v := get("gender", "jenis_kelamin"); v != "" {
-		row["JENIS KELAMIN"] = mapGender(v)
-	}
-	if v := get("tempat_lahir"); v != "" {
-		row["TEMPAT LAHIR"] = v
-	}
-	if v := get("tanggal_lahir"); v != "" {
-		row["TANGGAL LAHIR"] = v
-	}
-	if v := get("alamat"); v != "" {
-		row["ALAMAT"] = v
-	}
-	if v := get("provinsi"); v != "" {
-		row["PROVINSI"] = v
-	}
-	if v := get("kabupaten"); v != "" {
-		row["KABUPATEN / KOTA"] = v
-	}
-	if v := get("kecamatan"); v != "" {
-		row["KECAMATAN"] = v
-	}
-	if v := get("kelurahan"); v != "" {
-		row["KELURAHAN"] = v
-	}
-	if v := get("no_identitas", "nik"); v != "" {
-		row["NO KTP / NIK"] = v
-	}
-	if v := get("no_paspor"); v != "" {
-		row["NO PASPOR"] = v
-	}
-	if v := get("tanggal_paspor", "tanggal_terbit_paspor"); v != "" {
-		row["TANGGAL TERBIT PASPOR"] = v
-	}
-	if v := get("tanggal_expired_paspor", "tanggal_expired"); v != "" {
-		row["TANGGAL EXPIRED PASPOR"] = v
-	}
-	if v := get("kota_paspor"); v != "" {
-		row["TEMPAT TERBIT PASPOR"] = v
-	}
-	if v := get("no_telepon"); v != "" {
-		row["NO TELEPON"] = v
-	}
-	if v := get("no_hp"); v != "" {
-		row["NO HP"] = v
-	}
-	if v := get("email"); v != "" {
-		row["EMAIL"] = v
-	}
-	if v := get("kewarganegaraan"); v != "" {
-		row["KEWARGANEGARAAN"] = v
-	}
-	if v := get("status_pernikahan", "status_perkawinan"); v != "" {
-		row["STATUS PERKAWINAN"] = v
-	}
-	if v := get("pendidikan"); v != "" {
-		row["PENDIDIKAN TERAKHIR"] = v
-	}
-	if v := get("pekerjaan"); v != "" {
-		row["PEKERJAAN"] = v
-	}
-	if v := get("golongan_darah"); v != "" {
-		row["GOLONGAN DARAH"] = v
-	}
-	if v := get("nama_ayah"); v != "" {
-		row["NAMA AYAH"] = v
-	}
-	if v := get("no_visa"); v != "" {
-		row["NO VISA"] = v
-	}
-	if v := get("tanggal_visa"); v != "" {
-		row["TANGGAL TERBIT VISA"] = v
-	}
-	if v := get("tanggal_visa_akhir"); v != "" {
-		row["TANGGAL EXPIRED VISA"] = v
-	}
-	if v := get("provider_visa"); v != "" {
-		row["PROVIDER VISA"] = v
-	}
-
-	return row
 }
