@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,9 +13,13 @@ import (
 	"github.com/jamaah-in/v2/internal/shared/config"
 )
 
-// PolicyEntry is one person's row from a POLIS manifest, keyed by passport.
+// PolicyEntry is one person's row from a POLIS manifest, keyed by passport. The
+// manifest also carries the jamaah's name and birthdate, so a person listed in
+// the policy but not yet scanned can still be seeded as a row.
 type PolicyEntry struct {
+	Nama         string
 	NoIdentitas  string // passport / ID number (join key)
+	TanggalLahir string // yyyy-mm-dd
 	NoPolis      string
 	TanggalAwal  string // yyyy-mm-dd (keberangkatan)
 	TanggalAkhir string // yyyy-mm-dd (kepulangan)
@@ -28,9 +33,12 @@ type PolicyManifest struct {
 	Entries      []PolicyEntry
 }
 
-// PolicyExtractor turns a POLIS PDF's text into a structured manifest.
+// PolicyExtractor turns a POLIS PDF into a structured manifest. It gets both the
+// raw bytes (to render the manifest table page as an image — accurate for names
+// that wrap across lines) and the extracted text (to locate that page and read
+// the cover-level Asuransi / issue date).
 type PolicyExtractor interface {
-	ExtractManifest(ctx context.Context, pdfText string) (*PolicyManifest, error)
+	ExtractManifest(ctx context.Context, pdfData []byte, pdfText string) (*PolicyManifest, error)
 }
 
 // looksLikePolicy reports whether extracted PDF text is a travel-insurance
@@ -149,7 +157,9 @@ func parsePolicyJSON(s string) (*PolicyManifest, error) {
 		Asuransi     string `json:"asuransi"`
 		TanggalInput string `json:"tanggal_input_polis"`
 		Peserta      []struct {
+			Nama         string `json:"nama"`
 			NoIdentitas  string `json:"no_identitas"`
+			TanggalLahir string `json:"tanggal_lahir"`
 			NoPolis      string `json:"no_polis"`
 			TanggalAwal  string `json:"tanggal_awal_polis"`
 			TanggalAkhir string `json:"tanggal_akhir_polis"`
@@ -167,7 +177,9 @@ func parsePolicyJSON(s string) (*PolicyManifest, error) {
 			continue
 		}
 		m.Entries = append(m.Entries, PolicyEntry{
+			Nama:         strings.TrimSpace(p.Nama),
 			NoIdentitas:  strings.TrimSpace(p.NoIdentitas),
+			TanggalLahir: normalizeDate(p.TanggalLahir),
 			NoPolis:      strings.TrimSpace(p.NoPolis),
 			TanggalAwal:  normalizeDate(p.TanggalAwal),
 			TanggalAkhir: normalizeDate(p.TanggalAkhir),
@@ -195,21 +207,67 @@ Dari teks dokumen, kembalikan HANYA JSON dengan bentuk:
   "asuransi": "<nama perusahaan asuransi / Pengelola>",
   "tanggal_input_polis": "<tanggal terbit sertifikat, format yyyy-mm-dd>",
   "peserta": [
-    {"no_identitas":"<nomor paspor/identitas>", "no_polis":"<nomor polis peserta>",
+    {"nama":"<nama lengkap peserta>", "no_identitas":"<nomor paspor/identitas>",
+     "tanggal_lahir":"<tanggal lahir yyyy-mm-dd>", "no_polis":"<nomor polis peserta>",
      "tanggal_awal_polis":"<tanggal keberangkatan yyyy-mm-dd>", "tanggal_akhir_polis":"<tanggal kepulangan yyyy-mm-dd>"}
   ]
 }
-Aturan: ambil daftar peserta dari tabel MANIFEST (kolom NO IDENTITAS, NO POLIS, TANGGAL KEBERANGKATAN, TANGGAL KEPULANGAN).
+Aturan: ambil SEMUA baris peserta dari tabel MANIFEST (kolom NAMA, NO IDENTITAS, TANGGAL LAHIR, NO POLIS, TANGGAL KEBERANGKATAN, TANGGAL KEPULANGAN).
 no_identitas = nomor paspor/identitas peserta. Semua tanggal format yyyy-mm-dd. Jika ragu suatu field, kosongkan. Tanpa teks lain selain JSON.`
 
-// ExtractManifest implements PolicyExtractor using the OpenCode text chat API
-// (no vision — the document is parsed as text). The PDF text is capped so the
-// boilerplate per-person certificate pages after the manifest don't blow the
-// token budget; the cover, issue date, and manifest are early in the document.
-func (a *OpenCodeAnalyzer) ExtractManifest(ctx context.Context, pdfText string) (*PolicyManifest, error) {
+const policyVisionPrompt = `Gambar berikut adalah tabel MANIFEST dari sertifikat/polis asuransi perjalanan umrah (grup).
+Baca tabel dari GAMBAR — setiap baris adalah satu peserta. Cocokkan dengan teliti pada baris yang sama: kolom NAMA, NO IDENTITAS, TANGGAL LAHIR, NO POLIS, TANGGAL KEBERANGKATAN, TANGGAL KEPULANGAN. Nama bisa lebih dari satu kata atau menyambung ke baris berikutnya — ambil nama lengkapnya untuk paspor di baris itu.
+Kembalikan HANYA JSON:
+{
+  "asuransi": "<nama perusahaan asuransi / Pengelola, dari teks konteks>",
+  "tanggal_input_polis": "<tanggal terbit sertifikat yyyy-mm-dd, dari teks konteks>",
+  "peserta": [
+    {"nama":"<nama lengkap>", "no_identitas":"<nomor paspor/identitas>", "tanggal_lahir":"<yyyy-mm-dd>", "no_polis":"<nomor polis>", "tanggal_awal_polis":"<keberangkatan yyyy-mm-dd>", "tanggal_akhir_polis":"<kepulangan yyyy-mm-dd>"}
+  ]
+}
+Ambil SEMUA baris peserta. Semua tanggal yyyy-mm-dd. Jika ragu suatu field, kosongkan. Tanpa teks lain selain JSON.`
+
+// ExtractManifest reads the POLIS manifest. It renders the manifest table page(s)
+// to image and uses vision (the table reads cleanly there, whereas pdftotext
+// splits multi-line names and mis-aligns them with rows); the document text
+// supplies the cover-level Asuransi + issue date. Falls back to a text-only pass
+// when no manifest page can be rendered (e.g. a scanned policy).
+func (a *OpenCodeAnalyzer) ExtractManifest(ctx context.Context, pdfData []byte, pdfText string) (*PolicyManifest, error) {
 	if !a.Available() {
 		return nil, fmt.Errorf("opencode analyzer not configured (OPENCODE_API_KEY missing)")
 	}
+	imgs := manifestPageImages(ctx, pdfData, pdfText)
+	if len(imgs) == 0 {
+		return a.extractManifestText(ctx, pdfText)
+	}
+
+	docText := pdfText
+	if len(docText) > 8000 {
+		docText = docText[:8000]
+	}
+	content := []map[string]any{{"type": "text", "text": policyVisionPrompt}}
+	for _, img := range imgs {
+		content = append(content, map[string]any{
+			"type": "image_url",
+			"image_url": map[string]any{
+				"url": "data:image/png;base64," + base64.StdEncoding.EncodeToString(img),
+			},
+		})
+	}
+	content = append(content, map[string]any{
+		"type": "text",
+		"text": "Teks halaman sampul & catatan (untuk 'asuransi' dan 'tanggal_input_polis'):\n" + docText,
+	})
+	out, err := a.chat(ctx, content, 4096)
+	if err != nil {
+		return nil, err
+	}
+	return parsePolicyJSON(out)
+}
+
+// extractManifestText is the text-only fallback when the manifest page cannot be
+// rendered to an image.
+func (a *OpenCodeAnalyzer) extractManifestText(ctx context.Context, pdfText string) (*PolicyManifest, error) {
 	if len(pdfText) > 60000 {
 		pdfText = pdfText[:60000]
 	}
@@ -223,6 +281,29 @@ func (a *OpenCodeAnalyzer) ExtractManifest(ctx context.Context, pdfText string) 
 	return parsePolicyJSON(out)
 }
 
+// manifestPageImages locates the manifest table page(s) from the per-page text
+// (pdftotext separates pages with form feeds) and renders them to PNG, capped at
+// three pages.
+func manifestPageImages(ctx context.Context, data []byte, text string) [][]byte {
+	var imgs [][]byte
+	for i, pg := range strings.Split(text, "\f") {
+		u := strings.ToUpper(pg)
+		isManifest := strings.Contains(u, "MANIFEST") ||
+			(strings.Contains(u, "NO POLIS") &&
+				(strings.Contains(u, "KEBERANGKATAN") || strings.Contains(u, "IDENTITAS")))
+		if !isManifest {
+			continue
+		}
+		if img, err := rasterizePDFPage(ctx, data, i+1); err == nil && len(img) > 0 {
+			imgs = append(imgs, img)
+			if len(imgs) >= 3 {
+				break
+			}
+		}
+	}
+	return imgs
+}
+
 // NewPolicyExtractor returns the configured PolicyExtractor, or nil when the
 // provider is not opencode or its key is empty (callers treat nil as "no policy
 // enrichment"). The key is checked before constructing, so a nil concrete
@@ -232,6 +313,59 @@ func NewPolicyExtractor(cfg *config.Config) PolicyExtractor {
 		return NewOpenCodeAnalyzer(cfg.AI.OpenCodeAPIKey, cfg.AI.OpenCodeModel, cfg.AI.OpenCodeBaseURL)
 	}
 	return nil
+}
+
+// existingPasporKeys is the set of passport join keys already present in the
+// scanned rows, so the policy lane only seeds rows for jamaah not yet scanned.
+func existingPasporKeys(data []any) map[string]bool {
+	set := map[string]bool{}
+	for _, item := range data {
+		if m, ok := item.(map[string]any); ok {
+			if k := rowPasporKey(m); k != "" {
+				set[k] = true
+			}
+		}
+	}
+	return set
+}
+
+// policyEntryToRow builds a jamaah row from a manifest entry alone — used when a
+// person listed in the POLIS has no scanned identity document. It carries the
+// name, passport, birthdate and the full insurance block; identity-only fields
+// (address, gender, Title, …) stay empty until a passport/KTP is scanned.
+func policyEntryToRow(e PolicyEntry, asuransi, tglInput string) map[string]any {
+	row := map[string]any{
+		"source_doc_type":    "polis",
+		"siskopatuh_version": "2.0",
+	}
+	if e.Nama != "" {
+		row["nama"] = e.Nama
+		row["nama_paspor"] = e.Nama
+	}
+	if e.NoIdentitas != "" {
+		row["no_paspor"] = e.NoIdentitas
+		row["no_identitas"] = e.NoIdentitas
+		row["jenis_identitas"] = "PASPOR"
+	}
+	if e.TanggalLahir != "" {
+		row["tanggal_lahir"] = e.TanggalLahir
+	}
+	if a := mapAsuransi(asuransi); a != "" {
+		row["asuransi"] = a
+	}
+	if tglInput != "" {
+		row["tanggal_input_polis"] = tglInput
+	}
+	if e.NoPolis != "" {
+		row["no_polis"] = e.NoPolis
+	}
+	if e.TanggalAwal != "" {
+		row["tanggal_awal_polis"] = e.TanggalAwal
+	}
+	if e.TanggalAkhir != "" {
+		row["tanggal_akhir_polis"] = e.TanggalAkhir
+	}
+	return row
 }
 
 // enrichRowsWithPolicy fills the five insurance keys on every jamaah row whose
