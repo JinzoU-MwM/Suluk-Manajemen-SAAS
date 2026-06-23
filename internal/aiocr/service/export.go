@@ -22,10 +22,14 @@ type templateColumn struct {
 // templateColumns mirrors template jamaah.xlsm (Sheet1) header text + order
 // EXACTLY. Do not reword headers — Siskopatuh matches columns by header.
 var templateColumns = []templateColumn{
-	{"Title", func(g fieldGetter) string { return mapTitle(g.first("gender", "jenis_kelamin"), g.first("status_pernikahan", "status_perkawinan")) }},
+	{"Title", func(g fieldGetter) string {
+		return mapTitle(g.first("gender", "jenis_kelamin"), g.first("status_pernikahan", "status_perkawinan"))
+	}},
 	{"Nama (Sesuai Dengan nama Pada Kartu Vaksin)", func(g fieldGetter) string { return g.first("nama", "nama_paspor") }},
 	{"Nama Ayah", func(g fieldGetter) string { return g.first("nama_ayah") }},
-	{"Jenis Identitas", func(g fieldGetter) string { return jenisIdentitas(g.first("nik", "no_identitas"), g.first("no_paspor")) }},
+	{"Jenis Identitas", func(g fieldGetter) string {
+		return normJenisIdentitas(g.first("jenis_identitas"), g.first("nik"), g.first("no_paspor"))
+	}},
 	{"No Identitas", func(g fieldGetter) string { return g.first("no_paspor", "no_identitas", "nik") }},
 	{"Nama Paspor", func(g fieldGetter) string { return g.first("nama_paspor") }},
 	{"No Paspor", func(g fieldGetter) string { return g.first("no_paspor") }},
@@ -34,16 +38,18 @@ var templateColumns = []templateColumn{
 	{"Tempat Lahir", func(g fieldGetter) string { return g.first("tempat_lahir") }},
 	{"Tanggal Lahir(yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_lahir") }},
 	{"Alamat", func(g fieldGetter) string { return g.first("alamat") }},
-	{"Provinsi", func(g fieldGetter) string { return g.first("provinsi") }},
-	{"Kabupaten", func(g fieldGetter) string { return g.first("kabupaten") }},
+	{"Provinsi", func(g fieldGetter) string { return mapProvinsi(g.first("provinsi")) }},
+	{"Kabupaten", func(g fieldGetter) string {
+		return mapKabupaten(mapProvinsi(g.first("provinsi")), g.first("kabupaten"))
+	}},
 	{"Kecamatan", func(g fieldGetter) string { return g.first("kecamatan") }},
 	{"Kelurahan", func(g fieldGetter) string { return g.first("kelurahan") }},
 	{"No. Telepon", func(g fieldGetter) string { return g.first("no_telepon") }},
 	{"No Hp", func(g fieldGetter) string { return g.first("no_hp") }},
-	{"KewargaNegaraan", func(g fieldGetter) string { return g.first("kewarganegaraan") }},
+	{"KewargaNegaraan", func(g fieldGetter) string { return mapKewarganegaraan(g.first("kewarganegaraan")) }},
 	{"Status Pernikahan", func(g fieldGetter) string { return mapStatusNikah(g.first("status_pernikahan", "status_perkawinan")) }},
-	{"Pendidikan", func(g fieldGetter) string { return g.first("pendidikan") }},
-	{"Pekerjaan", func(g fieldGetter) string { return g.first("pekerjaan") }},
+	{"Pendidikan", func(g fieldGetter) string { return mapPendidikan(g.first("pendidikan")) }},
+	{"Pekerjaan", func(g fieldGetter) string { return mapPekerjaan(g.first("pekerjaan")) }},
 	{"Provider Visa", func(g fieldGetter) string { return g.first("provider_visa") }},
 	{"No Visa", func(g fieldGetter) string { return g.first("no_visa") }},
 	{"Tanggal Berlaku Visa (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_visa") }},
@@ -73,54 +79,6 @@ func (g fieldGetter) first(keys ...string) string {
 		}
 	}
 	return ""
-}
-
-// jenisIdentitas: a passport's ID type is "Paspor", a KTP's is "KTP" (template
-// column D). Passport wins when a passport number is present.
-func jenisIdentitas(nik, noPaspor string) string {
-	if strings.TrimSpace(noPaspor) != "" {
-		return "Paspor"
-	}
-	if strings.TrimSpace(nik) != "" {
-		return "KTP"
-	}
-	return ""
-}
-
-// mapStatusNikah collapses KTP marital statuses to the template's two values:
-// MENIKAH / BELUM MENIKAH. Empty stays empty.
-func mapStatusNikah(s string) string {
-	t := strings.ToLower(strings.TrimSpace(s))
-	if t == "" {
-		return ""
-	}
-	if strings.Contains(t, "belum") || strings.Contains(t, "tidak") ||
-		strings.Contains(t, "cerai") || strings.Contains(t, "janda") || strings.Contains(t, "duda") {
-		return "BELUM MENIKAH"
-	}
-	if strings.Contains(t, "kawin") || strings.Contains(t, "nikah") {
-		return "MENIKAH"
-	}
-	return "BELUM MENIKAH"
-}
-
-// mapTitle derives the Siskopatuh title (template column A): TUAN for a male;
-// for a female, NYONYA when married else NONA.
-func mapTitle(gender, status string) string {
-	g := strings.ToLower(strings.TrimSpace(gender))
-	switch {
-	case g == "":
-		return ""
-	case strings.Contains(g, "perempuan") || strings.Contains(g, "wanita") || strings.Contains(g, "female") || g == "p":
-		if mapStatusNikah(status) == "MENIKAH" {
-			return "NYONYA"
-		}
-		return "NONA"
-	case strings.Contains(g, "laki") || strings.Contains(g, "pria") || strings.Contains(g, "male") || g == "l":
-		return "TUAN"
-	default:
-		return ""
-	}
 }
 
 // writeSiskopatuhTemplate writes the records as the template jamaah.xlsm format.

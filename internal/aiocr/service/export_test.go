@@ -42,7 +42,7 @@ func TestExportMatchesJamaahTemplate(t *testing.T) {
 
 	// Row 2: passport, female, married.
 	for c, want := range map[string]string{
-		"A2": "NYONYA", "D2": "Paspor", "E2": "X2664222", "G2": "X2664222", "T2": "MENIKAH",
+		"A2": "NYONYA", "D2": "PASPOR", "E2": "X2664222", "G2": "X2664222", "T2": "MENIKAH",
 	} {
 		if got := cell(c); got != want {
 			t.Errorf("passport row %s = %q, want %q", c, got, want)
@@ -51,7 +51,7 @@ func TestExportMatchesJamaahTemplate(t *testing.T) {
 
 	// Row 3: KTP, male, single.
 	for c, want := range map[string]string{
-		"A3": "TUAN", "D3": "KTP", "E3": "3273123456780001", "T3": "BELUM MENIKAH",
+		"A3": "TUAN", "D3": "NIK", "E3": "3273123456780001", "T3": "BELUM MENIKAH",
 	} {
 		if got := cell(c); got != want {
 			t.Errorf("ktp row %s = %q, want %q", c, got, want)
