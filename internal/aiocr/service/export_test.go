@@ -61,6 +61,15 @@ func TestExportMatchesJamaahTemplate(t *testing.T) {
 	if got := cell("AA2"); got != "" {
 		t.Errorf("Asuransi should be blank, got %q", got)
 	}
+
+	// Nama (col B) and Nama Paspor (col F) must be identical in every row — the
+	// passport row carries both, the KTP row only "nama" (F used to come out blank).
+	if b, f := cell("B2"), cell("F2"); b == "" || b != f {
+		t.Errorf("row2: Nama B2=%q must equal Nama Paspor F2=%q", b, f)
+	}
+	if b, f := cell("B3"), cell("F3"); b == "" || b != f {
+		t.Errorf("row3: Nama B3=%q must equal Nama Paspor F3=%q", b, f)
+	}
 }
 
 func TestExportFillsInsuranceColumns(t *testing.T) {
