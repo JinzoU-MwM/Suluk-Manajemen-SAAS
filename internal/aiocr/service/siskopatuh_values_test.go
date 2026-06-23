@@ -129,6 +129,24 @@ func TestMapPekerjaan(t *testing.T) {
 	}
 }
 
+func TestMapProviderVisa(t *testing.T) {
+	cases := map[string]string{
+		"Saudi Digital Embassy":    "B2C",
+		"SAUDI DIGITAL EMBASSY":    "B2C",
+		"B2C":                      "B2C",
+		"E-Visa":                   "B2C",
+		"e visa elektronik":        "B2C",
+		"Nusuk":                    "B2C",
+		"":                         "",
+		"PT. AERO GLOBE INDONESIA": "PT. AERO GLOBE INDONESIA",
+	}
+	for in, want := range cases {
+		if got := mapProviderVisa(in); got != want {
+			t.Errorf("mapProviderVisa(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 // TestMappersStayInAllowedSets guards against any mapper ever emitting a value
 // outside its Sheet2 dropdown set (empty is always allowed = operator fills in).
 func TestMappersStayInAllowedSets(t *testing.T) {

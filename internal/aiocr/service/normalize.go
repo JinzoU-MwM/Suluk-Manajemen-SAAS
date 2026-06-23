@@ -126,8 +126,8 @@ func normalizeToSiskopatuh(data any, docType string) any {
 		normalized["kota_paspor"] = extracted.KotaPaspor
 	}
 
-	if extracted.ProviderVisa != "" {
-		normalized["provider_visa"] = extracted.ProviderVisa
+	if pv := mapProviderVisa(extracted.ProviderVisa); pv != "" {
+		normalized["provider_visa"] = pv
 	}
 	if extracted.NoVisa != "" {
 		normalized["no_visa"] = extracted.NoVisa

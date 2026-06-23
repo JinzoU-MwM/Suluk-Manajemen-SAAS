@@ -34,7 +34,10 @@ func main() {
 	logger.Infof("starting API gateway on :%d", cfg.Server.Port)
 
 	httpClient = &http.Client{
-		Timeout: 60 * time.Second,
+		// A multi-file scanner batch (AI OCR) can legitimately take a while; this
+		// must outlast ai-ocr-service's own 180s timeout, otherwise the gateway
+		// severs the proxied request at 60s and the browser gets a 502.
+		Timeout: 200 * time.Second,
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: 20,
@@ -43,9 +46,11 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
-		AppName:      "jamaah-api-gateway",
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		AppName: "jamaah-api-gateway",
+		// Match the proxy client: a long OCR scan must not be cut off at the
+		// gateway before ai-ocr-service (180s) responds.
+		ReadTimeout:  200 * time.Second,
+		WriteTimeout: 200 * time.Second,
 		// Allow multi-image scanner uploads through (matches ai-ocr's limit);
 		// the default 4 MB would 413 document batches at the gateway.
 		BodyLimit: 50 * 1024 * 1024,
@@ -66,15 +71,15 @@ func main() {
 	})
 
 	services := map[string]string{
-		"auth":      getEnv("AUTH_SERVICE_ADDR", "localhost:50051"),
-		"package":   getEnv("PACKAGE_SERVICE_ADDR", "localhost:50052"),
-		"jamaah":    getEnv("JAMAAH_SERVICE_ADDR", "localhost:50053"),
-		"invoice":   getEnv("INVOICE_SERVICE_ADDR", "localhost:50054"),
-		"finance":   getEnv("FINANCE_SERVICE_ADDR", "localhost:50055"),
-		"aiocr":     getEnv("AIOCR_SERVICE_ADDR", "localhost:50056"),
-		"vendor":    getEnv("VENDOR_SERVICE_ADDR", "localhost:50057"),
-		"contract":  getEnv("CONTRACT_SERVICE_ADDR", "localhost:50058"),
-		"inventory": getEnv("INVENTORY_SERVICE_ADDR", "localhost:50059"),
+		"auth":       getEnv("AUTH_SERVICE_ADDR", "localhost:50051"),
+		"package":    getEnv("PACKAGE_SERVICE_ADDR", "localhost:50052"),
+		"jamaah":     getEnv("JAMAAH_SERVICE_ADDR", "localhost:50053"),
+		"invoice":    getEnv("INVOICE_SERVICE_ADDR", "localhost:50054"),
+		"finance":    getEnv("FINANCE_SERVICE_ADDR", "localhost:50055"),
+		"aiocr":      getEnv("AIOCR_SERVICE_ADDR", "localhost:50056"),
+		"vendor":     getEnv("VENDOR_SERVICE_ADDR", "localhost:50057"),
+		"contract":   getEnv("CONTRACT_SERVICE_ADDR", "localhost:50058"),
+		"inventory":  getEnv("INVENTORY_SERVICE_ADDR", "localhost:50059"),
 		"payroll":    getEnv("PAYROLL_SERVICE_ADDR", "localhost:50060"),
 		"agent":      getEnv("AGENT_SERVICE_ADDR", "localhost:50061"),
 		"accounting": getEnv("ACCOUNTING_SERVICE_ADDR", "localhost:50062"),
