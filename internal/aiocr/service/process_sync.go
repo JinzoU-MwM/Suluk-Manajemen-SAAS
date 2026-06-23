@@ -51,6 +51,31 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 		FileResults:        []SyncFileResult{},
 	}
 
+	// Classify each file: a PDF whose text reads like an insurance policy goes to
+	// the policy lane (extract manifest, fill insurance columns later by passport
+	// join); everything else is an identity document. pdftotext runs at most once
+	// per PDF here and the text is reused for extraction.
+	type policyDoc struct {
+		file SyncFile
+		text string
+	}
+	var identity []SyncFile
+	var policies []policyDoc
+	for _, f := range files {
+		mime := f.ContentType
+		if mime == "" {
+			mime = detectMimeType(f.FileName)
+		}
+		if mime == "application/pdf" {
+			if text, err := extractPDFText(ctx, f.Data); err == nil && looksLikePolicy(text) {
+				policies = append(policies, policyDoc{file: f, text: text})
+				continue
+			}
+		}
+		identity = append(identity, f)
+	}
+
+	// --- identity lane ---
 	// Process files CONCURRENTLY (bounded) so a batch of N photos finishes in
 	// ~max(per-file time) instead of the sum. A sequential batch easily exceeds
 	// the proxy / Fiber WriteTimeout (~60s) and the browser gets a 502 while the
@@ -62,19 +87,19 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 		warnings   []map[string]any
 		fileResult SyncFileResult
 	}
-	outs := make([]fileOut, len(files))
+	outs := make([]fileOut, len(identity))
 
 	const maxConcurrent = 5
 	sem := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
-	for i := range files {
+	for i := range identity {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(i int) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			f := files[i]
+			f := identity[i]
 			mimeType := f.ContentType
 			if mimeType == "" {
 				mimeType = detectMimeType(f.FileName)
@@ -117,6 +142,43 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 			res.ValidationWarnings = append(res.ValidationWarnings, w)
 		}
 		res.FileResults = append(res.FileResults, outs[i].fileResult)
+	}
+
+	// --- policy lane: extract manifests, then enrich identity rows by passport ---
+	entriesByPaspor := map[string]PolicyEntry{}
+	var docAsuransi, docTglInput string
+	for _, pd := range policies {
+		if s.policy == nil {
+			res.FileResults = append(res.FileResults, SyncFileResult{
+				Filename: pd.file.FileName, Status: "failed",
+				Error: "ekstraksi polis tidak tersedia (AI provider belum dikonfigurasi)",
+			})
+			continue
+		}
+		m, err := s.policy.ExtractManifest(ctx, pd.text)
+		if err != nil || m == nil {
+			s.logger.Errorf("policy extract %s: %v", pd.file.FileName, err)
+			res.FileResults = append(res.FileResults, SyncFileResult{
+				Filename: pd.file.FileName, Status: "failed",
+				Error: "gagal membaca data polis (pastikan PDF asli, bukan hasil scan foto)",
+			})
+			continue
+		}
+		if m.Asuransi != "" {
+			docAsuransi = m.Asuransi
+		}
+		if m.TanggalInput != "" {
+			docTglInput = m.TanggalInput
+		}
+		for _, e := range m.Entries {
+			entriesByPaspor[normPaspor(e.NoIdentitas)] = e
+		}
+		res.FileResults = append(res.FileResults, SyncFileResult{
+			Filename: pd.file.FileName, Status: "completed", DocType: "polis",
+		})
+	}
+	if len(entriesByPaspor) > 0 {
+		enrichRowsWithPolicy(res.Data, entriesByPaspor, docAsuransi, docTglInput)
 	}
 
 	return res, nil

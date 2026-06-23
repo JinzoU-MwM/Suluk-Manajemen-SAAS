@@ -74,3 +74,67 @@ func TestProcessDocumentsSyncConcurrentAndOrdered(t *testing.T) {
 		t.Errorf("peak concurrency %d exceeded the cap of 5", fa.maxSeen)
 	}
 }
+
+// paspolAnalyzer returns a fixed passport number for every identity file.
+type paspolAnalyzer struct{ paspor string }
+
+func (p *paspolAnalyzer) Available() bool { return true }
+func (p *paspolAnalyzer) AnalyzeDocument(ctx context.Context, data []byte, mime string) (*OCRResult, error) {
+	return &OCRResult{DocType: "paspor", ExtractedData: ExtractedFields{NoPaspor: p.paspor}}, nil
+}
+
+type fakePolicy struct{ m *PolicyManifest }
+
+func (f *fakePolicy) ExtractManifest(ctx context.Context, text string) (*PolicyManifest, error) {
+	return f.m, nil
+}
+
+func TestProcessDocumentsSyncEnrichesFromPolicy(t *testing.T) {
+	// Stub pdftotext: the policy file's bytes -> policy text; anything else -> "".
+	orig := extractPDFText
+	extractPDFText = func(ctx context.Context, data []byte) (string, error) {
+		if string(data) == "POLISBYTES" {
+			return "MANIFEST ... NO POLIS", nil
+		}
+		return "", nil
+	}
+	defer func() { extractPDFText = orig }()
+
+	manifest := &PolicyManifest{
+		Asuransi: "PT. ASURANSI ASKRIDA SYARIAH", TanggalInput: "2026-06-17",
+		Entries: []PolicyEntry{{NoIdentitas: "X2664222", NoPolis: "POL-43",
+			TanggalAwal: "2026-07-01", TanggalAkhir: "2026-07-09"}},
+	}
+	svc := (&AIOCRService{analyzer: &paspolAnalyzer{paspor: "X2664222"}, logger: zap.NewNop().Sugar()}).
+		WithPolicy(&fakePolicy{m: manifest})
+
+	files := []SyncFile{
+		{FileName: "paspor.jpg", ContentType: "image/jpeg", Data: []byte("img")},
+		{FileName: "polis.pdf", ContentType: "application/pdf", Data: []byte("POLISBYTES")},
+	}
+	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	if err != nil {
+		t.Fatalf("ProcessDocumentsSync: %v", err)
+	}
+	if len(res.Data) != 1 {
+		t.Fatalf("expected 1 jamaah row (policy makes no row), got %d", len(res.Data))
+	}
+	row := res.Data[0].(map[string]any)
+	if row["no_polis"] != "POL-43" || row["asuransi"] != "ASURANSI ASKRIDA SYARIAH" ||
+		row["tanggal_input_polis"] != "2026-06-17" || row["tanggal_awal_polis"] != "2026-07-01" {
+		t.Errorf("row not enriched from policy: %+v", row)
+	}
+	// The policy file is reported, not turned into a jamaah row.
+	var sawPolis bool
+	for _, fr := range res.FileResults {
+		if fr.Filename == "polis.pdf" {
+			sawPolis = true
+			if fr.Status != "completed" || fr.DocType != "polis" {
+				t.Errorf("polis file_result = %+v", fr)
+			}
+		}
+	}
+	if !sawPolis {
+		t.Errorf("polis.pdf missing from file_results")
+	}
+}
