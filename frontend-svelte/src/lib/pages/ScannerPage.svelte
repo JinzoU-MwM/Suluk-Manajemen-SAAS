@@ -12,18 +12,16 @@
     Users,
     ScanLine,
     FileText,
+    Files,
     Image as ImageIcon,
     ShieldCheck,
     Clipboard,
     X,
   } from "lucide-svelte";
-  import PageHeader from "../components/PageHeader.svelte";
   import TableResult from "../components/TableResult.svelte";
-  import SubscriptionBanner from "../components/SubscriptionBanner.svelte";
   import GroupSelector from "../components/GroupSelector.svelte";
   import UpgradeModal from "../components/UpgradeModal.svelte";
   import Card from "../components/ui/Card.svelte";
-  import Badge from "../components/ui/Badge.svelte";
   import Button from "../components/ui/Button.svelte";
   import { ApiService } from "../services/api";
   import { isProOrHigher } from "../config/pricing.js";
@@ -35,7 +33,6 @@
     onSubscriptionChange = null,
   } = $props();
 
-  // Upload + processing state
   let files = $state([]);
   let dragOver = $state(false);
   let isProcessing = $state(false);
@@ -45,7 +42,6 @@
     if (subscription) localSubscription = subscription;
   });
 
-  // Result / preview state
   let showModal = $state(false);
   let previewData = $state([]);
   let isGenerating = $state(false);
@@ -53,13 +49,45 @@
   let fileResults = $state([]);
   let failedFileNames = $state([]);
 
-  // Group + upgrade
   let selectedGroup = $state(null);
   let isSavingToGroup = $state(false);
   let groupSaveSuccess = $state("");
   let showUpgradeModal = $state(false);
 
+  // On-device recent-scan history (the instant-scan flow keeps no server job).
+  const RECENT_KEY = "suluk_scanner_recent";
+  let recent = $state([]);
+  function loadRecent() {
+    try {
+      return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function saveRecent(list) {
+    recent = list.slice(0, 4);
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+    } catch {}
+  }
+  function pushRecent(entry) {
+    saveRecent([entry, ...recent]);
+  }
+  function markLatestDone() {
+    if (recent.length) saveRecent([{ ...recent[0], status: "Selesai" }, ...recent.slice(1)]);
+  }
+  function relTime(ts) {
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return "baru saja";
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} menit lalu`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} jam lalu`;
+    return `${Math.floor(h / 24)} hari lalu`;
+  }
+
   onMount(async () => {
+    recent = loadRecent();
     if (!localSubscription) {
       try {
         localSubscription = await ApiService.getSubscriptionStatus();
@@ -68,8 +96,15 @@
       }
     }
   });
+  onMount(() => {
+    const onWindowPaste = (e) => {
+      if (e.clipboardData?.files?.length) addFiles(e.clipboardData.files);
+    };
+    window.addEventListener("paste", onWindowPaste);
+    return () => window.removeEventListener("paste", onWindowPaste);
+  });
 
-  // ---- file intake (drag / click / paste) ----
+  // ---- file intake ----
   function addFiles(list) {
     const valid = Array.from(list).filter(
       (f) => f.type.startsWith("image/") || f.type === "application/pdf",
@@ -111,17 +146,6 @@
       console.error("Clipboard read failed", err);
     }
   }
-  onMount(() => {
-    const onWindowPaste = (e) => {
-      if (e.clipboardData?.files?.length) addFiles(e.clipboardData.files);
-    };
-    window.addEventListener("paste", onWindowPaste);
-    return () => window.removeEventListener("paste", onWindowPaste);
-  });
-
-  // A policy PDF is the one file that enriches insurance columns — flag it so the
-  // operator can see it was recognised as a POLIS (display hint only; the backend
-  // does the authoritative detection).
   function looksLikePolicy(f) {
     return f.type === "application/pdf" && /pol(is|icy)|asuransi/i.test(f.name);
   }
@@ -157,6 +181,18 @@
       failedFileNames = fileResults
         .filter((fr) => fr.status === "failed")
         .map((fr) => fr.filename);
+      const polis = fileResults.filter(
+        (fr) => fr.doc_type === "polis" && fr.status === "completed",
+      ).length;
+      if (previewData.length > 0) {
+        pushRecent({
+          label: selectedGroup?.name || `${previewData.length} jamaah`,
+          count: previewData.length,
+          polis,
+          status: "Review",
+          ts: Date.now(),
+        });
+      }
       showModal = true;
       try {
         localSubscription = await ApiService.getSubscriptionStatus();
@@ -188,6 +224,7 @@
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      markLatestDone();
       resetAfterExport();
     } catch (err) {
       errorMessage = err.message;
@@ -209,6 +246,7 @@
         ...selectedGroup,
         member_count: (selectedGroup.member_count || 0) + added,
       };
+      markLatestDone();
       resetAfterExport();
       setTimeout(() => (groupSaveSuccess = ""), 5000);
       onSubscriptionChange?.();
@@ -246,17 +284,24 @@
     errorMessage = "";
   }
 
-  // Gating: Pro keeps the editable table; only an explicit backend block locks.
+  // Gating + plan
   let isPro = $derived(
     isProOrHigher(localSubscription?.plan) &&
       localSubscription?.status !== "expired",
   );
   let isBlocked = $derived(!isPro && localSubscription?.allowed === false);
-
   let hasResults = $derived(previewData.length > 0);
   let polisCount = $derived(
     fileResults.filter((fr) => fr.doc_type === "polis" && fr.status === "completed")
       .length,
+  );
+  let usageCount = $derived(localSubscription?.usage_count ?? null);
+  let usageLimit = $derived(localSubscription?.usage_limit ?? null);
+  let remaining = $derived(
+    usageLimit ? Math.max(0, usageLimit - (usageCount || 0)) : null,
+  );
+  let usagePct = $derived(
+    usageLimit ? Math.min(100, Math.round(((usageCount || 0) / usageLimit) * 100)) : 0,
   );
   let scanLabel = $derived(
     isProcessing
@@ -266,31 +311,30 @@
 </script>
 
 <div class="scanner-page page-enter">
-  <PageHeader
-    kicker="Fitur Unggulan"
-    title="AI Scanner Dokumen"
-    subtitle="Unggah dokumen jamaah dan polis asuransi sekaligus — AI mengisi data Siskopatuh otomatis."
-  >
-    {#snippet actions()}
-      <Badge tone="success">
-        <span style="display:inline-flex;align-items:center;gap:5px;">
-          <Sparkles class="h-3.5 w-3.5" /> AI OCR
-        </span>
-      </Badge>
+  <!-- Header -->
+  <div class="sc-head">
+    <div>
+      <div class="eyebrow">Fitur unggulan</div>
+      <h1 class="sc-title">AI Scanner Dokumen</h1>
+      <p class="sc-sub">
+        Unggah dokumen jamaah &amp; polis asuransi — AI mengisi data Siskopatuh
+        otomatis.
+      </p>
+    </div>
+    <div class="head-badges">
+      <span class="badge-ai"><Sparkles class="h-3.5 w-3.5" /> AI OCR</span>
       {#if isPro}
-        <span class="pro-pill">
-          <Crown class="h-4 w-4" style="color:var(--c-accent)" /> Pro Active
-        </span>
+        <span class="badge-pro"><Crown class="h-3.5 w-3.5" /> Pro</span>
       {/if}
-    {/snippet}
-  </PageHeader>
-
-  <div style="margin-bottom:var(--gap, 1.25rem);">
-    <SubscriptionBanner
-      subscription={localSubscription}
-      onUpgrade={() => (showUpgradeModal = true)}
-    />
+    </div>
   </div>
+
+  {#if groupSaveSuccess}
+    <div class="success-banner">
+      <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
+      <span>{groupSaveSuccess}</span>
+    </div>
+  {/if}
 
   {#if isBlocked}
     <Card style="text-align:center;padding:48px 24px;">
@@ -303,20 +347,13 @@
       </p>
       <div style="display:inline-flex;">
         <Button variant="primary" icon={Crown} onclick={() => (showUpgradeModal = true)}>
-          Upgrade
+          Upgrade ke Pro
         </Button>
       </div>
     </Card>
   {:else}
-    <div class="flow">
-      {#if groupSaveSuccess}
-        <div class="success-banner">
-          <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
-          <span>{groupSaveSuccess}</span>
-        </div>
-      {/if}
-
-      <!-- Step 1 — unggah & pindai -->
+    <div class="scan-grid">
+      <!-- LEFT: action -->
       <Card>
         <div
           class="dropzone"
@@ -347,30 +384,20 @@
             onchange={onPick}
           />
           <div class="dz-icon">
-            {#if isProcessing}
-              <ScanLine class="h-6 w-6" />
-            {:else}
-              <UploadCloud class="h-6 w-6" />
-            {/if}
+            {#if isProcessing}<ScanLine class="h-6 w-6" />{:else}<UploadCloud
+                class="h-6 w-6"
+              />{/if}
           </div>
           <div class="dz-title">
-            {#if isProcessing}
-              AI sedang membaca {files.length} dokumen…
-            {:else}
-              Tarik &amp; lepas dokumen di sini
-            {/if}
+            {#if isProcessing}AI sedang membaca {files.length} dokumen…{:else}Tarik
+              &amp; lepas dokumen{/if}
           </div>
           <div class="dz-sub">
-            {#if isProcessing}
-              Mohon tunggu sebentar.
-            {:else}
-              atau klik untuk pilih · KTP, Paspor, Kartu Keluarga, dan PDF polis
-              asuransi
-            {/if}
+            {#if isProcessing}Mohon tunggu sebentar.{:else}atau
+              <span class="dz-link">klik untuk pilih</span> · KTP, Paspor, KK, PDF
+              polis{/if}
           </div>
-
           {#if isProcessing}<span class="scanline"></span>{/if}
-
           {#if !isProcessing}
             <button
               type="button"
@@ -380,27 +407,40 @@
                 handlePaste();
               }}
             >
-              <Clipboard class="h-3.5 w-3.5" />
-              <span>Tempel</span>
+              <Clipboard class="h-3.5 w-3.5" /><span>Tempel</span>
             </button>
           {/if}
         </div>
 
-        <!-- Policy nudge -->
         <div class="polis-hint">
           <ShieldCheck class="h-4 w-4" style="color:var(--c-accent);flex-shrink:0;" />
           <span>
             Sertakan <strong>PDF polis asuransi</strong> — kolom Asuransi &amp; No
-            Polis terisi otomatis per jamaah (dicocokkan lewat nomor paspor).
+            Polis terisi otomatis, dicocokkan lewat nomor paspor.
           </span>
         </div>
 
         {#if errorMessage}
           <div class="error-banner">
-            <AlertCircle class="h-5 w-5" style="flex-shrink:0;" />
-            <span>{errorMessage}</span>
+            <AlertCircle class="h-5 w-5" style="flex-shrink:0;" /><span
+              >{errorMessage}</span
+            >
           </div>
         {/if}
+
+        <div class="divider"></div>
+
+        <!-- Group (optional) -->
+        <div class="group-label-row">
+          <span class="group-label"><Users class="h-4 w-4" /> Simpan ke grup</span>
+          <span class="opt-pill">opsional</span>
+        </div>
+        <GroupSelector
+          bind:selectedGroup
+          onGroupSelect={(g) => (selectedGroup = g)}
+          onViewGroup={viewGroupData}
+          isPro={isPro && localSubscription?.status === "active"}
+        />
 
         <!-- Selected files -->
         {#if files.length > 0}
@@ -435,18 +475,12 @@
           </div>
         {/if}
 
-        <!-- Group (optional) + scan action -->
-        <div class="action-row">
-          <div class="group-inline">
-            <span class="group-label"><Users class="h-4 w-4" /> Simpan ke grup</span>
-            <GroupSelector
-              bind:selectedGroup
-              onGroupSelect={(g) => (selectedGroup = g)}
-              onViewGroup={viewGroupData}
-              isPro={isPro && localSubscription?.status === "active"}
-            />
-            <span class="group-opt">opsional</span>
-          </div>
+        <!-- Action footer -->
+        <div class="action-foot">
+          <span class="file-count">
+            <Files class="h-4 w-4" />
+            {files.length > 0 ? `${files.length} dokumen` : "Belum ada dokumen"}
+          </span>
           <Button
             variant="primary"
             icon={ScanLine}
@@ -458,66 +492,131 @@
         </div>
       </Card>
 
-      <!-- Step 2 — hasil -->
-      {#if hasResults && !showModal}
+      <!-- RIGHT: context -->
+      <div class="context-col">
+        <!-- Plan / usage -->
         <Card>
-          <div class="result-band">
-            <div class="rb-left">
-              <div class="rb-icon"><CheckCircle class="h-6 w-6" /></div>
-              <div>
-                <div class="rb-title">
-                  {previewData.length} jamaah diekstrak
-                  {#if polisCount > 0}
-                    <span class="rb-dot">·</span>
-                    <span class="rb-polis">{polisCount} polis terbaca</span>
-                  {/if}
+          <div class="ctx-plan-head">
+            <Crown class="h-4 w-4" style="color:var(--c-accent)" />
+            <span>Paket {isPro ? "Pro" : "Gratis"}</span>
+          </div>
+          {#if isPro}
+            <div class="ctx-num">{(usageCount ?? 0).toLocaleString("id-ID")}</div>
+            <div class="ctx-num-sub">dokumen di-scan · tanpa batas</div>
+          {:else if usageLimit}
+            <div class="ctx-num">{remaining}</div>
+            <div class="ctx-num-sub">scan tersisa dari {usageLimit}</div>
+            <div class="quota-bar">
+              <div class="quota-fill" style="width:{usagePct}%"></div>
+            </div>
+            <Button
+              variant="soft"
+              icon={Crown}
+              full
+              size="sm"
+              onclick={() => (showUpgradeModal = true)}
+            >
+              Upgrade ke Pro
+            </Button>
+          {:else}
+            <div class="ctx-num-sub" style="margin-top:4px;">
+              Pindai dokumen untuk mulai.
+            </div>
+          {/if}
+        </Card>
+
+        <!-- How it works -->
+        <Card>
+          <div class="ctx-title">Cara kerja</div>
+          {#each ["Unggah dokumen jamaah & PDF polis", "AI membaca & mencocokkan via nomor paspor", "Data Siskopatuh terisi, siap di-review"] as step, i}
+            <div class="step-row">
+              <div class="step-num">{i + 1}</div>
+              <div class="step-text">{step}</div>
+            </div>
+          {/each}
+        </Card>
+
+        <!-- Recent scans -->
+        <Card>
+          <div class="ctx-title">Scan terakhir</div>
+          {#if recent.length === 0}
+            <div class="recent-empty">
+              Belum ada — hasil pindaian terakhir muncul di sini.
+            </div>
+          {:else}
+            {#each recent as r}
+              <div class="recent-row">
+                <Files class="h-4 w-4" style="color:var(--c-faint);flex-shrink:0;" />
+                <div class="recent-meta">
+                  <div class="recent-label" title={r.label}>{r.label}</div>
+                  <div class="recent-time">
+                    {relTime(r.ts)}{#if r.polis > 0} · {r.polis} polis{/if}
+                  </div>
                 </div>
-                <div class="rb-sub">
-                  {#if validationWarnings.length > 0}
-                    {validationWarnings.length} data perlu diperiksa — tinjau sebelum
-                    ekspor.
-                  {:else}
-                    Tinjau datanya sebelum diekspor.
-                  {/if}
-                </div>
+                <span class="recent-badge" class:done={r.status === "Selesai"}>
+                  {r.status}
+                </span>
+              </div>
+            {/each}
+          {/if}
+        </Card>
+      </div>
+    </div>
+
+    <!-- Result band (full width) -->
+    {#if hasResults && !showModal}
+      <Card style="margin-top:var(--gap,1.25rem);">
+        <div class="result-band">
+          <div class="rb-left">
+            <div class="rb-icon"><CheckCircle class="h-6 w-6" /></div>
+            <div>
+              <div class="rb-title">
+                {previewData.length} jamaah diekstrak
+                {#if polisCount > 0}<span class="rb-dot">·</span><span class="rb-polis"
+                    >{polisCount} polis terbaca</span
+                  >{/if}
+              </div>
+              <div class="rb-sub">
+                {#if validationWarnings.length > 0}{validationWarnings.length} data perlu
+                  diperiksa — tinjau sebelum ekspor.{:else}Tinjau datanya sebelum
+                  diekspor.{/if}
               </div>
             </div>
-            <div class="rb-actions">
-              <Button variant="primary" icon={Table} onclick={() => (showModal = true)}>
-                Tinjau &amp; edit
-              </Button>
-              <Button variant="ghost" icon={FileSpreadsheet} onclick={generateExcel}>
-                {isGenerating ? "Mengekspor…" : "Export Excel"}
-              </Button>
-              {#if selectedGroup}
-                <Button
-                  variant="ghost"
-                  icon={Users}
-                  onclick={saveToGroup}
-                  disabled={isSavingToGroup}
-                >
-                  {isSavingToGroup ? "Menyimpan…" : "Simpan ke grup"}
-                </Button>
-              {/if}
-            </div>
           </div>
-        </Card>
-      {/if}
-
-      <!-- Retry failed -->
-      {#if failedFileNames.length > 0 && !isProcessing && !showModal}
-        <div class="retry-banner">
-          <div class="retry-text">
-            <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
-            <span>
-              <strong>{failedFileNames.length}</strong> file gagal dipindai:
-              {failedFileNames.join(", ")}
-            </span>
+          <div class="rb-actions">
+            <Button variant="primary" icon={Table} onclick={() => (showModal = true)}>
+              Tinjau &amp; edit
+            </Button>
+            <Button variant="ghost" icon={FileSpreadsheet} onclick={generateExcel}>
+              {isGenerating ? "Mengekspor…" : "Export Excel"}
+            </Button>
+            {#if selectedGroup}
+              <Button
+                variant="ghost"
+                icon={Users}
+                onclick={saveToGroup}
+                disabled={isSavingToGroup}
+              >
+                {isSavingToGroup ? "Menyimpan…" : "Simpan ke grup"}
+              </Button>
+            {/if}
           </div>
-          <Button variant="danger" size="sm" onclick={retryFailed}>Coba Lagi</Button>
         </div>
-      {/if}
-    </div>
+      </Card>
+    {/if}
+
+    {#if failedFileNames.length > 0 && !isProcessing && !showModal}
+      <div class="retry-banner">
+        <div class="retry-text">
+          <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
+          <span
+            ><strong>{failedFileNames.length}</strong> file gagal dipindai:
+            {failedFileNames.join(", ")}</span
+          >
+        </div>
+        <Button variant="danger" size="sm" onclick={retryFailed}>Coba Lagi</Button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -560,33 +659,83 @@
     }
   }
 
-  /* Single, focused column — the workflow is a sequence, not a split. */
-  .flow {
+  .sc-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 1.25rem;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-primary);
+    margin-bottom: 5px;
+  }
+  .sc-title {
+    font-family: var(--font-display, Georgia, serif);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--c-ink);
+    margin: 0 0 5px;
+  }
+  .sc-sub {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--c-muted);
+    max-width: 480px;
+  }
+  .head-badges {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .badge-ai,
+  .badge-pro {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge-ai {
+    background: var(--c-primary-soft);
+    color: var(--c-primary-deep);
+  }
+  .badge-pro {
+    background: var(--c-accent-soft);
+    color: #8a6a1d;
+    border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
+  }
+
+  .scan-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--gap, 1.25rem);
+    align-items: start;
+  }
+  @media (min-width: 960px) {
+    .scan-grid {
+      grid-template-columns: 1.55fr 1fr;
+    }
+  }
+  .context-col {
     display: flex;
     flex-direction: column;
     gap: var(--gap, 1.25rem);
-    max-width: 760px;
-    margin: 0 auto;
-  }
-
-  .pro-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: var(--c-accent-soft);
-    color: #8a6a1d;
-    font-size: 13px;
-    font-weight: 700;
-    border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
   }
 
   .hidden-input {
     display: none;
   }
 
-  /* The hero: one combined dropzone. */
+  /* Dropzone */
   .dropzone {
     position: relative;
     overflow: hidden;
@@ -594,10 +743,10 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 4px;
-    padding: 30px 20px;
-    border: 2px dashed var(--c-line);
-    border-radius: var(--radius-lg);
+    gap: 3px;
+    padding: 28px 18px;
+    border: 1.5px dashed var(--c-line);
+    border-radius: var(--radius);
     background: var(--c-primary-tint);
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
@@ -622,25 +771,26 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 52px;
-    height: 52px;
+    width: 46px;
+    height: 46px;
     margin-bottom: 6px;
     border-radius: 50%;
     background: var(--c-primary-soft);
     color: var(--c-primary);
   }
   .dz-title {
-    font-size: 15.5px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--c-ink);
   }
   .dz-sub {
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--c-muted);
-    max-width: 420px;
   }
-
-  /* Signature: a scan line sweeping the dropzone while the AI reads. */
+  .dz-link {
+    color: var(--c-primary);
+    font-weight: 600;
+  }
   .scanline {
     position: absolute;
     left: 8%;
@@ -648,12 +798,7 @@
     top: 0;
     height: 2px;
     border-radius: 2px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--c-primary),
-      transparent
-    );
+    background: linear-gradient(90deg, transparent, var(--c-primary), transparent);
     animation: sweep 1.5s ease-in-out infinite;
   }
   @keyframes sweep {
@@ -679,16 +824,15 @@
       opacity: 0.6;
     }
   }
-
   .paste-btn {
     position: absolute;
     top: 10px;
     right: 10px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    font-size: 12.5px;
+    gap: 5px;
+    padding: 4px 9px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--c-ink-soft);
     background: var(--c-surface);
@@ -703,17 +847,14 @@
   .polis-hint {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 9px;
     margin-top: 12px;
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 9px 12px;
+    font-size: 12.5px;
     line-height: 1.45;
     color: #7a5e16;
     background: var(--c-accent-soft);
     border-radius: var(--radius);
-  }
-  .polis-hint strong {
-    font-weight: 700;
   }
 
   .error-banner {
@@ -727,11 +868,11 @@
     background: var(--c-danger-soft);
     border-radius: var(--radius);
   }
-
   .success-banner {
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-bottom: var(--gap, 1.25rem);
     padding: 0.85rem 1rem;
     font-size: 14px;
     color: var(--c-primary-deep);
@@ -740,11 +881,38 @@
     border-radius: var(--radius);
   }
 
+  .divider {
+    height: 1px;
+    background: var(--c-line-soft);
+    margin: 1rem 0;
+  }
+  .group-label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 9px;
+  }
+  .group-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-ink-soft);
+  }
+  .opt-pill {
+    font-size: 10.5px;
+    color: var(--c-faint);
+    border: 1px solid var(--c-line);
+    padding: 1px 7px;
+    border-radius: 999px;
+  }
+
   .files-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 18px 0 10px;
+    margin: 16px 0 9px;
     font-size: 13px;
     font-weight: 600;
     color: var(--c-ink-soft);
@@ -760,7 +928,6 @@
   .link-danger:hover {
     text-decoration: underline;
   }
-
   .chips {
     display: flex;
     flex-wrap: wrap;
@@ -784,7 +951,7 @@
     color: var(--c-primary-deep);
   }
   .chip-name {
-    max-width: 200px;
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -813,32 +980,131 @@
     color: var(--c-danger);
   }
 
-  .action-row {
+  .action-foot {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    margin-top: 18px;
-    padding-top: 18px;
-    border-top: 1px solid var(--c-line-soft);
+    gap: 12px;
+    margin-top: 1rem;
   }
-  .group-inline {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 13px;
-    color: var(--c-muted);
-  }
-  .group-label {
+  .file-count {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-  }
-  .group-opt {
     font-size: 12px;
     color: var(--c-faint);
+  }
+
+  /* Context cards */
+  .ctx-plan-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--c-muted);
+    margin-bottom: 8px;
+  }
+  .ctx-num {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--c-ink);
+  }
+  .ctx-num-sub {
+    font-size: 11.5px;
+    color: var(--c-faint);
+    margin-top: 4px;
+  }
+  .quota-bar {
+    height: 6px;
+    background: var(--c-bg-2);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 12px 0;
+  }
+  .quota-fill {
+    height: 100%;
+    background: var(--c-primary);
+    border-radius: 999px;
+    transition: width 0.4s;
+  }
+  .ctx-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--c-ink);
+    margin-bottom: 11px;
+  }
+  .step-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .step-row:last-child {
+    margin-bottom: 0;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--c-primary-soft);
+    color: var(--c-primary-deep);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-text {
+    font-size: 12.5px;
+    color: var(--c-muted);
+    line-height: 1.45;
+  }
+  .recent-empty {
+    font-size: 12px;
+    color: var(--c-faint);
+    line-height: 1.5;
+  }
+  .recent-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--c-line-soft);
+  }
+  .recent-row:last-child {
+    border-bottom: none;
+  }
+  .recent-meta {
+    flex: 1;
+    min-width: 0;
+  }
+  .recent-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--c-ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .recent-time {
+    font-size: 11px;
+    color: var(--c-faint);
+  }
+  .recent-badge {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--c-warning-soft);
+    color: var(--c-warning);
+  }
+  .recent-badge.done {
+    background: var(--c-primary-soft);
+    color: var(--c-primary-deep);
   }
 
   /* Result band */
@@ -874,6 +1140,7 @@
   .rb-dot {
     color: var(--c-faint);
     font-weight: 400;
+    margin: 0 4px;
   }
   .rb-polis {
     color: var(--c-primary);
@@ -895,6 +1162,7 @@
     justify-content: space-between;
     gap: 12px;
     flex-wrap: wrap;
+    margin-top: var(--gap, 1.25rem);
     padding: 0.85rem 1rem;
     border: 1px solid var(--c-danger-soft);
     background: var(--c-danger-soft);
@@ -908,7 +1176,6 @@
     font-size: 13.5px;
     color: var(--c-danger);
   }
-
   .locked-icon {
     display: flex;
     align-items: center;
