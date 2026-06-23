@@ -6,13 +6,19 @@
     Sparkles,
     AlertCircle,
     Lock,
-    Upload,
+    UploadCloud,
     FileSpreadsheet,
-    Eye,
+    Table,
+    Users,
+    ScanLine,
+    FileText,
+    Image as ImageIcon,
+    ShieldCheck,
+    Clipboard,
+    X,
   } from "lucide-svelte";
   import PageHeader from "../components/PageHeader.svelte";
   import TableResult from "../components/TableResult.svelte";
-  import FileUpload from "../components/FileUpload.svelte";
   import SubscriptionBanner from "../components/SubscriptionBanner.svelte";
   import GroupSelector from "../components/GroupSelector.svelte";
   import UpgradeModal from "../components/UpgradeModal.svelte";
@@ -29,84 +35,30 @@
     onSubscriptionChange = null,
   } = $props();
 
-  // State
+  // Upload + processing state
   let files = $state([]);
+  let dragOver = $state(false);
   let isProcessing = $state(false);
   let errorMessage = $state("");
-  let progress = $state(null);
-  let ocrStatus = $state(null);
-  // subscription comes from props, but we may need local state for it
   let localSubscription = $state(null);
-
-  // Use prop if provided, otherwise use local state
   $effect(() => {
-    if (subscription) {
-      localSubscription = subscription;
-    }
+    if (subscription) localSubscription = subscription;
   });
 
-  // Preview Modal State
+  // Result / preview state
   let showModal = $state(false);
   let previewData = $state([]);
   let isGenerating = $state(false);
   let validationWarnings = $state([]);
   let fileResults = $state([]);
-  let processingCacheMode = $state("default");
-  const cacheModeLabels = {
-    default: "Default (hemat biaya, read/write cache)",
-    refresh: "Refresh (skip read, tulis hasil terbaru)",
-    bypass: "Bypass (tanpa read/write cache)",
-  };
-  const cacheModeHint = $derived(cacheModeLabels[processingCacheMode] || cacheModeLabels.default);
-  const bypassQuota = $derived(ocrStatus?.cache_quota?.bypass || null);
-  const canUseBypassCacheMode = $derived(
-    (() => {
-      const isProActive = isProOrHigher(localSubscription?.plan) && localSubscription?.status === "active";
-      if (!isProActive) return false;
-      const backendAllowed = ocrStatus?.providers?.gemini?.bypass_allowed_now;
-      if (typeof backendAllowed === "boolean") return backendAllowed;
-      if (!bypassQuota) return true;
-      return Boolean(bypassQuota.unlimited || (bypassQuota.remaining_files ?? 0) > 0);
-    })(),
-  );
-  const cacheModeNotice = $derived(
-    (() => {
-      const isProActive = isProOrHigher(localSubscription?.plan) && localSubscription?.status === "active";
-      if (canUseBypassCacheMode) {
-        return bypassQuota?.unlimited
-          ? "Bypass aktif tanpa limit per jam. Tetap gunakan seperlunya untuk kontrol biaya."
-          : `Sisa bypass 1 jam: ${bypassQuota?.remaining_files ?? "-"} dari ${bypassQuota?.limit_files ?? "-"} file.`;
-      }
-      if (isProActive) {
-        return "Kuota bypass per jam sedang habis. Gunakan default/refresh atau tunggu quota reset.";
-      }
-      return "Mode bypass khusus Pro aktif untuk mencegah lonjakan biaya API.";
-    })(),
-  );
-
-  $effect(() => {
-    if (!canUseBypassCacheMode && processingCacheMode === "bypass") {
-      processingCacheMode = "default";
-    }
-  });
-
-  // Track failed files for retry
   let failedFileNames = $state([]);
 
-  // Group State
+  // Group + upgrade
   let selectedGroup = $state(null);
   let isSavingToGroup = $state(false);
   let groupSaveSuccess = $state("");
-
-  // Upgrade modal (5-tier shared component handles tiers + payment)
   let showUpgradeModal = $state(false);
 
-  // Document-type tabs (mirrors the Claude design). Purely presentational hint
-  // for the user — the real OCR auto-detects the document type.
-  const docTypes = ["KTP", "Kartu Keluarga", "Paspor"];
-  let activeDocType = $state("KTP");
-
-  // Fetch subscription status if not passed
   onMount(async () => {
     if (!localSubscription) {
       try {
@@ -115,15 +67,75 @@
         console.error("Failed to fetch subscription:", e);
       }
     }
-    try {
-      ocrStatus = await ApiService.getOcrStatus();
-    } catch (e) {
-      console.warn("Failed to fetch OCR status:", e);
-    }
   });
 
-  function generateSessionId() {
-    return Math.random().toString(36).substring(2, 10);
+  // ---- file intake (drag / click / paste) ----
+  function addFiles(list) {
+    const valid = Array.from(list).filter(
+      (f) => f.type.startsWith("image/") || f.type === "application/pdf",
+    );
+    if (valid.length) files = [...files, ...valid];
+  }
+  function onDrop(e) {
+    e.preventDefault();
+    dragOver = false;
+    if (e.dataTransfer?.files) addFiles(e.dataTransfer.files);
+  }
+  function onPick(e) {
+    if (e.target.files) addFiles(e.target.files);
+    e.target.value = "";
+  }
+  function openPicker() {
+    if (!isProcessing) document.getElementById("scannerFileInput")?.click();
+  }
+  function removeFile(i) {
+    files = files.filter((_, idx) => idx !== i);
+  }
+  function clearFiles() {
+    files = [];
+  }
+  async function handlePaste() {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const t = item.types.find((x) => x.startsWith("image/"));
+        if (t) {
+          const blob = await item.getType(t);
+          files = [
+            ...files,
+            new File([blob], `tempel-${Date.now()}.png`, { type: t }),
+          ];
+        }
+      }
+    } catch (err) {
+      console.error("Clipboard read failed", err);
+    }
+  }
+  onMount(() => {
+    const onWindowPaste = (e) => {
+      if (e.clipboardData?.files?.length) addFiles(e.clipboardData.files);
+    };
+    window.addEventListener("paste", onWindowPaste);
+    return () => window.removeEventListener("paste", onWindowPaste);
+  });
+
+  // A policy PDF is the one file that enriches insurance columns — flag it so the
+  // operator can see it was recognised as a POLIS (display hint only; the backend
+  // does the authoritative detection).
+  function looksLikePolicy(f) {
+    return f.type === "application/pdf" && /pol(is|icy)|asuransi/i.test(f.name);
+  }
+  function fileIcon(f) {
+    if (looksLikePolicy(f)) return ShieldCheck;
+    return f.type === "application/pdf" ? FileText : ImageIcon;
+  }
+  function fmtSize(b) {
+    if (b < 1024) return b + " B";
+    if (b < 1048576) return (b / 1024).toFixed(0) + " KB";
+    return (b / 1048576).toFixed(1) + " MB";
+  }
+  function sessionId() {
+    return Math.random().toString(36).slice(2, 10);
   }
 
   async function processDocuments(filesToProcess = null) {
@@ -134,76 +146,31 @@
     errorMessage = "";
     failedFileNames = [];
     groupSaveSuccess = "";
-    progress = {
-      current: 0,
-      total: uploadFiles.length,
-      status: "starting",
-      current_file: "",
-      completed_files: [],
-      failed_files: [],
-    };
-
-    const sessionId = generateSessionId();
-
-    let eventSource = null;
-    try {
-      eventSource = ApiService.streamProgress(sessionId, (data) => {
-        progress = { ...data };
-      });
-    } catch (e) {
-      console.warn("SSE connection failed:", e);
-    }
 
     try {
-      const result = await ApiService.uploadDocuments(uploadFiles, sessionId, {
-        cacheMode: processingCacheMode,
+      const result = await ApiService.uploadDocuments(uploadFiles, sessionId(), {
+        cacheMode: "default",
       });
-      if (eventSource) eventSource.close();
-
-      previewData = result.data;
+      previewData = result.data || [];
       validationWarnings = result.validation_warnings || [];
       fileResults = result.file_results || [];
-      if (result.cache_quota?.bypass) {
-        ocrStatus = {
-          ...(ocrStatus || {}),
-          cache_quota: {
-            ...(ocrStatus?.cache_quota || {}),
-            bypass: result.cache_quota.bypass,
-          },
-        };
-      }
-      failedFileNames = (result.file_results || [])
+      failedFileNames = fileResults
         .filter((fr) => fr.status === "failed")
         .map((fr) => fr.filename);
       showModal = true;
-
-      // Refresh subscription (usage count changed)
       try {
         localSubscription = await ApiService.getSubscriptionStatus();
       } catch {}
     } catch (err) {
-      if (eventSource) eventSource.close();
-      if (
-        processingCacheMode === "bypass" &&
-        String(err?.message || "").toLowerCase().includes("bypass")
-      ) {
-        processingCacheMode = "default";
-        try {
-          ocrStatus = await ApiService.getOcrStatus();
-        } catch {
-          // ignore refresh errors
-        }
-      }
       errorMessage = err.message;
     } finally {
       isProcessing = false;
-      progress = null;
     }
   }
 
   function retryFailed() {
-    const retryFiles = files.filter((f) => failedFileNames.includes(f.name));
-    if (retryFiles.length > 0) processDocuments(retryFiles);
+    const retry = files.filter((f) => failedFileNames.includes(f.name));
+    if (retry.length) processDocuments(retry);
   }
 
   async function generateExcel() {
@@ -221,12 +188,7 @@
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      showModal = false;
-      files = [];
-      previewData = [];
-      validationWarnings = [];
-      fileResults = [];
-      failedFileNames = [];
+      resetAfterExport();
     } catch (err) {
       errorMessage = err.message;
     } finally {
@@ -240,22 +202,14 @@
     errorMessage = "";
     try {
       const result = await ApiService.addGroupMembers(selectedGroup.id, previewData);
-      const addedCount = result?.added_count ?? previewData.length;
-      const updatedCount = result?.updated_count ?? 0;
-
-      groupSaveSuccess = `${addedCount} data baru dan ${updatedCount} data update berhasil diproses ke grup "${selectedGroup.name}"`;
-      // Update the group's member count in the selector
+      const added = result?.added_count ?? previewData.length;
+      const updated = result?.updated_count ?? 0;
+      groupSaveSuccess = `${added} data baru dan ${updated} update tersimpan ke grup "${selectedGroup.name}".`;
       selectedGroup = {
         ...selectedGroup,
-        member_count: (selectedGroup.member_count || 0) + addedCount,
+        member_count: (selectedGroup.member_count || 0) + added,
       };
-      showModal = false;
-      files = [];
-      previewData = [];
-      validationWarnings = [];
-      fileResults = [];
-      failedFileNames = [];
-      // Auto-dismiss success after 5 seconds
+      resetAfterExport();
       setTimeout(() => (groupSaveSuccess = ""), 5000);
       onSubscriptionChange?.();
     } catch (err) {
@@ -265,11 +219,20 @@
     }
   }
 
+  function resetAfterExport() {
+    showModal = false;
+    files = [];
+    previewData = [];
+    validationWarnings = [];
+    fileResults = [];
+    failedFileNames = [];
+  }
+
   async function viewGroupData(group) {
     errorMessage = "";
     try {
-      const fullGroup = await ApiService.getGroup(group.id);
-      previewData = fullGroup.members || [];
+      const full = await ApiService.getGroup(group.id);
+      previewData = full.members || [];
       validationWarnings = [];
       fileResults = [];
       showModal = true;
@@ -283,28 +246,30 @@
     errorMessage = "";
   }
 
-  // Block only when the backend EXPLICITLY disallows access, and never for a
-  // pro-or-higher active plan. (The subscription status payload has no `allowed`
-  // field, so the old `!allowed` blocked everyone — including Pro.)
-  // Match the app-wide definition (App.svelte / Dashboard): an expired plan is
-  // not Pro, otherwise an expired Pro user would keep the editable table here.
+  // Gating: Pro keeps the editable table; only an explicit backend block locks.
   let isPro = $derived(
     isProOrHigher(localSubscription?.plan) &&
       localSubscription?.status !== "expired",
   );
-  let isBlocked = $derived(
-    !isPro && localSubscription?.allowed === false,
-  );
+  let isBlocked = $derived(!isPro && localSubscription?.allowed === false);
 
-  // Whether we currently have extracted results to surface in the right card.
   let hasResults = $derived(previewData.length > 0);
+  let polisCount = $derived(
+    fileResults.filter((fr) => fr.doc_type === "polis" && fr.status === "completed")
+      .length,
+  );
+  let scanLabel = $derived(
+    isProcessing
+      ? "Memindai…"
+      : `Pindai${files.length ? " " + files.length : ""} dokumen`,
+  );
 </script>
 
 <div class="scanner-page page-enter">
   <PageHeader
     kicker="Fitur Unggulan"
     title="AI Scanner Dokumen"
-    subtitle="Pindai KTP, Kartu Keluarga, atau Paspor — sistem akan mengekstrak data jamaah secara otomatis dengan OCR."
+    subtitle="Unggah dokumen jamaah dan polis asuransi sekaligus — AI mengisi data Siskopatuh otomatis."
   >
     {#snippet actions()}
       <Badge tone="success">
@@ -313,16 +278,13 @@
         </span>
       </Badge>
       {#if isPro}
-        <span
-          style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--c-accent-soft);color:#8a6a1d;font-size:13px;font-weight:700;border:1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);"
-        >
+        <span class="pro-pill">
           <Crown class="h-4 w-4" style="color:var(--c-accent)" /> Pro Active
         </span>
       {/if}
     {/snippet}
   </PageHeader>
 
-  <!-- Subscription Banner -->
   <div style="margin-bottom:var(--gap, 1.25rem);">
     <SubscriptionBanner
       subscription={localSubscription}
@@ -331,10 +293,11 @@
   </div>
 
   {#if isBlocked}
-    <!-- Locked state -->
     <Card style="text-align:center;padding:48px 24px;">
       <div class="locked-icon"><Lock class="h-8 w-8" /></div>
-      <h2 style="margin:0 0 8px;font-size:19px;font-weight:800;color:var(--c-ink);">Akses Terbatas</h2>
+      <h2 style="margin:0 0 8px;font-size:19px;font-weight:800;color:var(--c-ink);">
+        Akses Terbatas
+      </h2>
       <p style="margin:0 auto 24px;max-width:420px;font-size:14px;color:var(--c-muted);">
         Batas penggunaan gratis telah tercapai. Upgrade untuk melanjutkan.
       </p>
@@ -345,161 +308,219 @@
       </div>
     </Card>
   {:else}
-    <!-- Two-column layout (matches the Claude design) -->
-    <div class="scan-grid">
-      <!-- LEFT: doc-type tabs + group selector + upload dropzone -->
+    <div class="flow">
+      {#if groupSaveSuccess}
+        <div class="success-banner">
+          <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
+          <span>{groupSaveSuccess}</span>
+        </div>
+      {/if}
+
+      <!-- Step 1 — unggah & pindai -->
       <Card>
-        <!-- Doc-type tabs -->
-        <div class="doc-tabs">
-          {#each docTypes as d}
+        <div
+          class="dropzone"
+          class:drag={dragOver}
+          class:scanning={isProcessing}
+          role="button"
+          tabindex="0"
+          onclick={openPicker}
+          onkeydown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openPicker();
+            }
+          }}
+          ondragover={(e) => {
+            e.preventDefault();
+            dragOver = true;
+          }}
+          ondragleave={() => (dragOver = false)}
+          ondrop={onDrop}
+        >
+          <input
+            id="scannerFileInput"
+            type="file"
+            multiple
+            accept="image/*,.pdf"
+            class="hidden-input"
+            onchange={onPick}
+          />
+          <div class="dz-icon">
+            {#if isProcessing}
+              <ScanLine class="h-6 w-6" />
+            {:else}
+              <UploadCloud class="h-6 w-6" />
+            {/if}
+          </div>
+          <div class="dz-title">
+            {#if isProcessing}
+              AI sedang membaca {files.length} dokumen…
+            {:else}
+              Tarik &amp; lepas dokumen di sini
+            {/if}
+          </div>
+          <div class="dz-sub">
+            {#if isProcessing}
+              Mohon tunggu sebentar.
+            {:else}
+              atau klik untuk pilih · KTP, Paspor, Kartu Keluarga, dan PDF polis
+              asuransi
+            {/if}
+          </div>
+
+          {#if isProcessing}<span class="scanline"></span>{/if}
+
+          {#if !isProcessing}
             <button
               type="button"
-              class="doc-tab"
-              class:active={activeDocType === d}
-              onclick={() => (activeDocType = d)}
+              class="paste-btn"
+              onclick={(e) => {
+                e.stopPropagation();
+                handlePaste();
+              }}
             >
-              {d}
+              <Clipboard class="h-3.5 w-3.5" />
+              <span>Tempel</span>
             </button>
-          {/each}
-        </div>
-
-        <!-- Group selector -->
-        <div style="margin-bottom:18px;">
-          <GroupSelector
-            bind:selectedGroup
-            onGroupSelect={(g) => (selectedGroup = g)}
-            onViewGroup={viewGroupData}
-            isPro={isPro && localSubscription?.status === "active"}
-          />
-        </div>
-
-        <!-- Success banner -->
-        {#if groupSaveSuccess}
-          <div class="success-banner">
-            <CheckCircle class="h-5 w-5" style="color:var(--c-success);flex-shrink:0;" />
-            <span style="font-size:14px;color:var(--c-primary-deep);">{groupSaveSuccess}</span>
-          </div>
-        {/if}
-
-        <!-- Upload dropzone hint (matches the design header above the real uploader) -->
-        <div class="dropzone-head">
-          <div class="dropzone-icon"><Upload class="h-6 w-6" /></div>
-          <div style="min-width:0;">
-            <div style="font-size:15.5px;font-weight:700;color:var(--c-ink);">
-              Jatuhkan foto {activeDocType} di sini
-            </div>
-            <div style="margin-top:2px;font-size:13px;color:var(--c-muted);">
-              atau klik untuk mengunggah · JPG, PNG, PDF · maks 10 MB
-            </div>
-          </div>
-        </div>
-
-        <!-- Real upload + OCR flow (functional component, restyled wrapper) -->
-        <div class="uploader-wrap">
-          <FileUpload
-            bind:files
-            {isProcessing}
-            {errorMessage}
-            onProcess={() => processDocuments()}
-            {progress}
-          />
-        </div>
-
-        <!-- Process / rescan button row (mirrors the design's primary action) -->
-        {#if files.length === 0 && !isProcessing}
-          <p class="dropzone-hint">
-            Tambahkan dokumen di atas, lalu jalankan ekstraksi otomatis.
-          </p>
-        {/if}
-
-        <!-- Advanced OCR settings -->
-        <details class="adv-settings">
-          <summary>
-            <Sparkles class="h-4 w-4" style="color:var(--c-primary)" />
-            Advanced OCR Settings
-          </summary>
-          <div class="adv-row">
-            <label for="cache-mode">Mode cache AI (Gemini)</label>
-            <select id="cache-mode" bind:value={processingCacheMode}>
-              <option value="default">default</option>
-              <option value="refresh">refresh</option>
-              <option value="bypass" disabled={!canUseBypassCacheMode}>bypass (Pro)</option>
-            </select>
-          </div>
-          <p class="adv-hint">{cacheModeHint}</p>
-          <p class="adv-hint">{cacheModeNotice}</p>
-        </details>
-      </Card>
-
-      <!-- RIGHT: extraction results / empty state -->
-      <Card style="min-height:380px;display:flex;flex-direction:column;">
-        <div class="result-head">
-          <div style="font-size:15.5px;font-weight:800;color:var(--c-ink);">Hasil Ekstraksi</div>
-          {#if hasResults}
-            <Badge status="Lunas">
-              <span style="display:inline-flex;align-items:center;gap:5px;">
-                <Sparkles class="h-3.5 w-3.5" /> Akurasi 94%
-              </span>
-            </Badge>
           {/if}
         </div>
 
-        {#if isProcessing}
-          <!-- Processing empty state -->
-          <div class="result-empty">
-            <div class="empty-icon"><Sparkles class="h-6 w-6" /></div>
-            <div class="empty-text">AI sedang membaca dokumen Anda…</div>
+        <!-- Policy nudge -->
+        <div class="polis-hint">
+          <ShieldCheck class="h-4 w-4" style="color:var(--c-accent);flex-shrink:0;" />
+          <span>
+            Sertakan <strong>PDF polis asuransi</strong> — kolom Asuransi &amp; No
+            Polis terisi otomatis per jamaah (dicocokkan lewat nomor paspor).
+          </span>
+        </div>
+
+        {#if errorMessage}
+          <div class="error-banner">
+            <AlertCircle class="h-5 w-5" style="flex-shrink:0;" />
+            <span>{errorMessage}</span>
           </div>
-        {:else if hasResults}
-          <!-- Results summary (full data lives in the TableResult modal) -->
-          <div class="result-body">
-            <div class="result-stat">
-              <span class="result-count">{previewData.length}</span>
-              <span class="result-count-label">jamaah berhasil diekstrak</span>
-            </div>
+        {/if}
 
-            {#if validationWarnings.length > 0}
-              <div class="warn-banner">
-                <AlertCircle class="h-4 w-4" style="color:var(--c-warning);flex-shrink:0;" />
-                <span>{validationWarnings.length} data perlu diperiksa</span>
-              </div>
+        <!-- Selected files -->
+        {#if files.length > 0}
+          <div class="files-head">
+            <span>{files.length} file siap dipindai</span>
+            {#if !isProcessing}
+              <button type="button" class="link-danger" onclick={clearFiles}>
+                Hapus semua
+              </button>
             {/if}
+          </div>
+          <div class="chips">
+            {#each files as file, i}
+              {@const Ico = fileIcon(file)}
+              <span class="chip" class:polis={looksLikePolicy(file)}>
+                <Ico class="h-4 w-4" />
+                <span class="chip-name" title={file.name}>{file.name}</span>
+                <span class="chip-size">{fmtSize(file.size)}</span>
+                {#if looksLikePolicy(file)}<span class="chip-badge">polis</span>{/if}
+                {#if !isProcessing}
+                  <button
+                    type="button"
+                    class="chip-x"
+                    aria-label="Hapus {file.name}"
+                    onclick={() => removeFile(i)}
+                  >
+                    <X class="h-3.5 w-3.5" />
+                  </button>
+                {/if}
+              </span>
+            {/each}
+          </div>
+        {/if}
 
-            <div class="result-actions">
-              <Button variant="primary" icon={Eye} full onclick={() => (showModal = true)}>
-                Tinjau &amp; Edit Data
+        <!-- Group (optional) + scan action -->
+        <div class="action-row">
+          <div class="group-inline">
+            <span class="group-label"><Users class="h-4 w-4" /> Simpan ke grup</span>
+            <GroupSelector
+              bind:selectedGroup
+              onGroupSelect={(g) => (selectedGroup = g)}
+              onViewGroup={viewGroupData}
+              isPro={isPro && localSubscription?.status === "active"}
+            />
+            <span class="group-opt">opsional</span>
+          </div>
+          <Button
+            variant="primary"
+            icon={ScanLine}
+            disabled={files.length === 0 || isProcessing}
+            onclick={() => processDocuments()}
+          >
+            {scanLabel}
+          </Button>
+        </div>
+      </Card>
+
+      <!-- Step 2 — hasil -->
+      {#if hasResults && !showModal}
+        <Card>
+          <div class="result-band">
+            <div class="rb-left">
+              <div class="rb-icon"><CheckCircle class="h-6 w-6" /></div>
+              <div>
+                <div class="rb-title">
+                  {previewData.length} jamaah diekstrak
+                  {#if polisCount > 0}
+                    <span class="rb-dot">·</span>
+                    <span class="rb-polis">{polisCount} polis terbaca</span>
+                  {/if}
+                </div>
+                <div class="rb-sub">
+                  {#if validationWarnings.length > 0}
+                    {validationWarnings.length} data perlu diperiksa — tinjau sebelum
+                    ekspor.
+                  {:else}
+                    Tinjau datanya sebelum diekspor.
+                  {/if}
+                </div>
+              </div>
+            </div>
+            <div class="rb-actions">
+              <Button variant="primary" icon={Table} onclick={() => (showModal = true)}>
+                Tinjau &amp; edit
               </Button>
-              <Button variant="ghost" icon={FileSpreadsheet} full onclick={generateExcel}>
+              <Button variant="ghost" icon={FileSpreadsheet} onclick={generateExcel}>
                 {isGenerating ? "Mengekspor…" : "Export Excel"}
               </Button>
+              {#if selectedGroup}
+                <Button
+                  variant="ghost"
+                  icon={Users}
+                  onclick={saveToGroup}
+                  disabled={isSavingToGroup}
+                >
+                  {isSavingToGroup ? "Menyimpan…" : "Simpan ke grup"}
+                </Button>
+              {/if}
             </div>
           </div>
-        {:else}
-          <!-- Idle empty state (matches the design) -->
-          <div class="result-empty">
-            <div class="empty-icon"><Sparkles class="h-6 w-6" /></div>
-            <div class="empty-text">Data hasil pindai akan muncul di sini secara otomatis.</div>
-          </div>
-        {/if}
+        </Card>
+      {/if}
 
-        <!-- Retry banner for failed files -->
-        {#if failedFileNames.length > 0 && !isProcessing && !showModal}
-          <div class="retry-banner">
-            <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-              <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
-              <span style="font-size:13.5px;color:var(--c-danger);">
-                <strong>{failedFileNames.length}</strong> file gagal: {failedFileNames.join(", ")}
-              </span>
-            </div>
-            <Button variant="danger" size="sm" onclick={retryFailed}>Coba Lagi</Button>
+      <!-- Retry failed -->
+      {#if failedFileNames.length > 0 && !isProcessing && !showModal}
+        <div class="retry-banner">
+          <div class="retry-text">
+            <AlertCircle class="h-5 w-5" style="color:var(--c-danger);flex-shrink:0;" />
+            <span>
+              <strong>{failedFileNames.length}</strong> file gagal dipindai:
+              {failedFileNames.join(", ")}
+            </span>
           </div>
-        {/if}
-      </Card>
+          <Button variant="danger" size="sm" onclick={retryFailed}>Coba Lagi</Button>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
 
-<!-- Preview Modal -->
 <TableResult
   isOpen={showModal}
   bind:data={previewData}
@@ -519,7 +540,6 @@
   {errorMessage}
 />
 
-<!-- Upgrade Modal (shared 5-tier component) -->
 <UpgradeModal
   show={showUpgradeModal}
   onClose={() => (showUpgradeModal = false)}
@@ -540,217 +560,353 @@
     }
   }
 
-  /* Two-column grid (1fr 1fr), stacks on mobile */
-  .scan-grid {
-    display: grid;
-    grid-template-columns: 1fr;
+  /* Single, focused column — the workflow is a sequence, not a split. */
+  .flow {
+    display: flex;
+    flex-direction: column;
     gap: var(--gap, 1.25rem);
-    align-items: start;
-  }
-  @media (min-width: 1024px) {
-    .scan-grid {
-      grid-template-columns: 1fr 1fr;
-    }
+    max-width: 760px;
+    margin: 0 auto;
   }
 
-  /* Doc-type tabs */
-  .doc-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 18px;
-  }
-  .doc-tab {
-    flex: 1;
-    padding: 10px;
+  .pro-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--c-accent-soft);
+    color: #8a6a1d;
     font-size: 13px;
     font-weight: 700;
-    border-radius: var(--radius);
-    border: 1px solid var(--c-line);
-    background: var(--c-surface);
-    color: var(--c-muted);
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s, color 0.15s;
-  }
-  .doc-tab.active {
-    border-color: var(--c-primary);
-    background: var(--c-primary-soft);
-    color: var(--c-primary-deep);
+    border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
   }
 
-  /* Dropzone header (icon + copy) */
-  .dropzone-head {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 12px;
+  .hidden-input {
+    display: none;
   }
-  .dropzone-icon {
-    flex-shrink: 0;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
+
+  /* The hero: one combined dropzone. */
+  .dropzone {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    padding: 30px 20px;
+    border: 2px dashed var(--c-line);
+    border-radius: var(--radius-lg);
+    background: var(--c-primary-tint);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dropzone:hover {
+    border-color: color-mix(in srgb, var(--c-primary) 45%, var(--c-line));
+  }
+  .dropzone.drag {
+    border-color: var(--c-primary);
     background: var(--c-primary-soft);
-    color: var(--c-primary);
+  }
+  .dropzone.scanning {
+    cursor: default;
+    border-color: var(--c-primary);
+  }
+  .dropzone:focus-visible {
+    outline: none;
+    border-color: var(--c-primary);
+    box-shadow: 0 0 0 3px var(--c-primary-soft);
+  }
+  .dz-icon {
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 6px;
+    border-radius: 50%;
+    background: var(--c-primary-soft);
+    color: var(--c-primary);
   }
-  .dropzone-hint {
-    margin: 12px 0 0;
-    font-size: 12.5px;
-    color: var(--c-faint);
+  .dz-title {
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--c-ink);
+  }
+  .dz-sub {
+    font-size: 13px;
+    color: var(--c-muted);
+    max-width: 420px;
   }
 
-  /* Wrapper neutralizes the FileUpload component's own white card so it reads
-     as a single dashed dropzone inside our design Card. */
-  .uploader-wrap :global(.rounded-3xl) {
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    padding: 0;
+  /* Signature: a scan line sweeping the dropzone while the AI reads. */
+  .scanline {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--c-primary),
+      transparent
+    );
+    animation: sweep 1.5s ease-in-out infinite;
   }
-  .uploader-wrap :global(.text-center.mb-6),
-  .uploader-wrap :global(.text-center.mb-8) {
-    display: none;
+  @keyframes sweep {
+    0% {
+      top: 6%;
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      top: 94%;
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scanline {
+      animation: none;
+      top: 50%;
+      opacity: 0.6;
+    }
+  }
+
+  .paste-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--c-ink-soft);
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .paste-btn:hover {
+    background: var(--c-bg);
+  }
+
+  .polis-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #7a5e16;
+    background: var(--c-accent-soft);
+    border-radius: var(--radius);
+  }
+  .polis-hint strong {
+    font-weight: 700;
+  }
+
+  .error-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 0.8rem 1rem;
+    font-size: 13.5px;
+    color: var(--c-danger);
+    background: var(--c-danger-soft);
+    border-radius: var(--radius);
   }
 
   .success-banner {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 16px;
     padding: 0.85rem 1rem;
+    font-size: 14px;
+    color: var(--c-primary-deep);
     border: 1px solid var(--c-primary-soft);
     background: var(--c-primary-soft);
     border-radius: var(--radius);
   }
 
-  /* Advanced settings */
-  .adv-settings {
-    margin-top: 18px;
-    padding: 0.85rem 1rem;
-    background: var(--c-bg);
-    border: 1px solid var(--c-line);
-    border-radius: var(--radius);
-  }
-  .adv-settings summary {
+  .files-head {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 14px;
+    justify-content: space-between;
+    margin: 18px 0 10px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--c-ink-soft);
+  }
+  .link-danger {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    color: var(--c-danger);
     cursor: pointer;
-    user-select: none;
   }
-  .adv-row {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  @media (min-width: 640px) {
-    .adv-row {
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-    }
-  }
-  .adv-row label {
-    font-size: 14px;
-    color: var(--c-muted);
-  }
-  .adv-row select {
-    border: 1px solid var(--c-line);
-    background: var(--c-surface);
-    color: var(--c-ink-soft);
-    padding: 8px 12px;
-    font-size: 14px;
-    border-radius: var(--radius);
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .adv-row select:focus {
-    border-color: var(--c-primary);
-    box-shadow: 0 0 0 3px var(--c-primary-soft);
-  }
-  .adv-hint {
-    margin: 8px 0 0;
-    font-size: 12px;
-    color: var(--c-muted);
+  .link-danger:hover {
+    text-decoration: underline;
   }
 
-  /* Right card */
-  .result-head {
+  .chips {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
-  .result-empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+  .chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 60px 20px;
-    text-align: center;
+    gap: 7px;
+    max-width: 100%;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    color: var(--c-ink-soft);
+    background: var(--c-surface);
+    border: 1px solid var(--c-line);
+    border-radius: var(--radius);
+  }
+  .chip.polis {
+    background: var(--c-primary-soft);
+    border-color: color-mix(in srgb, var(--c-primary) 28%, transparent);
+    color: var(--c-primary-deep);
+  }
+  .chip-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .chip-size {
+    font-size: 11px;
     color: var(--c-faint);
   }
-  .empty-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--c-bg-2);
+  .chip-badge {
+    padding: 1px 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--c-primary);
+    border-radius: 999px;
+  }
+  .chip-x {
+    display: inline-flex;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--c-faint);
+    cursor: pointer;
+  }
+  .chip-x:hover {
+    color: var(--c-danger);
+  }
+
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--c-line-soft);
+  }
+  .group-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--c-muted);
+  }
+  .group-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .group-opt {
+    font-size: 12px;
+    color: var(--c-faint);
+  }
+
+  /* Result band */
+  .result-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .rb-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .rb-icon {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius);
+    background: var(--c-primary-soft);
+    color: var(--c-primary);
   }
-  .empty-text {
-    font-size: 14px;
-    font-weight: 600;
-    max-width: 260px;
+  .rb-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--c-ink);
+  }
+  .rb-dot {
+    color: var(--c-faint);
+    font-weight: 400;
+  }
+  .rb-polis {
+    color: var(--c-primary);
+  }
+  .rb-sub {
+    margin-top: 1px;
+    font-size: 13px;
+    color: var(--c-muted);
+  }
+  .rb-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
-  .result-body {
+  .retry-banner {
     display: flex;
-    flex-direction: column;
-    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--c-danger-soft);
+    background: var(--c-danger-soft);
+    border-radius: var(--radius);
   }
-  .result-stat {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 18px 20px;
-    background: var(--c-primary-soft);
-    border-radius: var(--radius-lg);
-  }
-  .result-count {
-    font-size: 32px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--c-primary-deep);
-  }
-  .result-count-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--c-primary-deep);
-  }
-  .warn-banner {
+  .retry-text {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0.7rem 0.9rem;
-    font-size: 13px;
-    color: var(--c-warning);
-    background: var(--c-warning-soft);
-    border-radius: var(--radius);
-  }
-  .result-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    min-width: 0;
+    font-size: 13.5px;
+    color: var(--c-danger);
   }
 
   .locked-icon {
@@ -763,18 +919,5 @@
     border-radius: 50%;
     background: var(--c-accent-soft);
     color: var(--c-accent);
-  }
-
-  .retry-banner {
-    margin-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--c-danger-soft);
-    background: var(--c-danger-soft);
-    border-radius: var(--radius);
   }
 </style>
