@@ -46,13 +46,14 @@ func normalizeToSiskopatuh(data any, docType string) any {
 		normalized["nama"] = extracted.Nama
 	}
 	// Identity number = NIK for a KTP, but the PASSPORT NUMBER for a passport
-	// (a passport has no NIK). Matches template jamaah.xlsm columns D/E.
+	// (a passport has no NIK). Jenis Identitas uses the Siskopatuh dropdown
+	// values NIK / PASPOR (template Sheet2 col E), not "KTP"/"Paspor".
 	if extracted.NIK != "" {
 		normalized["no_identitas"] = extracted.NIK
-		normalized["jenis_identitas"] = "KTP"
+		normalized["jenis_identitas"] = "NIK"
 	} else if extracted.NoPaspor != "" {
 		normalized["no_identitas"] = extracted.NoPaspor
-		normalized["jenis_identitas"] = "Paspor"
+		normalized["jenis_identitas"] = "PASPOR"
 	}
 	if extracted.NoPaspor != "" {
 		normalized["no_paspor"] = extracted.NoPaspor
@@ -74,11 +75,12 @@ func normalizeToSiskopatuh(data any, docType string) any {
 	if extracted.Alamat != "" {
 		normalized["alamat"] = extracted.Alamat
 	}
-	if extracted.Provinsi != "" {
-		normalized["provinsi"] = extracted.Provinsi
+	canonProv := mapProvinsi(extracted.Provinsi)
+	if canonProv != "" {
+		normalized["provinsi"] = canonProv
 	}
 	if extracted.Kabupaten != "" {
-		normalized["kabupaten"] = extracted.Kabupaten
+		normalized["kabupaten"] = mapKabupaten(canonProv, extracted.Kabupaten)
 	}
 	if extracted.Kecamatan != "" {
 		normalized["kecamatan"] = extracted.Kecamatan
@@ -92,17 +94,17 @@ func normalizeToSiskopatuh(data any, docType string) any {
 	if extracted.NoHP != "" {
 		normalized["no_hp"] = extracted.NoHP
 	}
-	if extracted.Kewarganegaraan != "" {
-		normalized["kewarganegaraan"] = extracted.Kewarganegaraan
+	if kw := mapKewarganegaraan(extracted.Kewarganegaraan); kw != "" {
+		normalized["kewarganegaraan"] = kw
 	}
 	if extracted.GolonganDarah != "" {
 		normalized["golongan_darah"] = extracted.GolonganDarah
 	}
-	if extracted.Pendidikan != "" {
-		normalized["pendidikan"] = extracted.Pendidikan
+	if pd := mapPendidikan(extracted.Pendidikan); pd != "" {
+		normalized["pendidikan"] = pd
 	}
-	if extracted.Pekerjaan != "" {
-		normalized["pekerjaan"] = extracted.Pekerjaan
+	if pk := mapPekerjaan(extracted.Pekerjaan); pk != "" {
+		normalized["pekerjaan"] = pk
 	}
 	if extracted.StatusPerkawinan != "" {
 		normalized["status_pernikahan"] = mapStatusNikah(extracted.StatusPerkawinan)
