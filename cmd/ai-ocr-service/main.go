@@ -65,9 +65,12 @@ func main() {
 	aiocrHandler := handler.NewAIOCRHandler(aiocrService)
 
 	app := fiber.New(fiber.Config{
-		AppName:      "jamaah-aiocr-service",
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		AppName: "jamaah-aiocr-service",
+		// Batch OCR can take a while; keep the server from severing the response
+		// before a (now-concurrent) multi-file scan finishes. The proxy chain is
+		// the real ceiling, but don't let Fiber be the first to time out at 60s.
+		ReadTimeout:  180 * time.Second,
+		WriteTimeout: 180 * time.Second,
 		BodyLimit:    50 * 1024 * 1024,
 	})
 	app.Use(recover.New(), sharedMW.RequestID(), sharedMW.RequestLogger(logger))

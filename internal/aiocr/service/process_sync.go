@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 )
 
 // ErrOCRUnavailable is returned when no AI provider is configured, so the
@@ -50,39 +51,72 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 		FileResults:        []SyncFileResult{},
 	}
 
-	for _, f := range files {
-		mimeType := f.ContentType
-		if mimeType == "" {
-			mimeType = detectMimeType(f.FileName)
-		}
+	// Process files CONCURRENTLY (bounded) so a batch of N photos finishes in
+	// ~max(per-file time) instead of the sum. A sequential batch easily exceeds
+	// the proxy / Fiber WriteTimeout (~60s) and the browser gets a 502 while the
+	// server is still grinding. Each goroutine writes only its own index, so the
+	// response keeps the upload order with no data race.
+	type fileOut struct {
+		data       any
+		hasData    bool
+		warnings   []map[string]any
+		fileResult SyncFileResult
+	}
+	outs := make([]fileOut, len(files))
 
-		result, err := s.analyzer.AnalyzeDocument(ctx, f.Data, mimeType)
-		if err != nil {
-			s.logger.Errorf("ocr analyze %s: %v", f.FileName, err)
-			res.FileResults = append(res.FileResults, SyncFileResult{
+	const maxConcurrent = 5
+	sem := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
+	for i := range files {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			f := files[i]
+			mimeType := f.ContentType
+			if mimeType == "" {
+				mimeType = detectMimeType(f.FileName)
+			}
+			result, err := s.analyzer.AnalyzeDocument(ctx, f.Data, mimeType)
+			if err != nil {
+				s.logger.Errorf("ocr analyze %s: %v", f.FileName, err)
+				outs[i].fileResult = SyncFileResult{
+					Filename: f.FileName,
+					Status:   "failed",
+					Error:    "gagal mengekstrak dokumen (coba foto yang lebih jelas/terang)",
+				}
+				return
+			}
+			outs[i].data = normalizeToSiskopatuh(result.ExtractedData, result.DocType)
+			outs[i].hasData = true
+			for _, ve := range validateExtractedData(result.ExtractedData, result.DocType) {
+				outs[i].warnings = append(outs[i].warnings, map[string]any{
+					"filename": f.FileName,
+					"field":    ve.Field,
+					"message":  ve.Message,
+					"value":    ve.Value,
+				})
+			}
+			outs[i].fileResult = SyncFileResult{
 				Filename: f.FileName,
-				Status:   "failed",
-				Error:    "gagal mengekstrak dokumen (coba foto yang lebih jelas/terang)",
-			})
-			continue
+				Status:   "completed",
+				DocType:  result.DocType,
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	// Assemble in upload order.
+	for i := range outs {
+		if outs[i].hasData {
+			res.Data = append(res.Data, outs[i].data)
 		}
-
-		res.Data = append(res.Data, normalizeToSiskopatuh(result.ExtractedData, result.DocType))
-
-		for _, ve := range validateExtractedData(result.ExtractedData, result.DocType) {
-			res.ValidationWarnings = append(res.ValidationWarnings, map[string]any{
-				"filename": f.FileName,
-				"field":    ve.Field,
-				"message":  ve.Message,
-				"value":    ve.Value,
-			})
+		for _, w := range outs[i].warnings {
+			res.ValidationWarnings = append(res.ValidationWarnings, w)
 		}
-
-		res.FileResults = append(res.FileResults, SyncFileResult{
-			Filename: f.FileName,
-			Status:   "completed",
-			DocType:  result.DocType,
-		})
+		res.FileResults = append(res.FileResults, outs[i].fileResult)
 	}
 
 	return res, nil
