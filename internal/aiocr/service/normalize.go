@@ -42,8 +42,16 @@ func normalizeToSiskopatuh(data any, docType string) any {
 
 	normalized := map[string]any{}
 
-	if extracted.Nama != "" {
-		normalized["nama"] = extracted.Nama
+	// Nama and Nama Paspor must both carry the same name, but the OCR sometimes
+	// fills only one of them (e.g. a passport's name read into nama_paspor only).
+	// Resolve one name (prefer Nama, fall back to NamaPaspor) and mirror it into
+	// both keys so neither column comes out blank.
+	if name := extracted.Nama; name != "" || extracted.NamaPaspor != "" {
+		if name == "" {
+			name = extracted.NamaPaspor
+		}
+		normalized["nama"] = name
+		normalized["nama_paspor"] = name
 	}
 	// Identity number = NIK for a KTP, but the PASSPORT NUMBER for a passport
 	// (a passport has no NIK). Jenis Identitas uses the Siskopatuh dropdown
@@ -57,13 +65,6 @@ func normalizeToSiskopatuh(data any, docType string) any {
 	}
 	if extracted.NoPaspor != "" {
 		normalized["no_paspor"] = extracted.NoPaspor
-	}
-	// Nama Paspor mirrors Nama so the preview shows the same name the export will —
-	// Siskopatuh expects an identical name in the "Nama" and "Nama Paspor" columns.
-	if extracted.Nama != "" {
-		normalized["nama_paspor"] = extracted.Nama
-	} else if extracted.NamaPaspor != "" {
-		normalized["nama_paspor"] = extracted.NamaPaspor
 	}
 	if extracted.TempatLahir != "" {
 		normalized["tempat_lahir"] = extracted.TempatLahir
