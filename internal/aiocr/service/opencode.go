@@ -43,7 +43,7 @@ type OpenCodeAnalyzer struct {
 
 func NewOpenCodeAnalyzer(apiKey, model, baseURL string) *OpenCodeAnalyzer {
 	if model == "" {
-		model = "gpt-5-nano"
+		model = "claude-haiku-4-5"
 	}
 	if baseURL == "" {
 		baseURL = "https://opencode.ai/zen/v1"

@@ -11,8 +11,8 @@ func TestLoadAIDefaults(t *testing.T) {
 	if c.AI.Provider != "opencode" {
 		t.Errorf("Provider = %q, want opencode", c.AI.Provider)
 	}
-	if c.AI.OpenCodeModel != "gpt-5-nano" {
-		t.Errorf("OpenCodeModel = %q, want gpt-5-nano", c.AI.OpenCodeModel)
+	if c.AI.OpenCodeModel != "claude-haiku-4-5" {
+		t.Errorf("OpenCodeModel = %q, want claude-haiku-4-5", c.AI.OpenCodeModel)
 	}
 	if c.AI.OpenCodeBaseURL != "https://opencode.ai/zen/v1" {
 		t.Errorf("OpenCodeBaseURL = %q", c.AI.OpenCodeBaseURL)

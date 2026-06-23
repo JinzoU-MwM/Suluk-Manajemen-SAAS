@@ -155,7 +155,7 @@ func Load() *Config {
 		AI: AIConfig{
 			Provider:        normalizeProvider(envOr("AI_PROVIDER", "opencode")),
 			OpenCodeAPIKey:  envOr("OPENCODE_API_KEY", ""),
-			OpenCodeModel:   envOr("OPENCODE_MODEL", "gpt-5-nano"),
+			OpenCodeModel:   envOr("OPENCODE_MODEL", "claude-haiku-4-5"),
 			OpenCodeBaseURL: strings.TrimRight(envOr("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1"), "/"),
 		},
 		Pakasir: PakasirConfig{
