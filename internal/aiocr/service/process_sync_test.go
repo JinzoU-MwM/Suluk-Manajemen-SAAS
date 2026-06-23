@@ -85,7 +85,7 @@ func (p *paspolAnalyzer) AnalyzeDocument(ctx context.Context, data []byte, mime 
 
 type fakePolicy struct{ m *PolicyManifest }
 
-func (f *fakePolicy) ExtractManifest(ctx context.Context, text string) (*PolicyManifest, error) {
+func (f *fakePolicy) ExtractManifest(ctx context.Context, data []byte, text string) (*PolicyManifest, error) {
 	return f.m, nil
 }
 
@@ -136,5 +136,49 @@ func TestProcessDocumentsSyncEnrichesFromPolicy(t *testing.T) {
 	}
 	if !sawPolis {
 		t.Errorf("polis.pdf missing from file_results")
+	}
+}
+
+func TestProcessDocumentsSyncSeedsRowsFromPolicyOnly(t *testing.T) {
+	// Uploading ONLY the policy (no identity scans) must still produce a row per
+	// jamaah listed in the manifest, with name/passport/birthdate + insurance.
+	orig := extractPDFText
+	extractPDFText = func(ctx context.Context, data []byte) (string, error) {
+		if string(data) == "POLISBYTES" {
+			return "MANIFEST ... NO POLIS", nil
+		}
+		return "", nil
+	}
+	defer func() { extractPDFText = orig }()
+
+	manifest := &PolicyManifest{
+		Asuransi: "PT. ASURANSI ASKRIDA SYARIAH", TanggalInput: "2026-06-17",
+		Entries: []PolicyEntry{
+			{Nama: "DWINTA DISTIANE", NoIdentitas: "X8557911", TanggalLahir: "1990-01-01",
+				NoPolis: "POL-1", TanggalAwal: "2026-07-01", TanggalAkhir: "2026-07-09"},
+			{Nama: "HENDRA MAHPUDIN", NoIdentitas: "X8558076", NoPolis: "POL-2",
+				TanggalAwal: "2026-07-01", TanggalAkhir: "2026-07-09"},
+		},
+	}
+	svc := (&AIOCRService{analyzer: &fakeAnalyzer{}, logger: zap.NewNop().Sugar()}).
+		WithPolicy(&fakePolicy{m: manifest})
+
+	files := []SyncFile{{FileName: "polis.pdf", ContentType: "application/pdf", Data: []byte("POLISBYTES")}}
+	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	if err != nil {
+		t.Fatalf("ProcessDocumentsSync: %v", err)
+	}
+	if len(res.Data) != 2 {
+		t.Fatalf("policy-only should seed 2 jamaah rows, got %d", len(res.Data))
+	}
+	r0 := res.Data[0].(map[string]any)
+	for k, want := range map[string]string{
+		"nama": "DWINTA DISTIANE", "no_paspor": "X8557911", "jenis_identitas": "PASPOR",
+		"tanggal_lahir": "1990-01-01", "asuransi": "ASURANSI ASKRIDA SYARIAH",
+		"no_polis": "POL-1", "tanggal_input_polis": "2026-06-17",
+	} {
+		if got, _ := r0[k].(string); got != want {
+			t.Errorf("seeded row[%q] = %q, want %q", k, got, want)
+		}
 	}
 }

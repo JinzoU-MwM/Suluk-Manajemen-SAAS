@@ -64,7 +64,7 @@ func TestNormPaspor(t *testing.T) {
 
 func TestParsePolicyJSON(t *testing.T) {
 	in := `{"asuransi":"PT. ASURANSI ASKRIDA SYARIAH","tanggal_input_polis":"17-June-2026",
-	"peserta":[{"no_identitas":"X2664222","no_polis":"122015022600316-000043","tanggal_awal_polis":"01-Jul-2026","tanggal_akhir_polis":"09-Jul-2026"},
+	"peserta":[{"nama":"LESTARI EKA CITRA","no_identitas":"X2664222","tanggal_lahir":"15-Jun-1987","no_polis":"122015022600316-000043","tanggal_awal_polis":"01-Jul-2026","tanggal_akhir_polis":"09-Jul-2026"},
 	{"no_identitas":" ","no_polis":"x"}]}`
 	m, err := parsePolicyJSON(in)
 	if err != nil {
@@ -77,8 +77,8 @@ func TestParsePolicyJSON(t *testing.T) {
 		t.Fatalf("entries = %d, want 1", len(m.Entries))
 	}
 	e := m.Entries[0]
-	if e.NoIdentitas != "X2664222" || e.NoPolis != "122015022600316-000043" ||
-		e.TanggalAwal != "2026-07-01" || e.TanggalAkhir != "2026-07-09" {
+	if e.Nama != "LESTARI EKA CITRA" || e.NoIdentitas != "X2664222" || e.TanggalLahir != "1987-06-15" ||
+		e.NoPolis != "122015022600316-000043" || e.TanggalAwal != "2026-07-01" || e.TanggalAkhir != "2026-07-09" {
 		t.Errorf("entry = %+v", e)
 	}
 }

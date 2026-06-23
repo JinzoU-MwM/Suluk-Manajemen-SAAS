@@ -59,11 +59,21 @@ func NewOpenCodeAnalyzer(apiKey, model, baseURL string) *OpenCodeAnalyzer {
 func (a *OpenCodeAnalyzer) Available() bool { return a != nil && a.apiKey != "" }
 
 // rasterizePDF is a package var so tests can stub it without invoking pdftoppm.
+// It renders page 1 (the single-document OCR path).
 var rasterizePDF = rasterizePDFImpl
 
-// rasterizePDFImpl renders page 1 of a PDF to PNG via poppler's `pdftoppm`
-// (-singlefile => the output is exactly <prefix>.png, no page-number suffix).
 func rasterizePDFImpl(ctx context.Context, data []byte) ([]byte, error) {
+	return rasterizePageImpl(ctx, data, 1)
+}
+
+// rasterizePDFPage renders a specific 1-indexed PDF page to PNG (used by the
+// policy extractor to read the manifest table from its page image). Package var
+// so tests can stub it.
+var rasterizePDFPage = rasterizePageImpl
+
+// rasterizePageImpl renders one page of a PDF to PNG via poppler's `pdftoppm`
+// (-singlefile => the output is exactly <prefix>.png, no page-number suffix).
+func rasterizePageImpl(ctx context.Context, data []byte, page int) ([]byte, error) {
 	in, err := os.CreateTemp("", "ocr-*.pdf")
 	if err != nil {
 		return nil, err
@@ -78,7 +88,8 @@ func rasterizePDFImpl(ctx context.Context, data []byte) ([]byte, error) {
 	prefix := in.Name() + "-out"
 	out := prefix + ".png"
 	defer os.Remove(out)
-	cmd := exec.CommandContext(ctx, "pdftoppm", "-png", "-r", "200", "-f", "1", "-l", "1", "-singlefile", in.Name(), prefix)
+	ps := fmt.Sprintf("%d", page)
+	cmd := exec.CommandContext(ctx, "pdftoppm", "-png", "-r", "200", "-f", ps, "-l", ps, "-singlefile", in.Name(), prefix)
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("pdftoppm gagal: %v: %s", err, string(combined))
 	}

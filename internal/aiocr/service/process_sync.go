@@ -150,6 +150,7 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 
 	// --- policy lane: extract manifests, then enrich identity rows by passport ---
 	entriesByPaspor := map[string]PolicyEntry{}
+	var ordered []PolicyEntry // manifest order, deduped by passport key
 	var docAsuransi, docTglInput string
 	for _, pd := range policies {
 		if s.policy == nil {
@@ -159,7 +160,7 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 			})
 			continue
 		}
-		m, err := s.policy.ExtractManifest(ctx, pd.text)
+		m, err := s.policy.ExtractManifest(ctx, pd.file.Data, pd.text)
 		if err != nil || m == nil {
 			s.logger.Errorf("policy extract %s: %v", pd.file.FileName, err)
 			res.FileResults = append(res.FileResults, SyncFileResult{
@@ -175,14 +176,28 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 			docTglInput = m.TanggalInput
 		}
 		for _, e := range m.Entries {
-			entriesByPaspor[normPaspor(e.NoIdentitas)] = e
+			k := normPaspor(e.NoIdentitas)
+			if _, seen := entriesByPaspor[k]; !seen {
+				ordered = append(ordered, e)
+			}
+			entriesByPaspor[k] = e
 		}
 		res.FileResults = append(res.FileResults, SyncFileResult{
 			Filename: pd.file.FileName, Status: "completed", DocType: "polis",
 		})
 	}
 	if len(entriesByPaspor) > 0 {
+		// Fill insurance columns on scanned rows that match a manifest entry…
 		enrichRowsWithPolicy(res.Data, entriesByPaspor, docAsuransi, docTglInput)
+		// …then seed a row for every jamaah listed in the policy who has not been
+		// scanned, so uploading the policy alone still produces the full list.
+		existing := existingPasporKeys(res.Data)
+		for _, e := range ordered {
+			if existing[normPaspor(e.NoIdentitas)] {
+				continue
+			}
+			res.Data = append(res.Data, policyEntryToRow(e, docAsuransi, docTglInput))
+		}
 	}
 
 	return res, nil
