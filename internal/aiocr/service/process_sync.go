@@ -144,6 +144,10 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 		res.FileResults = append(res.FileResults, outs[i].fileResult)
 	}
 
+	// Merge documents of the same jamaah (a passport and its visa share the
+	// passport number) so one person yields one row, not one row per file.
+	res.Data = mergeIdentityRows(res.Data)
+
 	// --- policy lane: extract manifests, then enrich identity rows by passport ---
 	entriesByPaspor := map[string]PolicyEntry{}
 	var docAsuransi, docTglInput string
