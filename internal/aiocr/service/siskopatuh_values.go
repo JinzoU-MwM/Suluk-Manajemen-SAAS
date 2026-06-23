@@ -164,3 +164,26 @@ func mapPekerjaan(s string) string {
 		return "LAINNYA"
 	}
 }
+
+// mapProviderVisa -> template Provider Visa dropdown. Saudi umrah e-visas are
+// issued via the "Saudi Digital Embassy" / Nusuk system, which is the direct
+// B2C channel, so any such wording (or an unrecognised issuer) collapses to the
+// "B2C" dropdown value. Empty stays empty.
+func mapProviderVisa(s string) string {
+	t := normUpper(s)
+	if t == "" {
+		return ""
+	}
+	if strings.Contains(t, "B2C") ||
+		strings.Contains(t, "SAUDI") ||
+		strings.Contains(t, "DIGITAL EMBASSY") ||
+		strings.Contains(t, "E-VISA") || strings.Contains(t, "EVISA") || strings.Contains(t, "E VISA") ||
+		strings.Contains(t, "ELECTRONIC") || strings.Contains(t, "ELEKTRONIK") ||
+		strings.Contains(t, "NUSUK") ||
+		strings.Contains(t, "KEDUTAAN") {
+		return "B2C"
+	}
+	// A recognised travel-agency issuer would already be a PT name; keep it
+	// uppercased as a best-effort match to the agency dropdown.
+	return t
+}

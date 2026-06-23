@@ -52,7 +52,7 @@ var templateColumns = []templateColumn{
 	{"Status Pernikahan", func(g fieldGetter) string { return mapStatusNikah(g.first("status_pernikahan", "status_perkawinan")) }},
 	{"Pendidikan", func(g fieldGetter) string { return mapPendidikan(g.first("pendidikan")) }},
 	{"Pekerjaan", func(g fieldGetter) string { return mapPekerjaan(g.first("pekerjaan")) }},
-	{"Provider Visa", func(g fieldGetter) string { return g.first("provider_visa") }},
+	{"Provider Visa", func(g fieldGetter) string { return mapProviderVisa(g.first("provider_visa")) }},
 	{"No Visa", func(g fieldGetter) string { return g.first("no_visa") }},
 	{"Tanggal Berlaku Visa (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_visa") }},
 	{"Tanggal Akhir  Visa (yyyy-mm-dd)", func(g fieldGetter) string { return g.first("tanggal_visa_akhir") }},
