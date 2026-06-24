@@ -19,6 +19,35 @@ func NewAIOCRRepo(pool *pgxpool.Pool) *AIOCRRepo {
 	return &AIOCRRepo{pool: pool}
 }
 
+// IncrementScanUsage atomically adds n successful scans to the org's counter for
+// the current calendar month (upsert on the (org, year, month) key). The
+// increment runs in the DB, so it is safe under the concurrent OCR goroutines.
+func (r *AIOCRRepo) IncrementScanUsage(ctx context.Context, orgID uuid.UUID, n int) error {
+	if n <= 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO scan_usage (org_id, year, month, documents_scanned)
+		VALUES ($1, EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int, $2)
+		ON CONFLICT (org_id, year, month)
+		DO UPDATE SET documents_scanned = scan_usage.documents_scanned + EXCLUDED.documents_scanned,
+		              updated_at = NOW()`,
+		orgID, n)
+	return err
+}
+
+// GetScanUsageThisMonth returns the org's scanned-document count for the current
+// calendar month (0 when no row exists yet).
+func (r *AIOCRRepo) GetScanUsageThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COALESCE((SELECT documents_scanned FROM scan_usage
+			WHERE org_id = $1 AND year = EXTRACT(YEAR FROM NOW())::int
+			  AND month = EXTRACT(MONTH FROM NOW())::int), 0)`,
+		orgID).Scan(&n)
+	return n, err
+}
+
 var (
 	ErrScanJobNotFound    = fmt.Errorf("scan job not found")
 	ErrScanResultNotFound = fmt.Errorf("scan result not found")

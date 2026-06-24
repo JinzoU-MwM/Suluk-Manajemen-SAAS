@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +45,7 @@ func TestProcessDocumentsSyncConcurrentAndOrdered(t *testing.T) {
 	}
 
 	start := time.Now()
-	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	res, err := svc.ProcessDocumentsSync(context.Background(), uuid.Nil, files, "default")
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("ProcessDocumentsSync: %v", err)
@@ -112,7 +113,7 @@ func TestProcessDocumentsSyncEnrichesFromPolicy(t *testing.T) {
 		{FileName: "paspor.jpg", ContentType: "image/jpeg", Data: []byte("img")},
 		{FileName: "polis.pdf", ContentType: "application/pdf", Data: []byte("POLISBYTES")},
 	}
-	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	res, err := svc.ProcessDocumentsSync(context.Background(), uuid.Nil, files, "default")
 	if err != nil {
 		t.Fatalf("ProcessDocumentsSync: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestProcessDocumentsSyncSeedsRowsFromPolicyOnly(t *testing.T) {
 		WithPolicy(&fakePolicy{m: manifest})
 
 	files := []SyncFile{{FileName: "polis.pdf", ContentType: "application/pdf", Data: []byte("POLISBYTES")}}
-	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	res, err := svc.ProcessDocumentsSync(context.Background(), uuid.Nil, files, "default")
 	if err != nil {
 		t.Fatalf("ProcessDocumentsSync: %v", err)
 	}

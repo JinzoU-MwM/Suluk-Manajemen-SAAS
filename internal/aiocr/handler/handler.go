@@ -93,7 +93,8 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 		})
 	}
 
-	result, err := h.svc.ProcessDocumentsSync(c.Context(), files, c.Query("cache_mode", "default"))
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	result, err := h.svc.ProcessDocumentsSync(c.Context(), claims.OrgID, files, c.Query("cache_mode", "default"))
 	if err != nil {
 		if errors.Is(err, service.ErrOCRUnavailable) {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"success": false, "error": err.Error()})
