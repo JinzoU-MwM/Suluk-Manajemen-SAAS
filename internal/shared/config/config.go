@@ -103,7 +103,10 @@ type GeminiConfig struct {
 
 // AIConfig selects and configures the AI provider for OCR + accounting insights.
 // Provider is "opencode" (default) or "gemini"; Gemini stays available for an
-// instant env-flip fallback.
+// instant env-flip fallback. The "opencode" provider is a generic
+// OpenAI-compatible chat-completions client; it defaults to the Aivene gateway
+// (https://api.aivene.com/v1) and can be repointed to any compatible endpoint
+// via OPENCODE_BASE_URL.
 type AIConfig struct {
 	Provider        string
 	OpenCodeAPIKey  string
@@ -156,7 +159,7 @@ func Load() *Config {
 			Provider:        normalizeProvider(envOr("AI_PROVIDER", "opencode")),
 			OpenCodeAPIKey:  envOr("OPENCODE_API_KEY", ""),
 			OpenCodeModel:   envOr("OPENCODE_MODEL", "claude-haiku-4-5"),
-			OpenCodeBaseURL: strings.TrimRight(envOr("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1"), "/"),
+			OpenCodeBaseURL: strings.TrimRight(envOr("OPENCODE_BASE_URL", "https://api.aivene.com/v1"), "/"),
 		},
 		Pakasir: PakasirConfig{
 			APIKey:      envOr("PAKASIR_API_KEY", ""),

@@ -46,7 +46,8 @@ func NewOpenCodeAnalyzer(apiKey, model, baseURL string) *OpenCodeAnalyzer {
 		model = "claude-haiku-4-5"
 	}
 	if baseURL == "" {
-		baseURL = "https://opencode.ai/zen/v1"
+		// Aivene gateway (OpenAI-compatible); override via OPENCODE_BASE_URL.
+		baseURL = "https://api.aivene.com/v1"
 	}
 	return &OpenCodeAnalyzer{
 		apiKey:  apiKey,
