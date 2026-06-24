@@ -31,16 +31,17 @@ const Unlimited = -1
 // A limit of Unlimited (-1) means no cap. Annual price 0 on a purchasable tier
 // would be invalid; only non-purchasable tiers (gratis/enterprise) carry 0.
 type Tier struct {
-	Key          string   `json:"key"`
-	Name         string   `json:"name"`
-	Rank         int      `json:"rank"`
-	MonthlyPrice int64    `json:"monthly_price"`
-	AnnualPrice  int64    `json:"annual_price"`
-	MaxJamaah    int      `json:"max_jamaah"`
-	MaxGroups    int      `json:"max_groups"`
-	MaxUsers     int      `json:"max_users"`
-	Purchasable  bool     `json:"purchasable"`
-	Features     []string `json:"features"`
+	Key              string   `json:"key"`
+	Name             string   `json:"name"`
+	Rank             int      `json:"rank"`
+	MonthlyPrice     int64    `json:"monthly_price"`
+	AnnualPrice      int64    `json:"annual_price"`
+	MaxJamaah        int      `json:"max_jamaah"`
+	MaxGroups        int      `json:"max_groups"`
+	MaxUsers         int      `json:"max_users"`
+	MaxScansPerMonth int      `json:"max_scans_per_month"`
+	Purchasable      bool     `json:"purchasable"`
+	Features         []string `json:"features"`
 }
 
 // Catalog is the canonical tier definition. Annual ≈ 10× monthly (~2 months free).
@@ -48,35 +49,35 @@ var Catalog = map[string]Tier{
 	Gratis: {
 		Key: Gratis, Name: "Gratis", Rank: 0,
 		MonthlyPrice: 0, AnnualPrice: 0,
-		MaxJamaah: 50, MaxGroups: 2, MaxUsers: 1,
+		MaxJamaah: 50, MaxGroups: 2, MaxUsers: 1, MaxScansPerMonth: 5,
 		Purchasable: false,
 		Features:    []string{"Hingga 50 jamaah", "Data jamaah & grup", "Manajemen paket dasar", "1 pengguna"},
 	},
 	Starter: {
 		Key: Starter, Name: "Starter", Rank: 1,
 		MonthlyPrice: 149000, AnnualPrice: 1490000,
-		MaxJamaah: 250, MaxGroups: 5, MaxUsers: 3,
+		MaxJamaah: 500, MaxGroups: 10, MaxUsers: 3, MaxScansPerMonth: 100,
 		Purchasable: true,
-		Features:    []string{"Hingga 250 jamaah", "CRM & pembayaran", "AI Scanner dokumen", "Hingga 3 pengguna", "Laporan dasar"},
+		Features:    []string{"Hingga 500 jamaah", "Pembayaran & cicilan jamaah", "AI Scanner 100 dok/bulan", "Hingga 3 pengguna", "Laporan dasar"},
 	},
 	Pro: {
 		Key: Pro, Name: "Pro", Rank: 2,
 		MonthlyPrice: 299000, AnnualPrice: 2990000,
-		MaxJamaah: Unlimited, MaxGroups: Unlimited, MaxUsers: 10,
+		MaxJamaah: Unlimited, MaxGroups: Unlimited, MaxUsers: 10, MaxScansPerMonth: Unlimited,
 		Purchasable: true,
 		Features:    []string{"Jamaah tak terbatas", "Semua modul (CRM, Keuangan, Kontrak)", "AI Scanner tanpa batas", "Hingga 10 pengguna", "Laporan & ekspor lanjutan"},
 	},
 	Bisnis: {
 		Key: Bisnis, Name: "Bisnis", Rank: 3,
 		MonthlyPrice: 599000, AnnualPrice: 5990000,
-		MaxJamaah: Unlimited, MaxGroups: Unlimited, MaxUsers: 25,
+		MaxJamaah: Unlimited, MaxGroups: Unlimited, MaxUsers: 25, MaxScansPerMonth: Unlimited,
 		Purchasable: true,
 		Features:    []string{"Semua fitur Pro", "Multi-cabang & multi-PT", "Hingga 25 pengguna", "Dukungan prioritas"},
 	},
 	Enterprise: {
 		Key: Enterprise, Name: "Enterprise", Rank: 4,
 		MonthlyPrice: 0, AnnualPrice: 0,
-		MaxJamaah: Unlimited, MaxGroups: Unlimited, MaxUsers: Unlimited,
+		MaxJamaah: Unlimited, MaxGroups: Unlimited, MaxUsers: Unlimited, MaxScansPerMonth: Unlimited,
 		Purchasable: false,
 		Features:    []string{"Semua fitur Bisnis", "Akses API & integrasi", "Pengguna tak terbatas", "Dukungan prioritas 24/7"},
 	},
