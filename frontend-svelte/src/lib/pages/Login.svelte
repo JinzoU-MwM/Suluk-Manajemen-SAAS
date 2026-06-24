@@ -274,7 +274,7 @@
       <!-- Tagline -->
       <p class="text-center text-slate-500 text-sm mb-6">
         {mode === "register"
-          ? "Daftar gratis - dapatkan trial 7 hari!"
+          ? "Daftar gratis - dapatkan trial 14 hari!"
           : "Input Data Jamaah, Gak Pake Lama."}
       </p>
 

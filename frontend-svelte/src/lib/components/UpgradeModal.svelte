@@ -412,7 +412,7 @@
                                         <Loader2 class="h-4 w-4 animate-spin" />
                                         Memproses...
                                     {:else}
-                                        Coba Pro 7 Hari Gratis
+                                        Coba Pro 14 Hari Gratis
                                     {/if}
                                 </button>
                                 <p
@@ -499,7 +499,7 @@
                         style="font-size: 14px; color: #64748b; margin-bottom: 16px;"
                     >
                         Verifikasi nomor WhatsApp Anda untuk mengaktifkan Pro
-                        Trial 7 hari gratis.
+                        Trial 14 hari gratis.
                     </p>
 
                     {#if !phoneOtpSent}

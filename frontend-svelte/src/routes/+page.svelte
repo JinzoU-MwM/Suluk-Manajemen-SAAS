@@ -7,7 +7,7 @@
   const BASE_URL = "https://suluk.site";
   const title = "Software Travel Umrah | Scan KTP/KK ke Siskopatuh - Suluk";
   const description =
-    "Otomatisasi input data jamaah 10x lebih cepat. Scan KTP/KK langsung jadi Excel Siskopatuh 32 kolom, auto rooming hotel, manifest digital mutawwif. Coba gratis 7 hari.";
+    "Otomatisasi input data jamaah 10x lebih cepat. Scan KTP/KK langsung jadi Excel Siskopatuh 32 kolom, auto rooming hotel, manifest digital mutawwif. Coba gratis 14 hari.";
 
   // Structured data (homepage). Kept as raw <script> tags injected via {@html}.
   const jsonLd = `
