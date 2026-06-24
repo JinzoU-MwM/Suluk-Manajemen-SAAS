@@ -32,6 +32,13 @@
     }
   }
 
+  // Pricing page shows 3 cards (Starter / Pro / Bisnis); Gratis & Enterprise are
+  // presented as secondary options below the grid (Pro is the hero anchor).
+  const mainPlans = PLANS.filter(
+    (p) => p.key === "starter" || p.key === "pro" || p.key === "bisnis",
+  );
+  const gratisPlan = PLANS.find((p) => p.key === "gratis");
+
   const modules = [
     { title: "Data Jamaah", desc: "Kelola data calon jamaah, dokumen, dan status pembayaran lengkap.", color: "#0f7a5a", svg: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
     { title: "AI Scanner", desc: "Pindai KTP, KK, dan paspor — data terisi otomatis dengan OCR.", color: "#2563c9", svg: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/>' },
@@ -261,7 +268,7 @@
         <p class="lp-sec-lead">Mulai gratis, tingkatkan saat bisnis berkembang. Tanpa biaya tersembunyi.</p>
       </div>
       <div class="lp-pricing">
-        {#each PLANS as p}
+        {#each mainPlans as p}
           <div class="lp-price {p.popular ? 'pop' : ''}">
             {#if p.popular}<span class="lp-price-badge">Paling Populer</span>{/if}
             <h3>{p.name}</h3>
@@ -281,6 +288,11 @@
             >{p.cta}</button>
           </div>
         {/each}
+      </div>
+      <div class="lp-pricing-alt">
+        <span>Baru mulai? <button type="button" class="lp-link-btn" onclick={() => onGoToRegister()}>Mulai gratis</button> — kelola sampai {gratisPlan.maxJamaah} jamaah, tanpa kartu kredit.</span>
+        <span class="lp-pricing-alt-sep" aria-hidden="true">·</span>
+        <span>Travel besar atau multi-cabang? <button type="button" class="lp-link-btn" onclick={() => window.open(SALES_WA, '_blank')}>Hubungi Sales (Enterprise)</button></span>
       </div>
     </div>
   </section>
@@ -465,7 +477,11 @@
   .lp-step h3 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
   .lp-step p { font-size: 14px; line-height: 1.55; color: var(--c-muted); margin: 0; }
 
-  .lp-pricing { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; align-items: stretch; }
+  .lp-pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: stretch; max-width: 940px; margin: 0 auto; }
+  .lp-pricing-alt { max-width: 940px; margin: 22px auto 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; text-align: center; font-size: 14px; color: var(--c-muted); }
+  .lp-pricing-alt-sep { color: var(--c-faint); }
+  .lp-link-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--c-primary-deep); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .lp-link-btn:hover { color: var(--c-primary); }
   .lp-price { border: 1px solid var(--c-line); border-radius: 20px; padding: 24px; background: var(--c-surface); display: flex; flex-direction: column; }
   .lp-price.pop { border: 2px solid var(--c-primary); box-shadow: 0 28px 60px -28px var(--c-primary); position: relative; }
   .lp-price-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--c-primary); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; }
