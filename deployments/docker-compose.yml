@@ -318,7 +318,7 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-opencode}
       OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
       OPENCODE_MODEL: ${OPENCODE_MODEL:-claude-haiku-4-5}
-      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-https://opencode.ai/zen/v1}
+      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-https://api.aivene.com/v1}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m
@@ -520,7 +520,7 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-opencode}
       OPENCODE_API_KEY: ${OPENCODE_API_KEY:-}
       OPENCODE_MODEL: ${OPENCODE_MODEL:-claude-haiku-4-5}
-      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-https://opencode.ai/zen/v1}
+      OPENCODE_BASE_URL: ${OPENCODE_BASE_URL:-https://api.aivene.com/v1}
       JWT_PRIVATE_KEY_PATH: /app/certs/private.pem
       JWT_PUBLIC_KEY_PATH: /app/certs/public.pem
       JWT_ACCESS_TTL: 15m

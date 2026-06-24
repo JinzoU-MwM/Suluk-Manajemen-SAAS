@@ -14,7 +14,7 @@ func TestLoadAIDefaults(t *testing.T) {
 	if c.AI.OpenCodeModel != "claude-haiku-4-5" {
 		t.Errorf("OpenCodeModel = %q, want claude-haiku-4-5", c.AI.OpenCodeModel)
 	}
-	if c.AI.OpenCodeBaseURL != "https://opencode.ai/zen/v1" {
+	if c.AI.OpenCodeBaseURL != "https://api.aivene.com/v1" {
 		t.Errorf("OpenCodeBaseURL = %q", c.AI.OpenCodeBaseURL)
 	}
 	if c.AI.OpenCodeAPIKey != "" {
