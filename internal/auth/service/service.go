@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -98,6 +99,13 @@ func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (
 	}
 	if err := s.repo.AddTeamMember(ctx, member); err != nil {
 		return nil, nil, nil, err
+	}
+
+	// Reverse trial: every new org starts on a 14-day Pro trial so the owner
+	// experiences the full product immediately. Best-effort — a failure here must
+	// not abort registration (the org simply starts on Gratis instead).
+	if err := s.ActivateTrial(ctx, org.ID); err != nil {
+		log.Printf("activate reverse trial (org %s): %v", org.ID, err)
 	}
 
 	tokens, err := s.jwt.GenerateTokenPair(userID, org.ID, "owner", user.Email, nil, nil)
