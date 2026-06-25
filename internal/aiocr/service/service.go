@@ -40,6 +40,15 @@ func (s *AIOCRService) Available() bool {
 	return s.analyzer != nil
 }
 
+// GetScanUsageThisMonth returns the org's scanned-document count for the current
+// calendar month. Returns 0 when no repo is wired (e.g. unit tests).
+func (s *AIOCRService) GetScanUsageThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	if s.repo == nil {
+		return 0, nil
+	}
+	return s.repo.GetScanUsageThisMonth(ctx, orgID)
+}
+
 func (s *AIOCRService) CreateScanJob(ctx context.Context, orgID, userID uuid.UUID, req model.CreateScanJobRequest) (*model.ScanJob, error) {
 	var packageID *uuid.UUID
 	if req.PackageID != nil && *req.PackageID != "" {

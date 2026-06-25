@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,6 +16,41 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
 )
+
+// validInternalKey authenticates a service-to-service call against the shared
+// INTERNAL_API_KEY using a constant-time comparison. An unset key fails closed.
+func validInternalKey(c *fiber.Ctx) bool {
+	want := os.Getenv("INTERNAL_API_KEY")
+	if want == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(c.Get("X-Internal-Key")), []byte(want)) == 1
+}
+
+// ScanUsageInternal is a service-to-service endpoint (NOT behind AuthMiddleware),
+// guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header. It reports
+// an org's AI-scan count for the current calendar month so auth-service can
+// surface it as usage_count on subscription status.
+func (h *AIOCRHandler) ScanUsageInternal(c *fiber.Ctx) error {
+	if !validInternalKey(c) {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req struct {
+		OrgID string `json:"org_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	n, err := h.svc.GetScanUsageThisMonth(c.Context(), orgID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"documents_scanned": n})
+}
 
 type AIOCRHandler struct {
 	svc *service.AIOCRService

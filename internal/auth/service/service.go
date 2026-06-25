@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,13 @@ type AuthService struct {
 	invoiceAddr string
 	httpc       *httpclient.Client
 	email       *email.Client
+	// aiocrAddr/internalKey let GetSubscriptionStatus enrich the response with the
+	// org's monthly scan count from the ai-ocr service (a separate DB). Empty when
+	// unconfigured → usage reported as 0. scanUsageCache shaves the cross-service
+	// round-trip off frequent status polls (same idea as jamaah's limit cache).
+	aiocrAddr      string
+	internalKey    string
+	scanUsageCache sync.Map // orgID -> scanUsageCacheEntry
 }
 
 func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis *sharedRedis.Client, jamaahAddr, invoiceAddr string) *AuthService {
@@ -46,6 +54,15 @@ func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis
 // WithEmail attaches a transactional-email client (for subscription invoices, etc.).
 func (s *AuthService) WithEmail(c *email.Client) *AuthService {
 	s.email = c
+	return s
+}
+
+// WithScanUsageSource points the service at the ai-ocr service (and the shared
+// internal key) so subscription status can report the org's monthly scan count.
+// Without it, usage is reported as 0.
+func (s *AuthService) WithScanUsageSource(aiocrAddr, internalKey string) *AuthService {
+	s.aiocrAddr = aiocrAddr
+	s.internalKey = internalKey
 	return s
 }
 

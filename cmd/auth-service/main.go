@@ -84,7 +84,8 @@ func main() {
 			SMTPUser:     cfg.Email.SMTPUser,
 			SMTPPass:     cfg.Email.SMTPPass,
 			ResendAPIKey: cfg.Email.ResendAPIKey,
-		}))
+		})).
+		WithScanUsageSource(os.Getenv("AIOCR_SERVICE_ADDR"), cfg.Internal.APIKey)
 	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{

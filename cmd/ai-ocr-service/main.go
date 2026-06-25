@@ -102,6 +102,11 @@ func main() {
 	genExcel := app.Group("/api/v1/generate-excel", authMW, sharedMW.RequireStaff)
 	genExcel.Post("/", aiocrHandler.GenerateExcel)
 
+	// Service-to-service: auth-service reads an org's monthly scan count to surface
+	// it as usage_count on subscription status. Guarded by X-Internal-Key inside
+	// the handler, so it is intentionally NOT behind AuthMiddleware.
+	app.Post("/api/v1/internal/scan-usage", aiocrHandler.ScanUsageInternal)
+
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
 			logger.Fatalf("ai/ocr service listen: %v", err)

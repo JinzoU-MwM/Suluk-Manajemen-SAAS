@@ -223,6 +223,11 @@ type SubscriptionStatusResponse struct {
 	MaxGroups         int        `json:"max_groups"`
 	MaxUsers          int        `json:"max_users"`
 	CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
+	// UsageCount is the org's AI scans this calendar month (sourced from the
+	// ai-ocr service); UsageLimit is the tier's monthly quota (Unlimited = -1).
+	// The frontend quota bar reads both off the subscription-status object.
+	UsageCount int `json:"usage_count"`
+	UsageLimit int `json:"usage_limit"`
 }
 
 // ActivatePlanRequest is the body of the internal service-to-service

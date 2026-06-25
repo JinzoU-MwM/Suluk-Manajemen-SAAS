@@ -131,8 +131,12 @@ services:
       REDIS_ADDR: redis:6379
       JAMAAH_SERVICE_ADDR: jamaah-service:50053
       INVOICE_SERVICE_ADDR: invoice-service:50054
+      # Read an org's monthly AI-scan count to surface as usage_count on
+      # subscription status (Phase 4a). Fail-open, so optional at runtime.
+      AIOCR_SERVICE_ADDR: ai-ocr-service:50056
       # Shared secret to authenticate the internal plan-activation endpoint
       # called by the payment webhook (must match invoice-service).
+      # Also authenticates the auth→ai-ocr scan-usage read.
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       # Transactional email (subscription invoice/confirmation, OTP, etc.).
       # SMTP preferred (mailspace.id); Resend is an optional fallback.
