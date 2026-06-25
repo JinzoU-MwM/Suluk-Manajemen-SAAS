@@ -138,6 +138,9 @@ services:
       # called by the payment webhook (must match invoice-service).
       # Also authenticates the auth→ai-ocr scan-usage read.
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      # Public app URL for the renewal-reminder "Perpanjang paket" link (Phase 5).
+      # Without it, cfg defaults to http://localhost:5173 (a broken link in emails).
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       # Transactional email (subscription invoice/confirmation, OTP, etc.).
       # SMTP preferred (mailspace.id); Resend is an optional fallback.
       EMAIL_FROM: ${EMAIL_FROM:-Suluk <admin@suluk.site>}
