@@ -18,6 +18,15 @@ export const paymentApi = {
         return unwrapData(await response.json());
     },
 
+    async createTopupOrder() {
+        const response = await apiFetch(`${API_URL}/payment/topup-order`, {
+            method: 'POST',
+            headers: authHeaders(),
+        });
+        if (!response.ok) throw new Error(await parseError(response));
+        return unwrapData(await response.json());
+    },
+
     async checkPaymentStatus(orderId) {
         const response = await apiFetch(`${API_URL}/payment/status/${orderId}`, {
             headers: authHeaders(),
