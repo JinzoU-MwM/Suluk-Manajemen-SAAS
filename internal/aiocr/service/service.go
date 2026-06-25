@@ -11,7 +11,11 @@ import (
 
 	"github.com/jamaah-in/v2/internal/aiocr/model"
 	"github.com/jamaah-in/v2/internal/aiocr/repository"
+	"github.com/jamaah-in/v2/internal/shared/plan"
 )
+
+// fairUseExceeded reports whether a monthly scan total has crossed the soft cap.
+func fairUseExceeded(total int) bool { return total >= plan.FairUseScanCap }
 
 type AIOCRService struct {
 	repo     *repository.AIOCRRepo

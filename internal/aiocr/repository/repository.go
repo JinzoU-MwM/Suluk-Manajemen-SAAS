@@ -71,6 +71,21 @@ func (r *AIOCRRepo) GetPurchasedScansThisMonth(ctx context.Context, orgID uuid.U
 	return n, err
 }
 
+// MarkFairUseAlerted stamps the current month's row as alerted IFF not already
+// stamped, returning true only for the first caller this month (so the WARN fires
+// once). Assumes the IncrementScanUsage row already exists.
+func (r *AIOCRRepo) MarkFairUseAlerted(ctx context.Context, orgID uuid.UUID) (bool, error) {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE scan_usage SET fairuse_alerted_at = NOW()
+		WHERE org_id = $1 AND year = EXTRACT(YEAR FROM NOW())::int
+		  AND month = EXTRACT(MONTH FROM NOW())::int AND fairuse_alerted_at IS NULL`,
+		orgID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 var (
 	ErrScanJobNotFound    = fmt.Errorf("scan job not found")
 	ErrScanResultNotFound = fmt.Errorf("scan result not found")

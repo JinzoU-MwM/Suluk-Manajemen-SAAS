@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	"github.com/jamaah-in/v2/internal/shared/plan"
 )
 
 // fakeAnalyzer simulates a slow OCR provider and records peak concurrency.
@@ -181,5 +183,14 @@ func TestProcessDocumentsSyncSeedsRowsFromPolicyOnly(t *testing.T) {
 		if got, _ := r0[k].(string); got != want {
 			t.Errorf("seeded row[%q] = %q, want %q", k, got, want)
 		}
+	}
+}
+
+func TestFairUseExceeded(t *testing.T) {
+	if fairUseExceeded(plan.FairUseScanCap - 1) {
+		t.Error("below cap should not exceed")
+	}
+	if !fairUseExceeded(plan.FairUseScanCap) {
+		t.Error("at cap should exceed")
 	}
 }

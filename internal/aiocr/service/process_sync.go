@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+
+	"github.com/jamaah-in/v2/internal/shared/plan"
 )
 
 // ErrOCRUnavailable is returned when no AI provider is configured, so the
@@ -214,6 +216,12 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, orgID uuid.UUID
 	if s.repo != nil && scanned > 0 {
 		if err := s.repo.IncrementScanUsage(ctx, orgID, scanned); err != nil {
 			s.logger.Errorf("record scan usage (org %s): %v", orgID, err)
+		} else if total, err := s.repo.GetScanUsageThisMonth(ctx, orgID); err == nil && fairUseExceeded(total) {
+			// Soft fair-use cap for "unlimited" tiers: WARN once per org/month for
+			// ops cost-protection — never blocks the scan.
+			if first, err := s.repo.MarkFairUseAlerted(ctx, orgID); err == nil && first {
+				s.logger.Warnf("fair-use: org %s reached %d scans this month (cap %d)", orgID, total, plan.FairUseScanCap)
+			}
 		}
 	}
 
