@@ -48,6 +48,29 @@ func (r *AIOCRRepo) GetScanUsageThisMonth(ctx context.Context, orgID uuid.UUID) 
 	return n, err
 }
 
+// CreditScanTopup records a purchased top-up for the org's current month. The
+// order_id PK + DO NOTHING make it idempotent: a duplicate webhook credits once.
+func (r *AIOCRRepo) CreditScanTopup(ctx context.Context, orderID, orgID uuid.UUID, scans int) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO scan_topups (order_id, org_id, year, month, scans)
+		VALUES ($1, $2, EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int, $3)
+		ON CONFLICT (order_id) DO NOTHING`,
+		orderID, orgID, scans)
+	return err
+}
+
+// GetPurchasedScansThisMonth sums the org's top-up credits for the current month
+// (0 when none).
+func (r *AIOCRRepo) GetPurchasedScansThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(scans), 0) FROM scan_topups
+		WHERE org_id = $1 AND year = EXTRACT(YEAR FROM NOW())::int
+		  AND month = EXTRACT(MONTH FROM NOW())::int`,
+		orgID).Scan(&n)
+	return n, err
+}
+
 var (
 	ErrScanJobNotFound    = fmt.Errorf("scan job not found")
 	ErrScanResultNotFound = fmt.Errorf("scan result not found")
