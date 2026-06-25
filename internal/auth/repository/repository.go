@@ -638,3 +638,65 @@ func (r *AuthRepo) StartCleanupScheduler(ctx context.Context) {
 	}()
 	r.RunStartupCleanup(ctx)
 }
+
+// ListExpiringSubscriptions returns active PAID subs expiring within 7 days
+// (the largest reminder threshold) that have not opted out of renewal.
+func (r *AuthRepo) ListExpiringSubscriptions(ctx context.Context) ([]model.ExpiringSub, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT org_id, plan, expires_at FROM subscriptions
+		WHERE status = 'active' AND plan <> 'gratis' AND cancel_at_period_end = FALSE
+		  AND expires_at IS NOT NULL AND expires_at > NOW() AND expires_at <= NOW() + INTERVAL '7 days'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.ExpiringSub
+	for rows.Next() {
+		var s model.ExpiringSub
+		if err := rows.Scan(&s.OrgID, &s.Plan, &s.ExpiresAt); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// GetOrgOwner returns the org owner's email + expiry-notification preference.
+func (r *AuthRepo) GetOrgOwner(ctx context.Context, orgID uuid.UUID) (email string, notifyExpiry bool, err error) {
+	err = r.pool.QueryRow(ctx,
+		`SELECT u.email, COALESCE(u.notify_expiry, TRUE)
+		FROM users u JOIN team_members tm ON u.id = tm.user_id
+		WHERE tm.org_id = $1 AND tm.role = 'owner' AND tm.status = 'active'
+		ORDER BY tm.joined_at LIMIT 1`,
+		orgID).Scan(&email, &notifyExpiry)
+	return email, notifyExpiry, err
+}
+
+// SentReminderThresholds lists thresholds already recorded for this expiry cycle.
+func (r *AuthRepo) SentReminderThresholds(ctx context.Context, orgID uuid.UUID, expiresAt time.Time) ([]int, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT threshold FROM subscription_reminders WHERE org_id = $1 AND expires_at = $2`,
+		orgID, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int
+	for rows.Next() {
+		var t int
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// MarkReminderSent records a threshold as sent (idempotent).
+func (r *AuthRepo) MarkReminderSent(ctx context.Context, orgID uuid.UUID, expiresAt time.Time, threshold int) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO subscription_reminders (org_id, expires_at, threshold)
+		VALUES ($1, $2, $3) ON CONFLICT (org_id, expires_at, threshold) DO NOTHING`,
+		orgID, expiresAt, threshold)
+	return err
+}

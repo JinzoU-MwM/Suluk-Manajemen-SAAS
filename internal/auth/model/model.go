@@ -214,6 +214,13 @@ type Subscription struct {
 	UpdatedAt         time.Time  `json:"updated_at" db:"updated_at"`
 }
 
+// ExpiringSub is the slice of a subscription the renewal-reminder job needs.
+type ExpiringSub struct {
+	OrgID     uuid.UUID
+	Plan      string
+	ExpiresAt time.Time
+}
+
 type SubscriptionStatusResponse struct {
 	Plan              string     `json:"plan"`
 	Status            string     `json:"status"`
