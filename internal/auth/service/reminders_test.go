@@ -2,7 +2,9 @@ package service
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestDueReminder(t *testing.T) {
@@ -30,5 +32,19 @@ func TestDueReminder(t *testing.T) {
 					c.daysLeft, c.sent, email, mark, ok, c.wantEmail, c.wantMark, c.wantOk)
 			}
 		})
+	}
+}
+
+func TestRenderRenewalEmail(t *testing.T) {
+	exp := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
+	subject, html := renderRenewalEmail("pro", 3, exp, "https://app.suluk.site/")
+
+	if !strings.Contains(subject, "Pro") || !strings.Contains(subject, "3 hari") {
+		t.Errorf("subject missing plan/days: %q", subject)
+	}
+	for _, want := range []string{"Pro", "3 hari", "01-07-2026", "https://app.suluk.site/", "Perpanjang"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("html missing %q:\n%s", want, html)
+		}
 	}
 }
