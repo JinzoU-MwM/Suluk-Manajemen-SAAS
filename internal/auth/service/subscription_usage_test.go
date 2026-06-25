@@ -44,18 +44,20 @@ func TestScanUsageThisMonthFetchesAndCaches(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		_, _ = w.Write([]byte(`{"success":true,"data":{"documents_scanned":7}}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"documents_scanned":7,"purchased_scans":100}}`))
 	}))
 	defer ts.Close()
 
 	s := &AuthService{httpc: httpclient.New(), aiocrAddr: addrOf(ts.URL), internalKey: "secret"}
 	org := uuid.New()
 
-	if got := s.scanUsageThisMonth(context.Background(), org); got != 7 {
-		t.Fatalf("first call got %d, want 7", got)
+	used, purchased := s.scanUsageThisMonth(context.Background(), org)
+	if used != 7 || purchased != 100 {
+		t.Fatalf("got (used=%d, purchased=%d), want (7, 100)", used, purchased)
 	}
-	if got := s.scanUsageThisMonth(context.Background(), org); got != 7 {
-		t.Fatalf("cached call got %d, want 7", got)
+	used2, _ := s.scanUsageThisMonth(context.Background(), org)
+	if used2 != 7 {
+		t.Fatalf("cached used = %d, want 7", used2)
 	}
 	if n := atomic.LoadInt32(&hits); n != 1 {
 		t.Errorf("ai-ocr hits = %d, want 1 (second call should be cached)", n)
@@ -71,8 +73,8 @@ func TestScanUsageThisMonthFailsOpen(t *testing.T) {
 	defer ts.Close()
 
 	s := &AuthService{httpc: httpclient.New(), aiocrAddr: addrOf(ts.URL), internalKey: "secret"}
-	if got := s.scanUsageThisMonth(context.Background(), uuid.New()); got != 0 {
-		t.Errorf("fail-open got %d, want 0", got)
+	if used, purchased := s.scanUsageThisMonth(context.Background(), uuid.New()); used != 0 || purchased != 0 {
+		t.Errorf("fail-open got (%d,%d), want (0,0)", used, purchased)
 	}
 }
 
@@ -80,7 +82,17 @@ func TestScanUsageThisMonthFailsOpen(t *testing.T) {
 // without attempting a call.
 func TestScanUsageThisMonthUnconfigured(t *testing.T) {
 	s := &AuthService{httpc: httpclient.New()}
-	if got := s.scanUsageThisMonth(context.Background(), uuid.New()); got != 0 {
-		t.Errorf("unconfigured got %d, want 0", got)
+	if used, purchased := s.scanUsageThisMonth(context.Background(), uuid.New()); used != 0 || purchased != 0 {
+		t.Errorf("unconfigured got (%d,%d), want (0,0)", used, purchased)
+	}
+}
+
+func TestUsageLimitAddsPurchased(t *testing.T) {
+	// Starter base 100 + 100 purchased = 200; Pro stays Unlimited.
+	if got := effectiveLimit(plan.Get(plan.Starter).MaxScansPerMonth, 100); got != 200 {
+		t.Errorf("starter effective limit = %d, want 200", got)
+	}
+	if got := effectiveLimit(plan.Get(plan.Pro).MaxScansPerMonth, 100); got != plan.Unlimited {
+		t.Errorf("pro effective limit = %d, want Unlimited", got)
 	}
 }
