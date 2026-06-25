@@ -203,16 +203,38 @@ func (s *InvoiceService) HandlePakasirWebhook(ctx context.Context, p model.Pakas
 		return nil
 	}
 
-	// Activate AFTER claiming. If activation fails, roll the order back to
+	// Apply the purchase AFTER claiming. On failure, roll the order back to
 	// pending so a later Pakasir retry re-attempts it — this avoids the
-	// paid-but-never-activated stuck state (customer charged, org left on free).
-	if err := s.activateSubscription(ctx, order, p.PaymentMethod); err != nil {
+	// paid-but-never-applied stuck state (customer charged, nothing granted).
+	var applyErr error
+	switch order.Purpose {
+	case "scan_topup":
+		applyErr = s.creditScanTopup(ctx, order)
+	default:
+		applyErr = s.activateSubscription(ctx, order, p.PaymentMethod)
+	}
+	if applyErr != nil {
 		if rerr := s.repo.RevertPaymentOrderToPending(ctx, order.ID); rerr != nil {
-			log.Printf("CRITICAL: order %s paid but activation AND revert failed — needs reconciliation: activate=%v revert=%v", order.ID, err, rerr)
+			log.Printf("CRITICAL: order %s paid but apply AND revert failed — needs reconciliation: apply=%v revert=%v", order.ID, applyErr, rerr)
 		}
-		return fmt.Errorf("activate subscription: %w", err) // transient → 5xx → retry
+		return fmt.Errorf("apply purchase: %w", applyErr) // transient → 5xx → retry
 	}
 	return nil
+}
+
+// creditScanTopup calls the ai-ocr internal endpoint to add the purchased scans
+// to the org's current month. Idempotent on the ai-ocr side (order_id key).
+func (s *InvoiceService) creditScanTopup(ctx context.Context, order *model.PaymentOrder) error {
+	if s.aiocrAddr == "" {
+		return fmt.Errorf("aiocr service address not configured")
+	}
+	body := map[string]any{
+		"order_id": order.ID.String(),
+		"org_id":   order.OrgID.String(),
+		"scans":    plan.ScanTopupScans,
+	}
+	headers := map[string]string{"X-Internal-Key": s.internalKey}
+	return s.httpc.PostJSON(ctx, s.aiocrAddr, "/api/v1/internal/scan-topup", headers, body, nil)
 }
 
 // activateSubscription calls the auth-service internal endpoint to flip the org
