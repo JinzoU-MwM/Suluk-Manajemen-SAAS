@@ -49,7 +49,42 @@ func (h *AIOCRHandler) ScanUsageInternal(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Internal(c, err)
 	}
-	return response.OK(c, fiber.Map{"documents_scanned": n})
+	purchased, err := h.svc.GetPurchasedScansThisMonth(c.Context(), orgID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"documents_scanned": n, "purchased_scans": purchased})
+}
+
+// ScanTopupInternal credits a paid scan top-up to an org's current month.
+// Service-to-service (X-Internal-Key); called by invoice-service's webhook.
+func (h *AIOCRHandler) ScanTopupInternal(c *fiber.Ctx) error {
+	if !validInternalKey(c) {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req struct {
+		OrderID string `json:"order_id"`
+		OrgID   string `json:"org_id"`
+		Scans   int    `json:"scans"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	orderID, err := uuid.Parse(req.OrderID)
+	if err != nil {
+		return response.BadRequest(c, "invalid order_id")
+	}
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	if req.Scans <= 0 {
+		return response.BadRequest(c, "scans must be positive")
+	}
+	if err := h.svc.CreditScanTopup(c.Context(), orderID, orgID, req.Scans); err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"credited": true})
 }
 
 type AIOCRHandler struct {

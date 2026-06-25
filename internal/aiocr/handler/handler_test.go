@@ -87,3 +87,40 @@ func TestScanUsageInternalReturnsCount(t *testing.T) {
 		t.Errorf("documents_scanned = %d, want 0 (nil repo)", out.Data.DocumentsScanned)
 	}
 }
+
+func TestScanTopupInternalRejectsMissingKey(t *testing.T) {
+	t.Setenv("INTERNAL_API_KEY", "testkey")
+	h := NewAIOCRHandler(service.NewAIOCRService(nil, nil, zap.NewNop().Sugar()))
+	app := fiber.New()
+	app.Post("/api/v1/internal/scan-topup", h.ScanTopupInternal)
+
+	body, _ := json.Marshal(map[string]any{"order_id": uuid.NewString(), "org_id": uuid.NewString(), "scans": 100})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/internal/scan-topup", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestScanTopupInternalCreditsWithValidKey(t *testing.T) {
+	t.Setenv("INTERNAL_API_KEY", "testkey")
+	h := NewAIOCRHandler(service.NewAIOCRService(nil, nil, zap.NewNop().Sugar()))
+	app := fiber.New()
+	app.Post("/api/v1/internal/scan-topup", h.ScanTopupInternal)
+
+	body, _ := json.Marshal(map[string]any{"order_id": uuid.NewString(), "org_id": uuid.NewString(), "scans": 100})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/internal/scan-topup", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Key", "testkey")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK { // nil repo → credit is a no-op success
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+}

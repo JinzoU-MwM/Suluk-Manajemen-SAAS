@@ -106,6 +106,7 @@ func main() {
 	// it as usage_count on subscription status. Guarded by X-Internal-Key inside
 	// the handler, so it is intentionally NOT behind AuthMiddleware.
 	app.Post("/api/v1/internal/scan-usage", aiocrHandler.ScanUsageInternal)
+	app.Post("/api/v1/internal/scan-topup", aiocrHandler.ScanTopupInternal)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {
