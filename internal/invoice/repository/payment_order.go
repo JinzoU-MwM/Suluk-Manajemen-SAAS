@@ -10,17 +10,17 @@ import (
 
 func (r *InvoiceRepo) CreatePaymentOrder(ctx context.Context, order *model.PaymentOrder) error {
 	query := `
-		INSERT INTO payment_orders (id, org_id, user_id, plan, plan_type, amount, status, redirect_url, gateway_ref)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO payment_orders (id, org_id, user_id, plan, plan_type, amount, status, redirect_url, gateway_ref, purpose)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING created_at, updated_at`
 	return r.pool.QueryRow(ctx, query,
 		order.ID, order.OrgID, order.UserID, order.Plan, order.PlanType, order.Amount,
-		order.Status, order.RedirectURL, order.GatewayRef,
+		order.Status, order.RedirectURL, order.GatewayRef, defaultPurpose(order.Purpose),
 	).Scan(&order.CreatedAt, &order.UpdatedAt)
 }
 
 func (r *InvoiceRepo) GetPaymentOrder(ctx context.Context, orderID, orgID uuid.UUID) (*model.PaymentOrder, error) {
-	query := `SELECT id, org_id, user_id, plan, plan_type, amount, status, redirect_url, gateway_ref, payment_method, completed_at, created_at, updated_at
+	query := `SELECT id, org_id, user_id, plan, plan_type, amount, status, purpose, redirect_url, gateway_ref, payment_method, completed_at, created_at, updated_at
 		FROM payment_orders WHERE id = $1 AND org_id = $2`
 	return scanPaymentOrder(r.pool.QueryRow(ctx, query, orderID, orgID))
 }
@@ -28,7 +28,7 @@ func (r *InvoiceRepo) GetPaymentOrder(ctx context.Context, orderID, orgID uuid.U
 // GetPaymentOrderByID looks up an order without org scoping — used by the
 // payment webhook, which only receives the order_id from Pakasir.
 func (r *InvoiceRepo) GetPaymentOrderByID(ctx context.Context, orderID uuid.UUID) (*model.PaymentOrder, error) {
-	query := `SELECT id, org_id, user_id, plan, plan_type, amount, status, redirect_url, gateway_ref, payment_method, completed_at, created_at, updated_at
+	query := `SELECT id, org_id, user_id, plan, plan_type, amount, status, purpose, redirect_url, gateway_ref, payment_method, completed_at, created_at, updated_at
 		FROM payment_orders WHERE id = $1`
 	return scanPaymentOrder(r.pool.QueryRow(ctx, query, orderID))
 }
@@ -41,13 +41,22 @@ func scanPaymentOrder(row rowScanner) (*model.PaymentOrder, error) {
 	var o model.PaymentOrder
 	err := row.Scan(
 		&o.ID, &o.OrgID, &o.UserID, &o.Plan, &o.PlanType, &o.Amount,
-		&o.Status, &o.RedirectURL, &o.GatewayRef, &o.PaymentMethod, &o.CompletedAt,
+		&o.Status, &o.Purpose, &o.RedirectURL, &o.GatewayRef, &o.PaymentMethod, &o.CompletedAt,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get payment order: %w", err)
 	}
 	return &o, nil
+}
+
+// defaultPurpose keeps existing callers (which never set Purpose) on the
+// subscription path.
+func defaultPurpose(p string) string {
+	if p == "" {
+		return "subscription"
+	}
+	return p
 }
 
 func (r *InvoiceRepo) UpdatePaymentOrderStatus(ctx context.Context, orderID, orgID uuid.UUID, status string) error {

@@ -277,6 +277,7 @@ type PaymentOrder struct {
 	PlanType      string     `json:"plan_type" db:"plan_type"` // period: monthly/yearly
 	Amount        int64      `json:"amount" db:"amount"`
 	Status        string     `json:"status" db:"status"`
+	Purpose       string     `json:"purpose" db:"purpose"` // "subscription" | "scan_topup"
 	RedirectURL   *string    `json:"redirect_url,omitempty" db:"redirect_url"`
 	GatewayRef    *string    `json:"gateway_ref,omitempty" db:"gateway_ref"`
 	PaymentMethod *string    `json:"payment_method,omitempty" db:"payment_method"`
