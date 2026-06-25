@@ -244,6 +244,8 @@ services:
       POSTGRES_SSLMODE: require
       NATS_ADDR: nats://nats:4222
       AUTH_SERVICE_ADDR: auth-service:50051
+      # Credit paid scan top-ups into ai-ocr after the Pakasir webhook (Phase 4b).
+      AIOCR_SERVICE_ADDR: ai-ocr-service:50056
       # Public base URL of the app (used to build the Pakasir redirect-back link).
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       # Shared internal secret (must match auth-service).
