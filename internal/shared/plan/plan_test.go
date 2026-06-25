@@ -139,3 +139,15 @@ func TestStarterRetunedLimits(t *testing.T) {
 		t.Errorf("Starter MaxGroups = %d, want 10", s.MaxGroups)
 	}
 }
+
+func TestScanTopupAndFairUseConstants(t *testing.T) {
+	if ScanTopupPrice != 49000 {
+		t.Errorf("ScanTopupPrice = %d, want 49000", ScanTopupPrice)
+	}
+	if ScanTopupScans != 100 {
+		t.Errorf("ScanTopupScans = %d, want 100", ScanTopupScans)
+	}
+	if FairUseScanCap != 2000 {
+		t.Errorf("FairUseScanCap = %d, want 2000", FairUseScanCap)
+	}
+}

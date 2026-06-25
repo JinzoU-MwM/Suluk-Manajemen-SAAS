@@ -27,6 +27,17 @@ const (
 // Unlimited marks a limit field as having no cap.
 const Unlimited = -1
 
+// Scan top-up SKU (Phase 4b): a one-time purchase that adds ScanTopupScans to a
+// Starter org's quota for the current month. Server-authoritative price (IDR).
+const (
+	ScanTopupPrice = 49000
+	ScanTopupScans = 100
+)
+
+// FairUseScanCap is the monthly soft cap for "unlimited" tiers (Pro/Bisnis):
+// crossing it raises an ops WARN, never a block.
+const FairUseScanCap = 2000
+
 // Tier describes one subscription plan. Prices are in IDR (no decimals).
 // A limit of Unlimited (-1) means no cap. Annual price 0 on a purchasable tier
 // would be invalid; only non-purchasable tiers (gratis/enterprise) carry 0.

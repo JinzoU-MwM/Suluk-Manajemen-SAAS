@@ -3,6 +3,10 @@
 
 export const UNLIMITED = -1;
 
+// Scan top-up SKU (mirror of plan.go ScanTopupPrice/ScanTopupScans).
+export const SCAN_TOPUP_PRICE = 49000;
+export const SCAN_TOPUP_SCANS = 100;
+
 /** Ordered tier catalog (low → high). Prices in IDR (no decimals). */
 export const PLANS = [
     {
