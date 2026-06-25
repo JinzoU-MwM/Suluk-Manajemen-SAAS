@@ -86,6 +86,8 @@ func main() {
 			ResendAPIKey: cfg.Email.ResendAPIKey,
 		})).
 		WithScanUsageSource(os.Getenv("AIOCR_SERVICE_ADDR"), cfg.Internal.APIKey)
+	// Renewal reminders (Phase 5): email org owners H-7/3/1 before a paid sub lapses.
+	authService.StartRenewalReminderScheduler(ctx, cfg.App.PublicURL)
 	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{
