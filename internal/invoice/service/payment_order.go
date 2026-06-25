@@ -69,6 +69,53 @@ func (s *InvoiceService) CreatePaymentOrder(ctx context.Context, orgID, userID u
 	}, nil
 }
 
+// callerPlan fetches the caller org's tier from auth (forwarding the caller's
+// bearer token), used to gate Starter-only purchases.
+func (s *InvoiceService) callerPlan(ctx context.Context, authToken string) (string, error) {
+	var out struct {
+		Plan string `json:"plan"`
+	}
+	if err := s.httpc.GetJSON(ctx, s.authAddr, "/api/v1/subscription/status", authToken, &out); err != nil {
+		return "", fmt.Errorf("check plan: %w", err)
+	}
+	return out.Plan, nil
+}
+
+// CreateTopupOrder creates a pending scan-topup order (server-priced) and returns
+// the Pakasir checkout URL. Only Starter orgs may buy top-ups.
+func (s *InvoiceService) CreateTopupOrder(ctx context.Context, orgID, userID uuid.UUID, authToken string) (*model.PaymentOrderResponse, error) {
+	p, err := s.callerPlan(ctx, authToken)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Normalize(p) != plan.Starter {
+		return nil, fmt.Errorf("top-up tersedia hanya untuk paket Starter")
+	}
+
+	orderID := uuid.New()
+	order := &model.PaymentOrder{
+		ID:      orderID,
+		OrgID:   orgID,
+		UserID:  userID,
+		Plan:    plan.Starter,
+		Amount:  plan.ScanTopupPrice,
+		Status:  "pending",
+		Purpose: "scan_topup",
+	}
+	if err := s.repo.CreatePaymentOrder(ctx, order); err != nil {
+		return nil, fmt.Errorf("create topup order: %w", err)
+	}
+
+	payURL := s.pakasirPayURL(orderID.String(), plan.ScanTopupPrice)
+	order.RedirectURL = &payURL
+	return &model.PaymentOrderResponse{
+		OrderID:    orderID.String(),
+		PaymentURL: payURL,
+		Status:     "pending",
+		Amount:     plan.ScanTopupPrice,
+	}, nil
+}
+
 // pakasirPayURL builds the Pakasir hosted-checkout URL (redirect method):
 // {base}/pay/{slug}/{amount}?order_id={id}&redirect={publicURL}/?payment=success
 func (s *InvoiceService) pakasirPayURL(orderID string, amount int64) string {

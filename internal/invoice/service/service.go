@@ -22,6 +22,7 @@ type InvoiceService struct {
 	pakasir     config.PakasirConfig
 	internalKey string
 	authAddr    string
+	aiocrAddr   string
 	publicURL   string
 	httpc       *httpclient.Client
 }
@@ -31,6 +32,7 @@ type PaymentDeps struct {
 	Pakasir     config.PakasirConfig
 	InternalKey string
 	AuthAddr    string
+	AiocrAddr   string
 	PublicURL   string
 }
 
@@ -43,6 +45,7 @@ func (s *InvoiceService) WithPayments(d PaymentDeps) *InvoiceService {
 	s.pakasir = d.Pakasir
 	s.internalKey = d.InternalKey
 	s.authAddr = d.AuthAddr
+	s.aiocrAddr = d.AiocrAddr
 	s.publicURL = d.PublicURL
 	return s
 }

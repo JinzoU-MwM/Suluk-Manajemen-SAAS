@@ -32,6 +32,17 @@ func (h *InvoiceHandler) CreatePaymentOrder(c *fiber.Ctx) error {
 	return response.Created(c, result)
 }
 
+// CreateTopupOrder starts a Starter scan top-up purchase. Server-priced; the
+// caller's token is forwarded so the service can verify the org is on Starter.
+func (h *InvoiceHandler) CreateTopupOrder(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	result, err := h.svc.CreateTopupOrder(c.Context(), claims.OrgID, claims.UserID, c.Get("Authorization"))
+	if err != nil {
+		return response.BadRequest(c, err.Error())
+	}
+	return response.Created(c, result)
+}
+
 // PakasirWebhook is the public callback Pakasir hits when a payment completes.
 // It is NOT behind AuthMiddleware (called server-to-server by Pakasir); the
 // service layer independently verifies the transaction before activating.
