@@ -114,3 +114,40 @@ func TestAtLeast(t *testing.T) {
 		t.Error("starter should not be at least pro")
 	}
 }
+
+func TestScanQuota(t *testing.T) {
+	cases := map[string]int{
+		Gratis:     5,
+		Starter:    100,
+		Pro:        Unlimited,
+		Bisnis:     Unlimited,
+		Enterprise: Unlimited,
+	}
+	for key, want := range cases {
+		if got := Get(key).MaxScansPerMonth; got != want {
+			t.Errorf("%s MaxScansPerMonth = %d, want %d", key, got, want)
+		}
+	}
+}
+
+func TestStarterRetunedLimits(t *testing.T) {
+	s := Get(Starter)
+	if s.MaxJamaah != 500 {
+		t.Errorf("Starter MaxJamaah = %d, want 500", s.MaxJamaah)
+	}
+	if s.MaxGroups != 10 {
+		t.Errorf("Starter MaxGroups = %d, want 10", s.MaxGroups)
+	}
+}
+
+func TestScanTopupAndFairUseConstants(t *testing.T) {
+	if ScanTopupPrice != 49000 {
+		t.Errorf("ScanTopupPrice = %d, want 49000", ScanTopupPrice)
+	}
+	if ScanTopupScans != 100 {
+		t.Errorf("ScanTopupScans = %d, want 100", ScanTopupScans)
+	}
+	if FairUseScanCap != 2000 {
+		t.Errorf("FairUseScanCap = %d, want 2000", FairUseScanCap)
+	}
+}

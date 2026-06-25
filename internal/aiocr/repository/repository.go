@@ -19,6 +19,73 @@ func NewAIOCRRepo(pool *pgxpool.Pool) *AIOCRRepo {
 	return &AIOCRRepo{pool: pool}
 }
 
+// IncrementScanUsage atomically adds n successful scans to the org's counter for
+// the current calendar month (upsert on the (org, year, month) key). The
+// increment runs in the DB, so it is safe under the concurrent OCR goroutines.
+func (r *AIOCRRepo) IncrementScanUsage(ctx context.Context, orgID uuid.UUID, n int) error {
+	if n <= 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO scan_usage (org_id, year, month, documents_scanned)
+		VALUES ($1, EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int, $2)
+		ON CONFLICT (org_id, year, month)
+		DO UPDATE SET documents_scanned = scan_usage.documents_scanned + EXCLUDED.documents_scanned,
+		              updated_at = NOW()`,
+		orgID, n)
+	return err
+}
+
+// GetScanUsageThisMonth returns the org's scanned-document count for the current
+// calendar month (0 when no row exists yet).
+func (r *AIOCRRepo) GetScanUsageThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COALESCE((SELECT documents_scanned FROM scan_usage
+			WHERE org_id = $1 AND year = EXTRACT(YEAR FROM NOW())::int
+			  AND month = EXTRACT(MONTH FROM NOW())::int), 0)`,
+		orgID).Scan(&n)
+	return n, err
+}
+
+// CreditScanTopup records a purchased top-up for the org's current month. The
+// order_id PK + DO NOTHING make it idempotent: a duplicate webhook credits once.
+func (r *AIOCRRepo) CreditScanTopup(ctx context.Context, orderID, orgID uuid.UUID, scans int) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO scan_topups (order_id, org_id, year, month, scans)
+		VALUES ($1, $2, EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int, $3)
+		ON CONFLICT (order_id) DO NOTHING`,
+		orderID, orgID, scans)
+	return err
+}
+
+// GetPurchasedScansThisMonth sums the org's top-up credits for the current month
+// (0 when none).
+func (r *AIOCRRepo) GetPurchasedScansThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(scans), 0) FROM scan_topups
+		WHERE org_id = $1 AND year = EXTRACT(YEAR FROM NOW())::int
+		  AND month = EXTRACT(MONTH FROM NOW())::int`,
+		orgID).Scan(&n)
+	return n, err
+}
+
+// MarkFairUseAlerted stamps the current month's row as alerted IFF not already
+// stamped, returning true only for the first caller this month (so the WARN fires
+// once). Assumes the IncrementScanUsage row already exists.
+func (r *AIOCRRepo) MarkFairUseAlerted(ctx context.Context, orgID uuid.UUID) (bool, error) {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE scan_usage SET fairuse_alerted_at = NOW()
+		WHERE org_id = $1 AND year = EXTRACT(YEAR FROM NOW())::int
+		  AND month = EXTRACT(MONTH FROM NOW())::int AND fairuse_alerted_at IS NULL`,
+		orgID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 var (
 	ErrScanJobNotFound    = fmt.Errorf("scan job not found")
 	ErrScanResultNotFound = fmt.Errorf("scan result not found")

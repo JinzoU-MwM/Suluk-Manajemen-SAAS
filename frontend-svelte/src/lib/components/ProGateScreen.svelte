@@ -63,7 +63,7 @@
                         Memproses...
                     {:else}
                         <Sparkles class="h-4 w-4" />
-                        Coba GRATIS 7 Hari
+                        Coba GRATIS 14 Hari
                     {/if}
                 </button>
                 <p class="gate-trial-note">

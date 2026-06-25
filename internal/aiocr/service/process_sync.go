@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	"github.com/google/uuid"
+
+	"github.com/jamaah-in/v2/internal/shared/plan"
 )
 
 // ErrOCRUnavailable is returned when no AI provider is configured, so the
@@ -40,7 +44,7 @@ type ProcessDocumentsResult struct {
 //
 // cacheMode is accepted for forward-compat with the UI's cache selector but is
 // not yet wired to the OCR cache table (every file is processed fresh).
-func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFile, cacheMode string) (*ProcessDocumentsResult, error) {
+func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, orgID uuid.UUID, files []SyncFile, cacheMode string) (*ProcessDocumentsResult, error) {
 	if s.analyzer == nil {
 		return nil, ErrOCRUnavailable
 	}
@@ -197,6 +201,27 @@ func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, files []SyncFil
 				continue
 			}
 			res.Data = append(res.Data, policyEntryToRow(e, docAsuransi, docTglInput))
+		}
+	}
+
+	// Meter successful scans (best-effort) toward the org's monthly quota. Counts
+	// every completed document (identity + policy); a failure here must not affect
+	// the OCR response returned to the user.
+	scanned := 0
+	for _, fr := range res.FileResults {
+		if fr.Status == "completed" {
+			scanned++
+		}
+	}
+	if s.repo != nil && scanned > 0 {
+		if err := s.repo.IncrementScanUsage(ctx, orgID, scanned); err != nil {
+			s.logger.Errorf("record scan usage (org %s): %v", orgID, err)
+		} else if total, err := s.repo.GetScanUsageThisMonth(ctx, orgID); err == nil && fairUseExceeded(total) {
+			// Soft fair-use cap for "unlimited" tiers: WARN once per org/month for
+			// ops cost-protection — never blocks the scan.
+			if first, err := s.repo.MarkFairUseAlerted(ctx, orgID); err == nil && first {
+				s.logger.Warnf("fair-use: org %s reached %d scans this month (cap %d)", orgID, total, plan.FairUseScanCap)
+			}
 		}
 	}
 

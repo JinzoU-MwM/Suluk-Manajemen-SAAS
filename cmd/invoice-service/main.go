@@ -66,6 +66,7 @@ func main() {
 		Pakasir:     cfg.Pakasir,
 		InternalKey: cfg.Internal.APIKey,
 		AuthAddr:    os.Getenv("AUTH_SERVICE_ADDR"),
+		AiocrAddr:   os.Getenv("AIOCR_SERVICE_ADDR"),
 		PublicURL:   cfg.App.PublicURL,
 	})
 	invoiceHandler := handler.NewInvoiceHandler(invoiceService)
@@ -136,6 +137,7 @@ func main() {
 
 	payment := app.Group("/api/v1/payment", authMW, sharedMW.RequireStaff)
 	payment.Post("/create-order", invoiceHandler.CreatePaymentOrder)
+	payment.Post("/topup-order", invoiceHandler.CreateTopupOrder)
 	payment.Get("/status/:id", invoiceHandler.CheckPaymentStatus)
 
 	// Kasir POS — cash drawer sessions (buka/tutup kas).

@@ -11,7 +11,11 @@ import (
 
 	"github.com/jamaah-in/v2/internal/aiocr/model"
 	"github.com/jamaah-in/v2/internal/aiocr/repository"
+	"github.com/jamaah-in/v2/internal/shared/plan"
 )
+
+// fairUseExceeded reports whether a monthly scan total has crossed the soft cap.
+func fairUseExceeded(total int) bool { return total >= plan.FairUseScanCap }
 
 type AIOCRService struct {
 	repo     *repository.AIOCRRepo
@@ -38,6 +42,32 @@ func (s *AIOCRService) WithPolicy(p PolicyExtractor) *AIOCRService {
 // Available reports whether OCR is configured (Gemini API key present).
 func (s *AIOCRService) Available() bool {
 	return s.analyzer != nil
+}
+
+// GetScanUsageThisMonth returns the org's scanned-document count for the current
+// calendar month. Returns 0 when no repo is wired (e.g. unit tests).
+func (s *AIOCRService) GetScanUsageThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	if s.repo == nil {
+		return 0, nil
+	}
+	return s.repo.GetScanUsageThisMonth(ctx, orgID)
+}
+
+// GetPurchasedScansThisMonth returns the org's bought top-up credits this month
+// (0 when no repo is wired).
+func (s *AIOCRService) GetPurchasedScansThisMonth(ctx context.Context, orgID uuid.UUID) (int, error) {
+	if s.repo == nil {
+		return 0, nil
+	}
+	return s.repo.GetPurchasedScansThisMonth(ctx, orgID)
+}
+
+// CreditScanTopup records a purchased top-up (idempotent). No-op without a repo.
+func (s *AIOCRService) CreditScanTopup(ctx context.Context, orderID, orgID uuid.UUID, scans int) error {
+	if s.repo == nil {
+		return nil
+	}
+	return s.repo.CreditScanTopup(ctx, orderID, orgID, scans)
 }
 
 func (s *AIOCRService) CreateScanJob(ctx context.Context, orgID, userID uuid.UUID, req model.CreateScanJobRequest) (*model.ScanJob, error) {

@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,6 +16,76 @@ import (
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
 )
+
+// validInternalKey authenticates a service-to-service call against the shared
+// INTERNAL_API_KEY using a constant-time comparison. An unset key fails closed.
+func validInternalKey(c *fiber.Ctx) bool {
+	want := os.Getenv("INTERNAL_API_KEY")
+	if want == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(c.Get("X-Internal-Key")), []byte(want)) == 1
+}
+
+// ScanUsageInternal is a service-to-service endpoint (NOT behind AuthMiddleware),
+// guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header. It reports
+// an org's AI-scan count for the current calendar month so auth-service can
+// surface it as usage_count on subscription status.
+func (h *AIOCRHandler) ScanUsageInternal(c *fiber.Ctx) error {
+	if !validInternalKey(c) {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req struct {
+		OrgID string `json:"org_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	n, err := h.svc.GetScanUsageThisMonth(c.Context(), orgID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	purchased, err := h.svc.GetPurchasedScansThisMonth(c.Context(), orgID)
+	if err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"documents_scanned": n, "purchased_scans": purchased})
+}
+
+// ScanTopupInternal credits a paid scan top-up to an org's current month.
+// Service-to-service (X-Internal-Key); called by invoice-service's webhook.
+func (h *AIOCRHandler) ScanTopupInternal(c *fiber.Ctx) error {
+	if !validInternalKey(c) {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req struct {
+		OrderID string `json:"order_id"`
+		OrgID   string `json:"org_id"`
+		Scans   int    `json:"scans"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	orderID, err := uuid.Parse(req.OrderID)
+	if err != nil {
+		return response.BadRequest(c, "invalid order_id")
+	}
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	if req.Scans <= 0 {
+		return response.BadRequest(c, "scans must be positive")
+	}
+	if err := h.svc.CreditScanTopup(c.Context(), orderID, orgID, req.Scans); err != nil {
+		return response.Internal(c, err)
+	}
+	return response.OK(c, fiber.Map{"credited": true})
+}
 
 type AIOCRHandler struct {
 	svc *service.AIOCRService
@@ -93,7 +165,8 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 		})
 	}
 
-	result, err := h.svc.ProcessDocumentsSync(c.Context(), files, c.Query("cache_mode", "default"))
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	result, err := h.svc.ProcessDocumentsSync(c.Context(), claims.OrgID, files, c.Query("cache_mode", "default"))
 	if err != nil {
 		if errors.Is(err, service.ErrOCRUnavailable) {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"success": false, "error": err.Error()})

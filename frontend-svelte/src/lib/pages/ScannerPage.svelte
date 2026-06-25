@@ -162,6 +162,16 @@
     return Math.random().toString(36).slice(2, 10);
   }
 
+  // Starter top-up: start a Pakasir checkout for 100 extra scans, then redirect.
+  async function buyTopup() {
+    try {
+      const res = await ApiService.createTopupOrder();
+      if (res?.payment_url) window.location.href = res.payment_url;
+    } catch (e) {
+      console.error("topup order failed:", e);
+    }
+  }
+
   async function processDocuments(filesToProcess = null) {
     const uploadFiles = filesToProcess || files;
     if (uploadFiles.length === 0) return;
@@ -297,6 +307,7 @@
   );
   let usageCount = $derived(localSubscription?.usage_count ?? null);
   let usageLimit = $derived(localSubscription?.usage_limit ?? null);
+  let isStarter = $derived(localSubscription?.plan === "starter");
   let remaining = $derived(
     usageLimit ? Math.max(0, usageLimit - (usageCount || 0)) : null,
   );
@@ -509,15 +520,24 @@
             <div class="quota-bar">
               <div class="quota-fill" style="width:{usagePct}%"></div>
             </div>
-            <Button
-              variant="soft"
-              icon={Crown}
-              full
-              size="sm"
-              onclick={() => (showUpgradeModal = true)}
-            >
-              Upgrade ke Pro
-            </Button>
+            {#if isStarter}
+              <Button variant="primary" full size="sm" onclick={buyTopup}>
+                Beli 100 scan · Rp49rb
+              </Button>
+              <button class="topup-upsell" onclick={() => (showUpgradeModal = true)}>
+                atau upgrade ke Pro (tanpa batas)
+              </button>
+            {:else}
+              <Button
+                variant="soft"
+                icon={Crown}
+                full
+                size="sm"
+                onclick={() => (showUpgradeModal = true)}
+              >
+                Upgrade ke Pro
+              </Button>
+            {/if}
           {:else}
             <div class="ctx-num-sub" style="margin-top:4px;">
               Pindai dokumen untuk mulai.
@@ -1029,6 +1049,15 @@
     background: var(--c-primary);
     border-radius: 999px;
     transition: width 0.4s;
+  }
+  .topup-upsell {
+    margin-top: 6px;
+    background: none;
+    border: none;
+    color: var(--c-muted);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
   }
   .ctx-title {
     font-size: 13px;

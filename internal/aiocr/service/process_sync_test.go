@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	"github.com/jamaah-in/v2/internal/shared/plan"
 )
 
 // fakeAnalyzer simulates a slow OCR provider and records peak concurrency.
@@ -44,7 +47,7 @@ func TestProcessDocumentsSyncConcurrentAndOrdered(t *testing.T) {
 	}
 
 	start := time.Now()
-	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	res, err := svc.ProcessDocumentsSync(context.Background(), uuid.Nil, files, "default")
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("ProcessDocumentsSync: %v", err)
@@ -112,7 +115,7 @@ func TestProcessDocumentsSyncEnrichesFromPolicy(t *testing.T) {
 		{FileName: "paspor.jpg", ContentType: "image/jpeg", Data: []byte("img")},
 		{FileName: "polis.pdf", ContentType: "application/pdf", Data: []byte("POLISBYTES")},
 	}
-	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	res, err := svc.ProcessDocumentsSync(context.Background(), uuid.Nil, files, "default")
 	if err != nil {
 		t.Fatalf("ProcessDocumentsSync: %v", err)
 	}
@@ -164,7 +167,7 @@ func TestProcessDocumentsSyncSeedsRowsFromPolicyOnly(t *testing.T) {
 		WithPolicy(&fakePolicy{m: manifest})
 
 	files := []SyncFile{{FileName: "polis.pdf", ContentType: "application/pdf", Data: []byte("POLISBYTES")}}
-	res, err := svc.ProcessDocumentsSync(context.Background(), files, "default")
+	res, err := svc.ProcessDocumentsSync(context.Background(), uuid.Nil, files, "default")
 	if err != nil {
 		t.Fatalf("ProcessDocumentsSync: %v", err)
 	}
@@ -180,5 +183,14 @@ func TestProcessDocumentsSyncSeedsRowsFromPolicyOnly(t *testing.T) {
 		if got, _ := r0[k].(string); got != want {
 			t.Errorf("seeded row[%q] = %q, want %q", k, got, want)
 		}
+	}
+}
+
+func TestFairUseExceeded(t *testing.T) {
+	if fairUseExceeded(plan.FairUseScanCap - 1) {
+		t.Error("below cap should not exceed")
+	}
+	if !fairUseExceeded(plan.FairUseScanCap) {
+		t.Error("at cap should exceed")
 	}
 }

@@ -73,6 +73,24 @@ describe("API domain modules", () => {
     );
   });
 
+  it("paymentApi.createTopupOrder posts to topup-order", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ order_id: "ord-2", payment_url: "https://pay/x" }),
+    });
+
+    const res = await paymentApi.createTopupOrder();
+
+    expect(res.payment_url).toBe("https://pay/x");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/payment/topup-order",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+      }),
+    );
+  });
+
   it("registrationApi.submitRegistration posts form data", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

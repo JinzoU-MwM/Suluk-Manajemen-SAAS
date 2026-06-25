@@ -131,8 +131,12 @@ services:
       REDIS_ADDR: redis:6379
       JAMAAH_SERVICE_ADDR: jamaah-service:50053
       INVOICE_SERVICE_ADDR: invoice-service:50054
+      # Read an org's monthly AI-scan count to surface as usage_count on
+      # subscription status (Phase 4a). Fail-open, so optional at runtime.
+      AIOCR_SERVICE_ADDR: ai-ocr-service:50056
       # Shared secret to authenticate the internal plan-activation endpoint
       # called by the payment webhook (must match invoice-service).
+      # Also authenticates the auth→ai-ocr scan-usage read.
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       # Transactional email (subscription invoice/confirmation, OTP, etc.).
       # SMTP preferred (mailspace.id); Resend is an optional fallback.
@@ -240,6 +244,8 @@ services:
       POSTGRES_SSLMODE: require
       NATS_ADDR: nats://nats:4222
       AUTH_SERVICE_ADDR: auth-service:50051
+      # Credit paid scan top-ups into ai-ocr after the Pakasir webhook (Phase 4b).
+      AIOCR_SERVICE_ADDR: ai-ocr-service:50056
       # Public base URL of the app (used to build the Pakasir redirect-back link).
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       # Shared internal secret (must match auth-service).

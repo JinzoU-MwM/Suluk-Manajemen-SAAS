@@ -69,6 +69,53 @@ func (s *InvoiceService) CreatePaymentOrder(ctx context.Context, orgID, userID u
 	}, nil
 }
 
+// callerPlan fetches the caller org's tier from auth (forwarding the caller's
+// bearer token), used to gate Starter-only purchases.
+func (s *InvoiceService) callerPlan(ctx context.Context, authToken string) (string, error) {
+	var out struct {
+		Plan string `json:"plan"`
+	}
+	if err := s.httpc.GetJSON(ctx, s.authAddr, "/api/v1/subscription/status", authToken, &out); err != nil {
+		return "", fmt.Errorf("check plan: %w", err)
+	}
+	return out.Plan, nil
+}
+
+// CreateTopupOrder creates a pending scan-topup order (server-priced) and returns
+// the Pakasir checkout URL. Only Starter orgs may buy top-ups.
+func (s *InvoiceService) CreateTopupOrder(ctx context.Context, orgID, userID uuid.UUID, authToken string) (*model.PaymentOrderResponse, error) {
+	p, err := s.callerPlan(ctx, authToken)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Normalize(p) != plan.Starter {
+		return nil, fmt.Errorf("top-up tersedia hanya untuk paket Starter")
+	}
+
+	orderID := uuid.New()
+	order := &model.PaymentOrder{
+		ID:      orderID,
+		OrgID:   orgID,
+		UserID:  userID,
+		Plan:    plan.Starter,
+		Amount:  plan.ScanTopupPrice,
+		Status:  "pending",
+		Purpose: "scan_topup",
+	}
+	if err := s.repo.CreatePaymentOrder(ctx, order); err != nil {
+		return nil, fmt.Errorf("create topup order: %w", err)
+	}
+
+	payURL := s.pakasirPayURL(orderID.String(), plan.ScanTopupPrice)
+	order.RedirectURL = &payURL
+	return &model.PaymentOrderResponse{
+		OrderID:    orderID.String(),
+		PaymentURL: payURL,
+		Status:     "pending",
+		Amount:     plan.ScanTopupPrice,
+	}, nil
+}
+
 // pakasirPayURL builds the Pakasir hosted-checkout URL (redirect method):
 // {base}/pay/{slug}/{amount}?order_id={id}&redirect={publicURL}/?payment=success
 func (s *InvoiceService) pakasirPayURL(orderID string, amount int64) string {
@@ -156,16 +203,38 @@ func (s *InvoiceService) HandlePakasirWebhook(ctx context.Context, p model.Pakas
 		return nil
 	}
 
-	// Activate AFTER claiming. If activation fails, roll the order back to
+	// Apply the purchase AFTER claiming. On failure, roll the order back to
 	// pending so a later Pakasir retry re-attempts it — this avoids the
-	// paid-but-never-activated stuck state (customer charged, org left on free).
-	if err := s.activateSubscription(ctx, order, p.PaymentMethod); err != nil {
+	// paid-but-never-applied stuck state (customer charged, nothing granted).
+	var applyErr error
+	switch order.Purpose {
+	case "scan_topup":
+		applyErr = s.creditScanTopup(ctx, order)
+	default:
+		applyErr = s.activateSubscription(ctx, order, p.PaymentMethod)
+	}
+	if applyErr != nil {
 		if rerr := s.repo.RevertPaymentOrderToPending(ctx, order.ID); rerr != nil {
-			log.Printf("CRITICAL: order %s paid but activation AND revert failed — needs reconciliation: activate=%v revert=%v", order.ID, err, rerr)
+			log.Printf("CRITICAL: order %s paid but apply AND revert failed — needs reconciliation: apply=%v revert=%v", order.ID, applyErr, rerr)
 		}
-		return fmt.Errorf("activate subscription: %w", err) // transient → 5xx → retry
+		return fmt.Errorf("apply purchase: %w", applyErr) // transient → 5xx → retry
 	}
 	return nil
+}
+
+// creditScanTopup calls the ai-ocr internal endpoint to add the purchased scans
+// to the org's current month. Idempotent on the ai-ocr side (order_id key).
+func (s *InvoiceService) creditScanTopup(ctx context.Context, order *model.PaymentOrder) error {
+	if s.aiocrAddr == "" {
+		return fmt.Errorf("aiocr service address not configured")
+	}
+	body := map[string]any{
+		"order_id": order.ID.String(),
+		"org_id":   order.OrgID.String(),
+		"scans":    plan.ScanTopupScans,
+	}
+	headers := map[string]string{"X-Internal-Key": s.internalKey}
+	return s.httpc.PostJSON(ctx, s.aiocrAddr, "/api/v1/internal/scan-topup", headers, body, nil)
 }
 
 // activateSubscription calls the auth-service internal endpoint to flip the org

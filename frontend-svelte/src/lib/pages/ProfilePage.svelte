@@ -589,7 +589,7 @@
                                 </Button>
                                 {#if trialStatus?.can_activate}
                                     <Button variant="soft" size="sm" full onclick={onUpgradeRequest}>
-                                        Coba 7 Hari Gratis
+                                        Coba 14 Hari Gratis
                                     </Button>
                                 {/if}
                             {/if}

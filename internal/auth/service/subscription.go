@@ -22,14 +22,57 @@ var ErrPlanLimit = errors.New("plan limit reached")
 func statusResponse(p, status string, expiresAt *time.Time) *model.SubscriptionStatusResponse {
 	t := plan.Get(p)
 	return &model.SubscriptionStatusResponse{
-		Plan:      t.Key,
-		Status:    status,
-		ExpiresAt: expiresAt,
-		Rank:      t.Rank,
-		MaxJamaah: t.MaxJamaah,
-		MaxGroups: t.MaxGroups,
-		MaxUsers:  t.MaxUsers,
+		Plan:       t.Key,
+		Status:     status,
+		ExpiresAt:  expiresAt,
+		Rank:       t.Rank,
+		MaxJamaah:  t.MaxJamaah,
+		MaxGroups:  t.MaxGroups,
+		MaxUsers:   t.MaxUsers,
+		UsageLimit: t.MaxScansPerMonth,
 	}
+}
+
+type scanUsageCacheEntry struct {
+	used      int
+	purchased int
+	expiry    time.Time
+}
+
+// effectiveLimit is the org's surfaced monthly scan cap: base plan quota plus any
+// purchased top-ups. Unlimited tiers stay Unlimited (top-ups are irrelevant).
+func effectiveLimit(base, purchased int) int {
+	if base == plan.Unlimited {
+		return plan.Unlimited
+	}
+	return base + purchased
+}
+
+// scanUsageThisMonth returns (used, purchased) scans for the org this calendar
+// month, fetched from the ai-ocr service (which owns the scan tables in its own
+// DB). It FAILS OPEN (returns 0, 0) when unconfigured or on any error, so a flaky
+// ai-ocr never breaks subscription status. Results are cached briefly per org so
+// frequent status polls don't hammer ai-ocr (mirrors jamaah's limit cache).
+func (s *AuthService) scanUsageThisMonth(ctx context.Context, orgID uuid.UUID) (int, int) {
+	if s.aiocrAddr == "" || s.internalKey == "" {
+		return 0, 0
+	}
+	if v, ok := s.scanUsageCache.Load(orgID); ok {
+		if e := v.(scanUsageCacheEntry); e.expiry.After(time.Now()) {
+			return e.used, e.purchased
+		}
+	}
+	var out struct {
+		DocumentsScanned int `json:"documents_scanned"`
+		PurchasedScans   int `json:"purchased_scans"`
+	}
+	if err := s.httpc.PostJSON(ctx, s.aiocrAddr, "/api/v1/internal/scan-usage",
+		map[string]string{"X-Internal-Key": s.internalKey},
+		map[string]string{"org_id": orgID.String()}, &out); err != nil {
+		return 0, 0
+	}
+	s.scanUsageCache.Store(orgID, scanUsageCacheEntry{used: out.DocumentsScanned, purchased: out.PurchasedScans, expiry: time.Now().Add(45 * time.Second)})
+	return out.DocumentsScanned, out.PurchasedScans
 }
 
 func (s *AuthService) GetSubscriptionStatus(ctx context.Context, orgID uuid.UUID) (*model.SubscriptionStatusResponse, error) {
@@ -37,8 +80,15 @@ func (s *AuthService) GetSubscriptionStatus(ctx context.Context, orgID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
+	// Org's scans this month + purchased top-ups (from ai-ocr); fail-open 0.
+	// Computed once and set on whichever response path runs so the frontend quota
+	// bar always has a value. usage_limit folds in purchased credits.
+	used, purchased := s.scanUsageThisMonth(ctx, orgID)
 	if sub == nil {
-		return statusResponse(plan.Gratis, "active", nil), nil
+		resp := statusResponse(plan.Gratis, "active", nil)
+		resp.UsageCount = used
+		resp.UsageLimit = effectiveLimit(resp.UsageLimit, purchased)
+		return resp, nil
 	}
 	if sub.ExpiresAt != nil && sub.ExpiresAt.Before(time.Now()) && sub.Status != "cancelled" {
 		sub.Status = "expired"
@@ -53,10 +103,14 @@ func (s *AuthService) GetSubscriptionStatus(ctx context.Context, orgID uuid.UUID
 	if sub.Status == "expired" || sub.Status == "cancelled" {
 		resp := statusResponse(plan.Gratis, sub.Status, sub.ExpiresAt)
 		resp.Plan = plan.Normalize(sub.Plan)
+		resp.UsageCount = used
+		resp.UsageLimit = effectiveLimit(resp.UsageLimit, purchased)
 		return resp, nil
 	}
 	resp := statusResponse(sub.Plan, sub.Status, sub.ExpiresAt)
 	resp.CancelAtPeriodEnd = sub.CancelAtPeriodEnd
+	resp.UsageCount = used
+	resp.UsageLimit = effectiveLimit(resp.UsageLimit, purchased)
 	return resp, nil
 }
 
