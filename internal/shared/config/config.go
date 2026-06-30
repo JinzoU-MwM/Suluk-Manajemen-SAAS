@@ -21,6 +21,7 @@ type Config struct {
 	Pakasir  PakasirConfig
 	Internal InternalConfig
 	Email    EmailConfig
+	Google   GoogleConfig
 }
 
 // EmailConfig holds transactional-email settings (SMTP preferred, Resend fallback).
@@ -101,6 +102,14 @@ type GeminiConfig struct {
 	APIKey string
 }
 
+// GoogleConfig holds the OAuth Web client id used to verify "Sign in with
+// Google" id_tokens (audience check). Only the public client id is needed — the
+// id_token signature is verified against Google's public JWKS, so no client
+// secret is required.
+type GoogleConfig struct {
+	ClientID string
+}
+
 // AIConfig selects and configures the AI provider for OCR + accounting insights.
 // Provider is "opencode" (default) or "gemini"; Gemini stays available for an
 // instant env-flip fallback. The "opencode" provider is a generic
@@ -169,6 +178,9 @@ func Load() *Config {
 		},
 		Internal: InternalConfig{
 			APIKey: envOr("INTERNAL_API_KEY", ""),
+		},
+		Google: GoogleConfig{
+			ClientID: envOr("GOOGLE_CLIENT_ID", ""),
 		},
 		Email: EmailConfig{
 			ResendAPIKey: envOr("RESEND_API_KEY", ""),

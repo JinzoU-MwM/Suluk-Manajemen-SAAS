@@ -71,6 +71,31 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	})
 }
 
+// GoogleLogin authenticates with a Google Identity Services id_token and returns
+// the same payload as Login (so the frontend treats both identically).
+func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
+	var req model.GoogleLoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	if req.IDToken == "" {
+		return response.BadRequest(c, "id_token is required")
+	}
+
+	user, org, tokens, err := h.svc.GoogleLogin(c.Context(), req.IDToken)
+	if err != nil {
+		return response.Unauthorized(c, err.Error())
+	}
+
+	return response.OK(c, fiber.Map{
+		"user":          sanitizeUser(user),
+		"organization":  org,
+		"access_token":  tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
+		"expires_at":    tokens.ExpiresAt,
+	})
+}
+
 func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 	var req model.RefreshRequest
 	if err := c.BodyParser(&req); err != nil {

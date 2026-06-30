@@ -22,12 +22,12 @@ func NewAuthRepo(pool *pgxpool.Pool) *AuthRepo {
 
 func (r *AuthRepo) CreateUser(ctx context.Context, user *model.User) error {
 	query := `
-		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id, jamaah_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (id, email, name, password_hash, phone, role, is_active, agent_id, jamaah_id, google_sub)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING created_at, updated_at`
 	err := r.pool.QueryRow(ctx, query,
 		user.ID, user.Email, user.Name, user.PasswordHash,
-		user.Phone, user.Role, user.IsActive, user.AgentID, user.JamaahID,
+		user.Phone, user.Role, user.IsActive, user.AgentID, user.JamaahID, user.GoogleSub,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
@@ -122,6 +122,40 @@ func (r *AuthRepo) GetUserByEmail(ctx context.Context, email string) (*model.Use
 		return nil, fmt.Errorf("get user by email: %w", err)
 	}
 	return u, nil
+}
+
+// GetUserByGoogleSub looks up a user by their linked Google account subject id.
+func (r *AuthRepo) GetUserByGoogleSub(ctx context.Context, sub string) (*model.User, error) {
+	u := &model.User{}
+	query := `SELECT id, email, name, password_hash, email_verified, phone, phone_verified,
+		city, bio, COALESCE(avatar_color,'blue'), COALESCE(notify_usage_limit,TRUE), COALESCE(notify_expiry,TRUE),
+		role, is_active, is_super_admin, agent_id, jamaah_id, created_at, updated_at FROM users WHERE google_sub = $1`
+	err := r.pool.QueryRow(ctx, query, sub).Scan(
+		&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.EmailVerified,
+		&u.Phone, &u.PhoneVerified,
+		&u.City, &u.Bio, &u.AvatarColor, &u.NotifyUsageLimit, &u.NotifyExpiry,
+		&u.Role, &u.IsActive, &u.IsSuperAdmin, &u.AgentID, &u.JamaahID,
+		&u.CreatedAt, &u.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get user by google_sub: %w", err)
+	}
+	return u, nil
+}
+
+// LinkGoogleSub attaches a Google account to an existing user (first Google
+// sign-in on a pre-existing email/password account).
+func (r *AuthRepo) LinkGoogleSub(ctx context.Context, userID uuid.UUID, sub string) error {
+	if _, err := r.pool.Exec(ctx,
+		`UPDATE users SET google_sub = $2, updated_at = NOW() WHERE id = $1`,
+		userID, sub,
+	); err != nil {
+		return fmt.Errorf("link google_sub: %w", err)
+	}
+	return nil
 }
 
 func (r *AuthRepo) UpdateUser(ctx context.Context, user *model.User) error {

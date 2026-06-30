@@ -10,6 +10,7 @@
   } from "lucide-svelte";
   import BrandLogo from "../components/BrandLogo.svelte";
   import { ApiService } from "../services/api";
+  import { onMount } from "svelte";
 
   let { onLoginSuccess, onBack, initialMode = "login" } = $props();
 
@@ -80,6 +81,89 @@
       isLoading = false;
     }
   }
+
+  // ── Google Sign-In (Google Identity Services) ──
+  // Public OAuth Web client id, baked at build via Vite env. Empty = button hidden.
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  let googleBtnEl = $state(null);
+  let gisReady = $state(false);
+
+  async function handleGoogleCredential(response) {
+    error = "";
+    success = "";
+    isLoading = true;
+    try {
+      const result = await ApiService.loginWithGoogle(response.credential);
+      if (result.access_token) {
+        localStorage.setItem("access_token", result.access_token);
+      }
+      if (result.refresh_token) {
+        localStorage.setItem("refresh_token", result.refresh_token);
+      }
+      localStorage.setItem("user", JSON.stringify(result.user));
+      onLoginSuccess(result.user);
+    } catch (err) {
+      error = err.message || "Gagal masuk dengan Google";
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Google Identity Services global (script-injected at runtime). Typed loose so
+  // checkJs doesn't complain about `window.google`.
+  function gsi() {
+    const w = /** @type {any} */ (window);
+    return w.google && w.google.accounts && w.google.accounts.id;
+  }
+
+  onMount(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    const init = () => {
+      const id = gsi();
+      if (!id) return;
+      id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCredential,
+        ux_mode: "popup",
+      });
+      gisReady = true;
+    };
+    if (gsi()) {
+      init();
+      return;
+    }
+    const existing = document.getElementById("google-gsi-script");
+    if (existing) {
+      existing.addEventListener("load", init);
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "google-gsi-script";
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = init;
+    document.head.appendChild(script);
+  });
+
+  // Render (or re-render) the official Google button whenever the library is
+  // ready and the container is mounted; its label follows the login/register mode.
+  $effect(() => {
+    const id = gsi();
+    if (gisReady && googleBtnEl && id) {
+      googleBtnEl.innerHTML = "";
+      id.renderButton(googleBtnEl, {
+        theme: "outline",
+        size: "large",
+        type: "standard",
+        shape: "rectangular",
+        text: mode === "register" ? "signup_with" : "signin_with",
+        logo_alignment: "center",
+        locale: "id",
+        width: 320,
+      });
+    }
+  });
 
   // ── Register ──
   async function handleRegister(e) {
@@ -398,6 +482,15 @@
           {/if}
         </button>
       </form>
+
+      {#if GOOGLE_CLIENT_ID}
+        <div class="flex items-center gap-3 my-4">
+          <div class="h-px bg-slate-200 flex-1"></div>
+          <span class="text-xs text-slate-400 font-medium">atau</span>
+          <div class="h-px bg-slate-200 flex-1"></div>
+        </div>
+        <div class="flex justify-center" bind:this={googleBtnEl}></div>
+      {/if}
 
       <!-- ═══════════════════════════════════════════════ -->
       <!-- OTP VERIFICATION MODE -->
