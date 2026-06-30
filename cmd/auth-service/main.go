@@ -85,7 +85,8 @@ func main() {
 			SMTPPass:     cfg.Email.SMTPPass,
 			ResendAPIKey: cfg.Email.ResendAPIKey,
 		})).
-		WithScanUsageSource(os.Getenv("AIOCR_SERVICE_ADDR"), cfg.Internal.APIKey)
+		WithScanUsageSource(os.Getenv("AIOCR_SERVICE_ADDR"), cfg.Internal.APIKey).
+		WithGoogleOAuth(cfg.Google.ClientID)
 	// Renewal reminders (Phase 5): email org owners H-7/3/1 before a paid sub lapses.
 	authService.StartRenewalReminderScheduler(ctx, cfg.App.PublicURL)
 	authHandler := handler.NewAuthHandler(authService)
@@ -118,6 +119,7 @@ func main() {
 	authPublic := app.Group("/api/v1/auth", authLimiter)
 	authPublic.Post("/register", authHandler.Register)
 	authPublic.Post("/login", authHandler.Login)
+	authPublic.Post("/google", authHandler.GoogleLogin)
 	authPublic.Post("/refresh", authHandler.RefreshToken)
 
 	authPrivate := app.Group("/api/v1/auth", sharedMW.AuthMiddleware(jwtManager))

@@ -88,3 +88,5 @@ htmlcov/
 # =============================================================================
 certs/*.pem
 .design-ref/
+
+testsprite_tests/tmp/config.json

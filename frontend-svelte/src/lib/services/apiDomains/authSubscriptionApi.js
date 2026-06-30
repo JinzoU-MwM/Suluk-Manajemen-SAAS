@@ -29,6 +29,18 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
             return unwrapData(await response.json());
         },
 
+        // Exchanges a Google Identity Services id_token (the `credential` from the
+        // Sign-in-with-Google callback) for a Suluk session — same payload as login().
+        async loginWithGoogle(idToken) {
+            const response = await apiFetch(`${API_URL}/auth/google`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_token: idToken }),
+            });
+            if (!response.ok) throw new Error(await parseError(response));
+            return unwrapData(await response.json());
+        },
+
         async logout() {
             const response = await apiFetch(`${API_URL}/auth/logout`, {
                 method: 'POST',

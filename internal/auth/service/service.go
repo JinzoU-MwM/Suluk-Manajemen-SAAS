@@ -38,6 +38,9 @@ type AuthService struct {
 	aiocrAddr      string
 	internalKey    string
 	scanUsageCache sync.Map // orgID -> scanUsageCacheEntry
+	// googleClientID is the OAuth Web client id used as the expected audience when
+	// verifying "Sign in with Google" id_tokens. Empty disables Google login.
+	googleClientID string
 }
 
 func NewAuthService(repo *repository.AuthRepo, jwt *sharedAuth.JWTManager, redis *sharedRedis.Client, jamaahAddr, invoiceAddr string) *AuthService {
@@ -63,6 +66,13 @@ func (s *AuthService) WithEmail(c *email.Client) *AuthService {
 func (s *AuthService) WithScanUsageSource(aiocrAddr, internalKey string) *AuthService {
 	s.aiocrAddr = aiocrAddr
 	s.internalKey = internalKey
+	return s
+}
+
+// WithGoogleOAuth enables "Sign in with Google" by setting the OAuth Web client
+// id used as the expected id_token audience. Empty leaves Google login disabled.
+func (s *AuthService) WithGoogleOAuth(clientID string) *AuthService {
+	s.googleClientID = clientID
 	return s
 }
 
@@ -187,6 +197,139 @@ func (s *AuthService) Login(ctx context.Context, req model.LoginRequest) (*model
 	}
 
 	return user, org, tokens, nil
+}
+
+// GoogleLogin authenticates via a Google "Sign in with Google" id_token.
+// Resolution order: (1) a user already linked to this Google account, (2) an
+// existing email/password account with the same email — linked then logged in,
+// (3) a brand-new account — auto-provisioned as owner + org + 14-day reverse
+// trial, mirroring Register but with no password (Google is the sole credential).
+func (s *AuthService) GoogleLogin(ctx context.Context, idToken string) (*model.User, *model.Organization, *sharedAuth.TokenPair, error) {
+	gc, err := sharedAuth.VerifyGoogleIDToken(ctx, idToken, s.googleClientID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("invalid Google credentials")
+	}
+	if !gc.EmailVerified {
+		return nil, nil, nil, fmt.Errorf("google account email is not verified")
+	}
+	email := strings.ToLower(strings.TrimSpace(gc.Email))
+	name := strings.TrimSpace(gc.Name)
+	if name == "" {
+		name = email
+	}
+
+	// (1) Returning Google user (already linked).
+	if user, err := s.repo.GetUserByGoogleSub(ctx, gc.Subject); err == nil {
+		if !user.IsActive {
+			return nil, nil, nil, fmt.Errorf("account is deactivated")
+		}
+		org, tokens, err := s.issueSession(ctx, user)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return user, org, tokens, nil
+	}
+
+	// (2) Existing email/password account → link Google, then log in.
+	if user, err := s.repo.GetUserByEmail(ctx, email); err == nil {
+		if !user.IsActive {
+			return nil, nil, nil, fmt.Errorf("account is deactivated")
+		}
+		if err := s.repo.LinkGoogleSub(ctx, user.ID, gc.Subject); err != nil {
+			return nil, nil, nil, err
+		}
+		org, tokens, err := s.issueSession(ctx, user)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return user, org, tokens, nil
+	}
+
+	// (3) New account: auto-provision owner + org + reverse trial.
+	userID := uuid.New()
+	sub := gc.Subject
+	user := &model.User{
+		ID:            userID,
+		Email:         email,
+		Name:          name,
+		PasswordHash:  "", // no password: Google-only login (bcrypt never matches "")
+		EmailVerified: true,
+		Role:          "owner",
+		IsActive:      true,
+		GoogleSub:     &sub,
+	}
+	if err := s.repo.CreateUser(ctx, user); err != nil {
+		return nil, nil, nil, err
+	}
+
+	slug := repository.GenerateSlug(name)
+	slug, err = s.repo.GenerateUniqueSlug(ctx, slug)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	org := &model.Organization{
+		ID:        uuid.New(),
+		Name:      name,
+		Slug:      slug,
+		CreatedBy: userID,
+	}
+	if err := s.repo.CreateOrganization(ctx, org); err != nil {
+		return nil, nil, nil, err
+	}
+	member := &model.TeamMember{
+		ID:     uuid.New(),
+		OrgID:  org.ID,
+		UserID: userID,
+		Role:   "owner",
+		Status: "active",
+	}
+	if err := s.repo.AddTeamMember(ctx, member); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := s.ActivateTrial(ctx, org.ID); err != nil {
+		log.Printf("activate reverse trial (org %s): %v", org.ID, err)
+	}
+
+	tokens, err := s.jwt.GenerateTokenPair(userID, org.ID, "owner", user.Email, nil, nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := s.storeRefreshToken(ctx, tokens.RefreshToken, userID); err != nil {
+		return nil, nil, nil, err
+	}
+
+	_ = s.repo.CreateAuditLog(ctx, &model.AuditLog{
+		ID:       uuid.New(),
+		OrgID:    &org.ID,
+		UserID:   &userID,
+		Action:   "user.register.google",
+		Entity:   "user",
+		EntityID: &userID,
+		NewValue: map[string]string{"email": user.Email, "name": user.Name},
+	})
+
+	return user, org, tokens, nil
+}
+
+// issueSession resolves a user's org + role and mints a fresh token pair,
+// persisting the refresh token. Shared by the Google login branches.
+func (s *AuthService) issueSession(ctx context.Context, user *model.User) (*model.Organization, *sharedAuth.TokenPair, error) {
+	org, member, err := s.getUserOrgAndRole(ctx, user.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	role := "viewer"
+	if member != nil {
+		role = member.Role
+	}
+	tokens, err := s.jwt.GenerateTokenPair(user.ID, org.ID, role, user.Email, user.AgentID, user.JamaahID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := s.storeRefreshToken(ctx, tokens.RefreshToken, user.ID); err != nil {
+		return nil, nil, err
+	}
+	return org, tokens, nil
 }
 
 func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*sharedAuth.TokenPair, error) {

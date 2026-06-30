@@ -70,8 +70,11 @@ type User struct {
 	IsSuperAdmin     bool       `json:"is_super_admin" db:"is_super_admin"`
 	AgentID          *uuid.UUID `json:"agent_id,omitempty" db:"agent_id"`
 	JamaahID         *uuid.UUID `json:"jamaah_id,omitempty" db:"jamaah_id"`
-	CreatedAt        time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at" db:"updated_at"`
+	// GoogleSub is the Google account subject id for users who signed in with
+	// Google. nil for password-only users. Never serialized to clients.
+	GoogleSub *string   `json:"-" db:"google_sub"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type Organization struct {
@@ -199,6 +202,12 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
+}
+
+// GoogleLoginRequest carries the id_token issued by Google Identity Services
+// (the `credential` field from the Sign-in-with-Google callback).
+type GoogleLoginRequest struct {
+	IDToken string `json:"id_token" validate:"required"`
 }
 
 type Subscription struct {

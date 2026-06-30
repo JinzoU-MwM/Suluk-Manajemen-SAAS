@@ -1,6 +1,13 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Public OAuth Web client id, baked into the SPA at build time (Vite only inlines
+# VITE_* vars). Passed as a build arg from docker-compose so "Sign in with Google"
+# works in the built image. Empty = the button stays hidden.
+ARG VITE_GOOGLE_CLIENT_ID=""
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 COPY frontend-svelte/package.json frontend-svelte/package-lock.json ./
 RUN npm ci
 

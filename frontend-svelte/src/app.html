@@ -22,9 +22,22 @@
     <div style="display: contents">%sveltekit.body%</div>
     <script>
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
-        });
+        const swLocal =
+          location.hostname === "localhost" || location.hostname === "127.0.0.1";
+        if (swLocal) {
+          // Dev: never let a cached service worker shadow Vite's live output.
+          navigator.serviceWorker
+            .getRegistrations()
+            .then((regs) => regs.forEach((r) => r.unregister()))
+            .catch(() => {});
+          if (window.caches?.keys) {
+            caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+          }
+        } else {
+          window.addEventListener("load", () => {
+            navigator.serviceWorker.register("/sw.js").catch(() => {});
+          });
+        }
       }
     </script>
   </body>

@@ -3,8 +3,13 @@
   // real route links (crawlable, consistent, good internal linking for SEO)
   // instead of the two divergent navbars that existed before the SvelteKit move.
   import { page } from "$app/stores";
+  import { onMount } from "svelte";
 
   let mobileOpen = $state(false);
+  // Elevate the bar once the page scrolls past the very top. A 1px sentinel +
+  // IntersectionObserver avoids a per-frame scroll listener.
+  let scrolled = $state(false);
+  let sentinel;
 
   const FEATURES = [
     { href: "/fitur/invoice-umrah", label: "Invoice Otomatis" },
@@ -17,9 +22,20 @@
   let path = $derived($page.url.pathname);
   let featuresActive = $derived(path.startsWith("/fitur/"));
   const close = () => (mobileOpen = false);
+
+  onMount(() => {
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([entry]) => (scrolled = !entry.isIntersecting),
+      { threshold: 0 },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  });
 </script>
 
-<nav class="ln">
+<div class="ln-sentinel" bind:this={sentinel} aria-hidden="true"></div>
+<nav class="ln" class:scrolled>
   <div class="ln-inner">
     <a class="ln-brand" href="/" onclick={close}>
       <span class="ln-mark"><img src="/brand/suluk-mark.png" alt="Suluk" /></span>
@@ -76,13 +92,35 @@
 </nav>
 
 <style>
+  .ln-sentinel { height: 1px; margin-bottom: -1px; }
+  /* At the very top the bar is fully transparent and blends into the hero;
+     once scrolled, the frosted glass + blur + shadow fade in across the bar. */
   .ln {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: saturate(180%) blur(14px);
-    border-bottom: 1px solid var(--c-line, #e6e9e7);
+    background: rgba(255, 255, 255, 0);
+    backdrop-filter: blur(0px) saturate(100%);
+    -webkit-backdrop-filter: blur(0px) saturate(100%);
+    border-bottom: 1px solid transparent;
+    transition: background 0.3s ease, backdrop-filter 0.3s ease,
+      -webkit-backdrop-filter 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .ln.scrolled {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom-color: var(--c-line, #e6e9e7);
+    box-shadow: 0 10px 34px -16px rgba(15, 61, 46, 0.32);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ln { transition: none; }
+  }
+  .ln a:focus-visible,
+  .ln button:focus-visible {
+    outline: 2px solid var(--c-primary, #0f7a5a);
+    outline-offset: 3px;
+    border-radius: 6px;
   }
   .ln-inner {
     display: flex;
@@ -126,9 +164,28 @@
   .ln-dd-btn.active { color: var(--c-primary, #0f7a5a); }
   .ln-links > a.active,
   .ln-dd-btn.active { font-weight: 700; }
+  /* Active-link underline indicator for clearer wayfinding. */
+  .ln-links > a,
+  .ln-dd-btn { position: relative; }
+  .ln-links > a.active::after,
+  .ln-dd-btn.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -8px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--c-primary, #0f7a5a);
+  }
 
   /* Dropdown */
   .ln-dd { position: relative; }
+  /* Invisible hover bridge across the gap so the menu doesn't close mid-travel. */
+  .ln-dd::after { content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 16px; }
+  .ln-dd-btn svg { transition: transform 0.18s ease; }
+  .ln-dd:hover .ln-dd-btn svg,
+  .ln-dd:focus-within .ln-dd-btn svg { transform: rotate(180deg); }
   .ln-dd-menu {
     position: absolute;
     top: calc(100% + 14px);
@@ -173,12 +230,14 @@
     color: #fff;
     background: var(--c-primary, #0f7a5a);
     padding: 10px 18px;
-    border-radius: 10px;
+    border-radius: 12px;
     text-decoration: none;
-    transition: background 0.15s, transform 0.1s;
+    box-shadow: 0 8px 20px -10px var(--c-primary, #0f7a5a);
+    transition: transform 0.12s, box-shadow 0.15s, filter 0.15s;
   }
-  .ln-cta:hover { background: var(--c-primary-dark, #0c5f46); }
-  .ln-cta:active { transform: translateY(1px); }
+  /* Match the page primary buttons' hover language (lift + brighten). */
+  .ln-cta:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: 0 12px 26px -10px var(--c-primary, #0f7a5a); }
+  .ln-cta:active { transform: translateY(1px); box-shadow: 0 6px 16px -10px var(--c-primary, #0f7a5a); }
 
   .ln-burger {
     display: none;
