@@ -60,7 +60,7 @@
         </div>
       </div>
 
-      <a href="/#harga">Harga</a>
+      <a href="/harga" class:active={path === "/harga"}>Harga</a>
       <a href="/unduh" class:active={path === "/unduh"}>Aplikasi</a>
       <a href="/panduan" class:active={path.startsWith("/panduan")}>Panduan</a>
       <a href="/tentang" class:active={path === "/tentang"}>Tentang</a>
@@ -81,7 +81,7 @@
       <span class="ln-mobile-label">Fitur</span>
       {#each FEATURES as f}<a href={f.href} onclick={close}>{f.label}</a>{/each}
     </div>
-    <a href="/#harga" onclick={close}>Harga</a>
+    <a href="/harga" onclick={close}>Harga</a>
     <a href="/unduh" onclick={close}>Aplikasi</a>
     <a href="/panduan" onclick={close}>Panduan</a>
     <a href="/tentang" onclick={close}>Tentang</a>
