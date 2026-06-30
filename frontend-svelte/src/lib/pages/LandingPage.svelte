@@ -41,20 +41,20 @@
 
   const modules = [
     { title: "Data Jamaah", desc: "Kelola data calon jamaah, dokumen, dan status pembayaran lengkap.", color: "#0f7a5a", svg: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
-    { title: "AI Scanner", desc: "Pindai KTP, KK, dan paspor — data terisi otomatis dengan OCR.", color: "#2563c9", svg: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/>' },
+    { title: "AI Scanner", desc: "Pindai KTP, KK, dan paspor; data terisi otomatis dengan OCR.", color: "#2563c9", feature: true, svg: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/>' },
     { title: "Paket Perjalanan", desc: "Atur paket umrah & haji, tier harga, kuota, dan publikasi.", color: "#c79a3e", svg: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22" x2="12" y2="12"/>' },
-    { title: "CRM & Pipeline", desc: "Kelola lead dari iklan hingga closing dengan pipeline visual.", color: "#7a5ae0", svg: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' },
+    { title: "CRM & Pipeline", desc: "Kelola lead dari iklan hingga closing dengan pipeline visual.", color: "#7a5ae0", feature: true, svg: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' },
     { title: "Invoice & Pembayaran", desc: "Buat tagihan, catat cicilan, dan pantau tunggakan otomatis.", color: "#0f7a5a", svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>' },
     { title: "Keuangan", desc: "Laporan laba rugi, arus kas, dan rincian biaya operasional.", color: "#15564a", svg: '<path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3a2 2 0 0 1 0-4h4"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>' },
     { title: "Rooming List", desc: "Atur penempatan kamar hotel dengan seret-lepas yang intuitif.", color: "#b87708", svg: '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>' },
     { title: "Kontrak Digital", desc: "Template akad & tanda tangan digital langsung dari WhatsApp.", color: "#a9842f", svg: '<path d="M3 17.5V21h3.5l11-11-3.5-3.5-11 11z"/><path d="M14 6.5 17.5 10"/><path d="M3 21h18"/>' },
-    { title: "Vendor & Agen", desc: "Pantau maskapai, hotel, muassasah, serta komisi agen mitra.", color: "#2563c9", svg: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>' },
+    { title: "Vendor & Agen", desc: "Pantau maskapai, hotel, muassasah, serta komisi agen mitra.", color: "#2563c9", feature: true, svg: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>' },
   ];
 
   const testimonials = [
-    { quote: "Suluk benar-benar mengubah cara kami bekerja. Input jamaah yang dulu makan waktu berjam-jam, sekarang cukup scan KTP. Tim admin kami jauh lebih produktif.", name: "Hj. Nurul Hidayah", role: "Owner, Cahaya Iman Tour — Jakarta", color: "#0f7a5a" },
-    { quote: "Laporan keuangan dan tunggakan jamaah langsung kelihatan real-time. Saya bisa ambil keputusan lebih cepat tanpa harus menunggu rekap manual.", name: "H. Lukman Hakim", role: "Direktur, Mitra Suci Wisata — Surabaya", color: "#c79a3e" },
-    { quote: "Fitur rooming list dan kontrak digitalnya sangat membantu saat musim haji. Semua rapi, jamaah pun merasa lebih profesional dilayani.", name: "Rizki Pratama", role: "Manajer, Safar Amanah — Medan", color: "#2563c9" },
+    { quote: "Suluk benar-benar mengubah cara kami bekerja. Input jamaah yang dulu makan waktu berjam-jam, sekarang cukup scan KTP. Tim admin kami jauh lebih produktif.", name: "Hj. Nurul Hidayah", role: "Owner, Cahaya Iman Tour, Jakarta", color: "#1B7F5A" },
+    { quote: "Laporan keuangan dan tunggakan jamaah langsung kelihatan real-time. Saya bisa ambil keputusan lebih cepat tanpa harus menunggu rekap manual.", name: "H. Lukman Hakim", role: "Direktur, Mitra Suci Wisata, Surabaya", color: "#C99A2E" },
+    { quote: "Fitur rooming list dan kontrak digitalnya sangat membantu saat musim haji. Semua rapi, jamaah pun merasa lebih profesional dilayani.", name: "Rizki Pratama", role: "Manajer, Safar Amanah, Medan", color: "#0F3D2E" },
   ];
 
   function initials(name) {
@@ -75,7 +75,7 @@
           Platform #1 Travel Umrah &amp; Haji di Indonesia
         </span>
         <h1 class="lp-h1">Kelola travel umrah &amp; haji Anda dalam <em>satu sistem</em></h1>
-        <p class="lp-lead">Dari pemindaian dokumen jamaah dengan AI, manajemen paket, keuangan, hingga kontrak digital — semuanya otomatis, rapi, dan terintegrasi.</p>
+        <p class="lp-lead">Dari pemindaian dokumen jamaah dengan AI, manajemen paket, keuangan, hingga kontrak digital. Semuanya otomatis, rapi, dan terintegrasi.</p>
         <div class="lp-hero-cta">
           <button class="lp-btn lp-btn-primary lp-btn-lg" onclick={() => onGoToRegister()}>
             Coba Gratis 14 Hari
@@ -96,7 +96,7 @@
             <span class="lp-dot" style="background:#f0625c"></span>
             <span class="lp-dot" style="background:#f5bd4f"></span>
             <span class="lp-dot" style="background:#62c554"></span>
-            <span style="margin-left:10px;font-size:12px;font-weight:700;color:var(--c-muted)">Dashboard — Suluk</span>
+            <span style="margin-left:10px;font-size:12px;font-weight:700;color:var(--c-muted)">Suluk Dashboard</span>
           </div>
           <div class="lp-mock-body">
             <div class="lp-mock-stats">
@@ -145,26 +145,24 @@
         <h2 class="lp-h2">Pindai KTP &amp; Paspor dalam hitungan detik</h2>
         <p class="lp-sec-lead">Tidak perlu lagi mengetik data jamaah satu per satu. Cukup foto dokumen, AI Suluk mengekstrak seluruh data secara otomatis dan akurat.</p>
         <ul class="lp-feature-list">
-          <li><span class="ck"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>OCR cerdas untuk KTP, KK &amp; Paspor</b><p>Ekstraksi NIK, nama, tanggal lahir, nomor paspor — langsung tervalidasi.</p></span></li>
+          <li><span class="ck"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>OCR cerdas untuk KTP, KK &amp; Paspor</b><p>Ekstraksi NIK, nama, tanggal lahir, dan nomor paspor yang langsung tervalidasi.</p></span></li>
           <li><span class="ck"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Hemat 90% waktu input data</b><p>Daftarkan puluhan jamaah dalam menit, bukan jam.</p></span></li>
           <li><span class="ck"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Minim kesalahan manusia</b><p>Data konsisten untuk manifest, visa, dan kontrak.</p></span></li>
         </ul>
       </div>
       <div class="lp-scan-card">
-        <div class="lp-scan-top">
-          <div class="lp-scan-line"></div>
-          <div style="text-align:center;color:rgba(255,255,255,.55)">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-            <div style="font-size:12px;margin-top:10px;font-weight:600;letter-spacing:.05em">KARTU TANDA PENDUDUK</div>
-          </div>
-        </div>
-        <div class="lp-scan-fields">
-          <div class="lp-scan-field"><div class="l">NIK</div><div class="v">3273014509680001</div></div>
-          <div class="lp-scan-field"><div class="l">Jenis Kelamin</div><div class="v">Laki-laki</div></div>
-          <div class="lp-scan-field full"><div class="l">Nama Lengkap</div><div class="v">Muhammad Faisal Akbar</div></div>
-          <div class="lp-scan-field"><div class="l">Tgl Lahir</div><div class="v">05-09-1997</div></div>
-          <div class="lp-scan-field"><div class="l">Kota</div><div class="v">Medan</div></div>
-        </div>
+        <video
+          class="lp-scan-video"
+          autoplay
+          loop
+          muted
+          playsinline
+          preload="auto"
+          poster="/scan-demo-poster.jpg"
+          aria-label="Animasi: KTP dipindai AI Suluk lalu datanya otomatis masuk ke Excel Siskopatuh"
+        >
+          <source src="/scan-demo.mp4" type="video/mp4" />
+        </video>
       </div>
     </div>
   </section>
@@ -175,12 +173,12 @@
       <div class="lp-sec-head">
         <div class="lp-eyebrow">Modul Lengkap</div>
         <h2 class="lp-h2">Semua kebutuhan operasional travel, di satu tempat</h2>
-        <p class="lp-sec-lead">Dari calon jamaah hingga keberangkatan dan laporan keuangan — Suluk menyatukan seluruh alur kerja bisnis travel Anda.</p>
+        <p class="lp-sec-lead">Dari calon jamaah, keberangkatan, hingga laporan keuangan. Suluk menyatukan seluruh alur kerja bisnis travel Anda.</p>
       </div>
       <div class="lp-modules">
         {#each modules as m}
-          <div class="lp-mod">
-            <div class="ic" style="background:{m.color}1c;color:{m.color}">
+          <div class="lp-mod" class:feature={m.feature}>
+            <div class="ic" style={m.feature ? 'background:rgba(255,255,255,0.16);color:#fff' : `background:${m.color}1c;color:${m.color}`}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html m.svg}</svg>
             </div>
             <h3>{m.title}</h3>
@@ -213,14 +211,14 @@
       <div class="lp-sec-head">
         <div class="lp-eyebrow">Cocok Untuk Siapa</div>
         <h2 class="lp-h2">Tumbuh bersama skala travel Anda</h2>
-        <p class="lp-sec-lead">Apa pun ukuran travel Anda, Suluk menyesuaikan diri — dari yang baru mulai hingga yang mengelola ribuan jamaah per tahun.</p>
+        <p class="lp-sec-lead">Apa pun ukuran travel Anda, Suluk menyesuaikan diri, dari yang baru mulai hingga yang mengelola ribuan jamaah per tahun.</p>
       </div>
       <div class="lp-usecases">
         <div class="lp-uc">
-          <div class="lp-uc-top" style="--uc:#0f7a5a">
+          <div class="lp-uc-top" style="--uc:#1B7F5A">
             <span class="lp-uc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg></span>
             <h3>Travel Kecil</h3>
-            <p class="lp-uc-scale">1–3 keberangkatan / tahun</p>
+            <p class="lp-uc-scale">1-3 keberangkatan / tahun</p>
           </div>
           <p class="lp-uc-desc">Baru memulai dan ingin langsung rapi tanpa biaya besar.</p>
           <div class="lp-uc-label">Tantangan</div>
@@ -229,11 +227,11 @@
           <p class="lp-uc-txt">Data Jamaah, AI Scanner, Paket dasar.</p>
           <div class="lp-uc-rec">Rekomendasi: <strong>Paket Pemula (Gratis)</strong></div>
         </div>
-        <div class="lp-uc">
-          <div class="lp-uc-top" style="--uc:#c79a3e">
+        <div class="lp-uc pop">
+          <div class="lp-uc-top" style="--uc:#C99A2E">
             <span class="lp-uc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M16 10h.01M8 10h.01"/></svg></span>
             <h3>Travel Menengah</h3>
-            <p class="lp-uc-scale">4–12 keberangkatan / tahun</p>
+            <p class="lp-uc-scale">4-12 keberangkatan / tahun</p>
           </div>
           <p class="lp-uc-desc">Operasional makin kompleks, butuh otomatisasi penuh.</p>
           <div class="lp-uc-label">Tantangan</div>
@@ -243,7 +241,7 @@
           <div class="lp-uc-rec">Rekomendasi: <strong>Paket Pro</strong></div>
         </div>
         <div class="lp-uc">
-          <div class="lp-uc-top" style="--uc:#2563c9">
+          <div class="lp-uc-top" style="--uc:#0F3D2E">
             <span class="lp-uc-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M19 21V9a2 2 0 0 0-2-2h-2"/><path d="M9 7h2M9 11h2M9 15h2"/></svg></span>
             <h3>Travel Besar</h3>
             <p class="lp-uc-scale">12+ keberangkatan / tahun</p>
@@ -290,7 +288,7 @@
         {/each}
       </div>
       <div class="lp-pricing-alt">
-        <span>Baru mulai? <button type="button" class="lp-link-btn" onclick={() => onGoToRegister()}>Mulai gratis</button> — kelola sampai {gratisPlan.maxJamaah} jamaah, tanpa kartu kredit.</span>
+        <span>Baru mulai? <button type="button" class="lp-link-btn" onclick={() => onGoToRegister()}>Mulai gratis</button>, kelola sampai {gratisPlan.maxJamaah} jamaah, tanpa kartu kredit.</span>
         <span class="lp-pricing-alt-sep" aria-hidden="true">·</span>
         <span>Travel besar atau multi-cabang? <button type="button" class="lp-link-btn" onclick={() => window.open(SALES_WA, '_blank')}>Hubungi Sales (Enterprise)</button></span>
       </div>
@@ -310,7 +308,7 @@
             <div class="lp-stars">
               {#each Array(5) as _}<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M11.5 2.3a.5.5 0 0 1 .9 0l2.3 4.6 5.1.7a.5.5 0 0 1 .3.9l-3.7 3.6.9 5.1a.5.5 0 0 1-.8.5L12 15.9l-4.6 2.4a.5.5 0 0 1-.8-.5l.9-5.1L3.8 9.1a.5.5 0 0 1 .3-.9l5.1-.7z"/></svg>{/each}
             </div>
-            <blockquote>“{t.quote}”</blockquote>
+            <blockquote>{t.quote}</blockquote>
             <div class="lp-tauthor">
               <div class="lp-tavatar" style="background:{t.color}22;color:{t.color}">{initials(t.name)}</div>
               <div><div class="n">{t.name}</div><div class="r">{t.role}</div></div>
@@ -328,19 +326,49 @@
         <div class="lp-app-copy">
           <span class="lp-app-tag">APLIKASI MOBILE · FITUR PRO</span>
           <h2>Kelola travel dari genggaman</h2>
-          <p>Scan KTP/paspor pakai kamera, catat pembayaran, setujui refund &amp; diskon, dan pantau jamaah — langsung dari ponsel, di mana saja. Tersedia untuk paket Pro ke atas.</p>
+          <p>Scan KTP/paspor pakai kamera, catat pembayaran, setujui refund &amp; diskon, dan pantau jamaah, langsung dari ponsel, di mana saja. Tersedia untuk paket Pro ke atas.</p>
           <div class="lp-app-actions">
-            <a class="lp-btn lp-btn-white lp-btn-lg" href="/unduh">⬇ Unduh Aplikasi</a>
-            <a class="lp-btn lp-btn-lg lp-app-ghost" href="/mobile">Buka Web App →</a>
+            <a class="lp-btn lp-btn-white lp-btn-lg" href="/unduh"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg> Unduh Aplikasi</a>
+            <a class="lp-btn lp-btn-lg lp-app-ghost" href="/mobile">Buka Web App <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
           </div>
         </div>
         <div class="lp-app-art" aria-hidden="true">
           <div class="lp-phone">
-            <div class="lp-phone-notch"></div>
-            <div class="lp-phone-screen">
-              <img src="/brand/suluk-mark-white.png" alt="" />
-              <div class="lp-phone-name">Suluk</div>
-              <div class="lp-phone-tag">ERP FOR TRAVEL</div>
+            <div class="lp-phone-island"></div>
+            <div class="lp-phone-app">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;font-weight:700;color:#0f3d2e;margin-bottom:12px">
+                <span>9:41</span>
+                <span style="display:inline-block;width:15px;height:7px;border:1.5px solid #0f3d2e;border-radius:2px;opacity:.65"></span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+                <div>
+                  <div style="font-size:8px;color:#6b7d77">Assalamualaikum</div>
+                  <div style="font-size:12.5px;font-weight:800;color:#10211c">Travel Anda</div>
+                </div>
+                <div style="width:23px;height:23px;border-radius:50%;background:#1B7F5A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">S</div>
+              </div>
+              <div style="background:linear-gradient(140deg,#1B7F5A,#0F3D2E);border-radius:13px;padding:11px 12px;color:#fff;margin-bottom:9px">
+                <div style="font-size:8.5px;opacity:.85">Jamaah Aktif</div>
+                <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1;margin-top:2px">1.284</div>
+                <div style="display:flex;gap:2px;align-items:flex-end;height:20px;margin-top:7px">
+                  <i style="flex:1;height:42%;background:rgba(255,255,255,.4);border-radius:1px"></i>
+                  <i style="flex:1;height:60%;background:rgba(255,255,255,.4);border-radius:1px"></i>
+                  <i style="flex:1;height:50%;background:rgba(255,255,255,.4);border-radius:1px"></i>
+                  <i style="flex:1;height:78%;background:rgba(255,255,255,.6);border-radius:1px"></i>
+                  <i style="flex:1;height:64%;background:rgba(255,255,255,.4);border-radius:1px"></i>
+                  <i style="flex:1;height:95%;background:#C99A2E;border-radius:1px"></i>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center;gap:8px;background:#f6f8f7;border-radius:10px;padding:8px 9px">
+                  <span style="width:23px;height:23px;border-radius:7px;background:#E8F4EF;color:#1B7F5A;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg></span>
+                  <span style="font-size:9.5px;font-weight:700;color:#10211c">Scan KTP Jamaah</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;background:#f6f8f7;border-radius:10px;padding:8px 9px">
+                  <span style="width:23px;height:23px;border-radius:7px;background:#F7EFD6;color:#a9842f;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <span style="font-size:9.5px;font-weight:700;color:#10211c">Pembayaran Lunas</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -378,7 +406,7 @@
         <div><h4>Akun</h4><ul><li><button class="lp-foot-link" onclick={() => onGoToLogin()}>Masuk</button></li><li><button class="lp-foot-link" onclick={() => onGoToRegister()}>Daftar Gratis</button></li></ul></div>
       </div>
       <div class="lp-footer-bottom">
-        <div>© 2026 Jamnas — PT Jaminan Nasional Indonesia. Hak cipta dilindungi.</div>
+        <div>© 2026 Jamnas (PT Jaminan Nasional Indonesia). Hak cipta dilindungi.</div>
         <div>Dibuat dengan ❤️ untuk travel umrah &amp; haji Indonesia</div>
       </div>
     </div>
@@ -386,7 +414,10 @@
 </div>
 
 <style>
-  .lp { font-family: var(--font-ui); color: var(--c-ink); background: var(--c-surface); overflow-x: hidden; }
+  /* `overflow-x: clip` contains the hero's overhanging float cards WITHOUT
+     becoming a scroll container — `overflow-x: hidden` here silently breaks the
+     sticky navbar (an overflow-x:hidden ancestor traps position:sticky). */
+  .lp { font-family: var(--font-ui); color: var(--c-ink); background: var(--c-surface); overflow-x: clip; }
   .lp :global(*) { box-sizing: border-box; }
   .lp-container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
   .lp :global(img) { max-width: 100%; display: block; }
@@ -400,6 +431,7 @@
   .lp-btn-white { background: #fff; color: var(--c-primary-deep); padding: 14px 26px; font-size: 15px; }
   .lp-btn-white:hover { transform: translateY(-2px); }
   .lp-btn-lg { padding: 16px 30px; font-size: 16px; }
+  .lp-btn:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 3px; }
 
   /* Brand mark styles — reused by the footer brand link. (The top navbar now
      lives in the shared LandingNav component.) */
@@ -410,16 +442,17 @@
 
   .lp-hero { padding: 80px 0 90px; background: radial-gradient(1200px 500px at 80% -10%, var(--c-primary-tint), transparent 60%), radial-gradient(900px 500px at 0% 0%, var(--c-accent-soft), transparent 55%); }
   .lp-hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
-  .lp-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--c-primary-deep); background: var(--c-primary-soft); padding: 7px 14px; border-radius: 999px; margin-bottom: 22px; }
+  .lp-kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--c-primary-deep); background: var(--c-primary-soft); border: 1px solid color-mix(in srgb, var(--c-primary) 16%, transparent); padding: 7px 14px 7px 12px; border-radius: 999px; margin-bottom: 22px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+  .lp-kicker svg { color: var(--c-accent); }
   .lp-h1 { font-family: var(--font-display); font-size: 54px; line-height: 1.08; font-weight: 800; letter-spacing: -.02em; margin: 0 0 20px; text-wrap: balance; }
   .lp-h1 em { font-style: italic; color: var(--c-primary); }
   .lp-lead { font-size: 18px; line-height: 1.6; color: var(--c-muted); max-width: 520px; margin: 0 0 30px; }
   .lp-hero-cta { display: flex; gap: 14px; flex-wrap: wrap; }
-  .lp-hero-note { margin-top: 18px; font-size: 13.5px; color: var(--c-faint); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .lp-hero-note span { display: inline-flex; align-items: center; gap: 6px; }
+  .lp-hero-note { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-line); font-size: 13.5px; font-weight: 600; color: var(--c-ink-soft); display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .lp-hero-note span { display: inline-flex; align-items: center; gap: 7px; }
 
   .lp-mock { position: relative; }
-  .lp-mock-card { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 20px; box-shadow: 0 30px 70px -28px rgba(16,33,28,.35); overflow: hidden; }
+  .lp-mock-card { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 20px; box-shadow: 0 30px 70px -28px rgba(16,33,28,.35), inset 0 1px 0 rgba(255,255,255,.8); overflow: hidden; }
   .lp-mock-bar { display: flex; align-items: center; gap: 7px; padding: 13px 16px; border-bottom: 1px solid var(--c-line-soft); background: var(--c-bg); }
   .lp-dot { width: 11px; height: 11px; border-radius: 999px; }
   .lp-mock-body { padding: 18px; }
@@ -429,7 +462,7 @@
   .lp-mock-stat .l { font-size: 11px; color: var(--c-muted); margin-top: 3px; }
   .lp-mock-chart { height: 130px; background: var(--c-primary-tint); border-radius: 12px; padding: 14px; display: flex; align-items: flex-end; gap: 9px; }
   .lp-mock-chart i { flex: 1; background: var(--c-primary); border-radius: 5px 5px 2px 2px; display: block; opacity: .85; }
-  .lp-float { position: absolute; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 14px; box-shadow: 0 18px 44px -18px rgba(16,33,28,.3); padding: 13px 15px; display: flex; align-items: center; gap: 11px; }
+  .lp-float { position: absolute; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 14px; box-shadow: 0 18px 44px -18px rgba(16,33,28,.3), inset 0 1px 0 rgba(255,255,255,.8); padding: 13px 15px; display: flex; align-items: center; gap: 11px; }
   .lp-float-1 { top: -22px; right: -18px; }
   .lp-float-2 { bottom: -24px; left: -22px; }
   .lp-float .ic { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -437,7 +470,8 @@
 
   .lp-trust { padding: 30px 0; border-top: 1px solid var(--c-line); border-bottom: 1px solid var(--c-line); background: var(--c-bg); }
   .lp-trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-  .lp-trust-item { text-align: center; }
+  .lp-trust-item { text-align: center; position: relative; }
+  .lp-trust-item:not(:first-child)::before { content: ""; position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 1px; height: 40px; background: var(--c-line); }
   .lp-trust-item .v { font-size: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--c-primary-deep); }
   .lp-trust-item .l { font-size: 13.5px; color: var(--c-muted); margin-top: 4px; }
 
@@ -454,36 +488,40 @@
   .lp-feature-list .ck { width: 26px; height: 26px; border-radius: 8px; background: var(--c-primary-soft); color: var(--c-primary-deep); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
   .lp-feature-list b { font-weight: 700; }
   .lp-feature-list p { margin: 3px 0 0; color: var(--c-muted); font-size: 14px; line-height: 1.5; }
-  .lp-scan-card { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 20px; box-shadow: var(--shadow-lg); overflow: hidden; }
-  .lp-scan-top { background: linear-gradient(135deg, #1a3d33, #0c2b22); padding: 30px; position: relative; min-height: 200px; display: flex; align-items: center; justify-content: center; }
-  .lp-scan-line { position: absolute; left: 24px; right: 24px; height: 3px; background: var(--c-accent); box-shadow: 0 0 16px 3px var(--c-accent); border-radius: 2px; animation: lpScan 2.6s ease-in-out infinite; }
-  @keyframes lpScan { 0%,100% { top: 30px; } 50% { top: 170px; } }
-  .lp-scan-fields { padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .lp-scan-field { background: var(--c-bg); border-radius: 10px; padding: 11px 13px; }
-  .lp-scan-field .l { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--c-faint); }
-  .lp-scan-field .v { font-size: 13px; font-weight: 700; margin-top: 3px; }
-  .lp-scan-field.full { grid-column: 1 / -1; }
+  .lp-scan-card { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 20px; box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.8); overflow: hidden; }
+  /* Remotion-rendered KTP -> scan -> Excel animation (1:1). */
+  .lp-scan-video { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: var(--c-primary-deep); }
 
   .lp-modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-  .lp-mod { padding: 26px; border: 1px solid var(--c-line); border-radius: 18px; background: var(--c-surface); transition: transform .18s, box-shadow .18s, border-color .18s; }
+  .lp-mod { padding: 26px; border: 1px solid var(--c-line); border-radius: 18px; background: var(--c-surface); box-shadow: 0 1px 2px rgba(16,33,28,.04); transition: transform .18s, box-shadow .18s, border-color .18s; }
   .lp-mod:hover { transform: translateY(-4px); box-shadow: 0 20px 44px -22px rgba(16,33,28,.28); border-color: var(--c-primary-soft); }
-  .lp-mod .ic { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+  .lp-mod .ic { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; transition: transform .18s; }
+  .lp-mod:hover .ic { transform: scale(1.06); }
   .lp-mod h3 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
   .lp-mod p { font-size: 14px; line-height: 1.55; color: var(--c-muted); margin: 0; }
+  /* Featured tiles: brand-green fill -> bento rhythm + background diversity. */
+  .lp-mod.feature { background: linear-gradient(155deg, var(--c-primary), var(--c-primary-deep)); border-color: transparent; box-shadow: 0 18px 40px -22px var(--c-primary); }
+  .lp-mod.feature h3 { color: #fff; }
+  .lp-mod.feature p { color: rgba(255,255,255,.82); }
+  .lp-mod.feature:hover { box-shadow: 0 26px 54px -22px var(--c-primary); border-color: transparent; }
 
-  .lp-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-  .lp-step { text-align: left; }
-  .lp-step .num { width: 46px; height: 46px; border-radius: 14px; background: var(--c-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; margin-bottom: 16px; }
+  .lp-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; position: relative; }
+  /* Connector path showing the 1 -> 2 -> 3 -> 4 flow (organizes the steps, not decoration). */
+  .lp-steps::before { content: ""; position: absolute; top: 23px; left: 12.5%; right: 12.5%; height: 2px; z-index: 0; background: linear-gradient(90deg, transparent, var(--c-primary-soft) 10%, var(--c-primary) 50%, var(--c-primary-soft) 90%, transparent); }
+  .lp-step { text-align: center; position: relative; z-index: 1; }
+  .lp-step .num { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(150deg, var(--c-primary), var(--c-primary-deep)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; margin: 0 auto 16px; box-shadow: 0 0 0 6px var(--c-bg), 0 8px 18px -8px var(--c-primary); }
   .lp-step h3 { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
-  .lp-step p { font-size: 14px; line-height: 1.55; color: var(--c-muted); margin: 0; }
+  .lp-step p { font-size: 14px; line-height: 1.55; color: var(--c-muted); margin: 0 auto; max-width: 230px; }
 
   .lp-pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: stretch; max-width: 940px; margin: 0 auto; }
   .lp-pricing-alt { max-width: 940px; margin: 22px auto 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; text-align: center; font-size: 14px; color: var(--c-muted); }
   .lp-pricing-alt-sep { color: var(--c-faint); }
   .lp-link-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 700; color: var(--c-primary-deep); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
   .lp-link-btn:hover { color: var(--c-primary); }
-  .lp-price { border: 1px solid var(--c-line); border-radius: 20px; padding: 24px; background: var(--c-surface); display: flex; flex-direction: column; }
+  .lp-price { border: 1px solid var(--c-line); border-radius: 20px; padding: 24px; background: var(--c-surface); display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(16,33,28,.04); transition: transform .18s, box-shadow .18s, border-color .18s; }
+  .lp-price:hover { transform: translateY(-4px); box-shadow: 0 22px 48px -24px rgba(16,33,28,.26); border-color: var(--c-primary-soft); }
   .lp-price.pop { border: 2px solid var(--c-primary); box-shadow: 0 28px 60px -28px var(--c-primary); position: relative; }
+  .lp-price.pop:hover { transform: translateY(-4px); box-shadow: 0 34px 70px -28px var(--c-primary); border-color: var(--c-primary); }
   .lp-price-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--c-primary); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; }
   .lp-price h3 { font-size: 19px; font-weight: 800; margin: 0 0 6px; }
   .lp-price .desc { font-size: 13.5px; color: var(--c-muted); margin: 0 0 20px; min-height: 38px; }
@@ -494,7 +532,11 @@
   .lp-price li svg { color: var(--c-primary); flex-shrink: 0; margin-top: 2px; }
 
   .lp-testi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
-  .lp-tcard { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 18px; padding: 28px; }
+  .lp-tcard { position: relative; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 18px; padding: 28px; box-shadow: 0 1px 2px rgba(16,33,28,.04); transition: transform .18s, box-shadow .18s, border-color .18s; }
+  .lp-tcard:hover { transform: translateY(-4px); box-shadow: 0 22px 48px -24px rgba(16,33,28,.26); border-color: var(--c-primary-soft); }
+  /* Soft decorative quote-mark watermark; card content sits above it. */
+  .lp-tcard::before { content: "\201D"; position: absolute; top: 6px; right: 22px; font-family: Georgia, "Times New Roman", serif; font-size: 92px; line-height: 1; color: color-mix(in srgb, var(--c-primary) 12%, transparent); pointer-events: none; z-index: 0; }
+  .lp-tcard > * { position: relative; z-index: 1; }
   .lp-stars { display: flex; gap: 3px; color: var(--c-accent); margin-bottom: 16px; }
   .lp-tcard blockquote { margin: 0 0 22px; font-size: 15.5px; line-height: 1.62; color: var(--c-ink); }
   .lp-tauthor { display: flex; align-items: center; gap: 12px; }
@@ -505,6 +547,10 @@
   .lp-usecases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
   .lp-uc { border: 1px solid var(--c-line); border-radius: 20px; padding: 26px; background: var(--c-surface); transition: box-shadow .18s, transform .18s; }
   .lp-uc:hover { box-shadow: 0 20px 46px -24px rgba(16,33,28,.28); transform: translateY(-4px); }
+  /* Recommended tier highlight (conversion guide, like the pricing "popular" card). */
+  .lp-uc.pop { border: 2px solid var(--c-primary); box-shadow: 0 26px 56px -28px var(--c-primary); position: relative; }
+  .lp-uc.pop:hover { box-shadow: 0 32px 64px -28px var(--c-primary); transform: translateY(-4px); }
+  .lp-uc.pop::before { content: "Paling Direkomendasikan"; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--c-primary); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 5px 14px; border-radius: 999px; white-space: nowrap; }
   .lp-uc-top { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--c-line-soft); }
   .lp-uc-ic { width: 48px; height: 48px; border-radius: 13px; background: color-mix(in srgb, var(--uc) 14%, #fff); color: var(--uc); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
   .lp-uc-top h3 { font-size: 19px; font-weight: 800; margin: 0; }
@@ -518,6 +564,7 @@
   .lp-cta-sec { padding: 30px 0 100px; }
   .lp-cta-box { background: linear-gradient(135deg, var(--c-primary-deep), var(--c-primary)); border-radius: 28px; padding: 64px 48px; text-align: center; color: #fff; position: relative; overflow: hidden; }
   .lp-cta-box::after { content: ''; position: absolute; width: 360px; height: 360px; border-radius: 50%; background: rgba(255,255,255,.07); right: -90px; top: -120px; }
+  .lp-cta-box::before { content: ''; position: absolute; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(closest-side, rgba(201,154,46,.20), transparent 70%); left: -90px; bottom: -130px; pointer-events: none; }
   .lp-cta-box h2 { font-family: var(--font-display); font-size: 40px; font-weight: 800; margin: 0 0 16px; letter-spacing: -.02em; position: relative; }
   .lp-cta-box p { font-size: 17px; opacity: .9; max-width: 520px; margin: 0 auto 30px; position: relative; }
   .lp-cta-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; }
@@ -536,6 +583,7 @@
     .lp-hero-grid { gap: 40px; }
     .lp-modules { grid-template-columns: repeat(2, 1fr); }
     .lp-steps { grid-template-columns: repeat(2, 1fr); row-gap: 36px; }
+    .lp-steps::before { display: none; }
     .lp-footer-grid { grid-template-columns: 1fr 1fr; row-gap: 36px; }
   }
 
@@ -591,13 +639,10 @@
   .lp-app-ghost:hover { background: rgba(255,255,255,.22); }
   .lp-app-art { display: flex; justify-content: center; }
   .lp-phone {
-    width: 168px; height: 320px; border-radius: 30px; background: #0a2a1f;
-    border: 6px solid rgba(255,255,255,.16); position: relative; box-shadow: 0 24px 60px -20px rgba(0,0,0,.5);
-    display: flex; align-items: center; justify-content: center;
+    width: 178px; height: 346px; border-radius: 34px; background: #0a2a1f;
+    border: 7px solid rgba(255,255,255,.14); position: relative; box-shadow: 0 28px 64px -22px rgba(0,0,0,.55);
+    padding: 8px;
   }
-  .lp-phone-notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 54px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.25); }
-  .lp-phone-screen { text-align: center; }
-  .lp-phone-screen img { height: 60px; width: auto; }
-  .lp-phone-name { font-family: var(--font-display, Georgia, serif); font-size: 22px; font-weight: 800; color: #fff; margin-top: 12px; }
-  .lp-phone-tag { font-size: 9px; font-weight: 700; letter-spacing: .18em; color: var(--c-accent); margin-top: 3px; }
+  .lp-phone-island { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); width: 44px; height: 13px; border-radius: 999px; background: #05130d; z-index: 3; }
+  .lp-phone-app { width: 100%; height: 100%; border-radius: 27px; background: #fff; overflow: hidden; padding: 26px 12px 12px; }
 </style>
