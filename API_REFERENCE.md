@@ -108,6 +108,25 @@
 | POST | `/invoices/:id/payments` | Yes | Record payment |
 | GET | `/invoices/:id/payments` | Yes | Get payments |
 
+## Refunds
+
+Write endpoints (initiate/approve/process/complete/reject a refund, create/update/delete a policy) additionally require the `owner`, `admin`, or `finance` role.
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/invoices/:id/refund` | Yes | Initiate a refund for an invoice |
+| GET | `/refunds/` | Yes | List refunds (paginated, filterable by status) |
+| GET | `/refunds/:id` | Yes | Get refund detail |
+| GET | `/refunds/by-invoice/:id` | Yes | List refunds for an invoice |
+| PUT | `/refunds/:id/approve` | Yes | Approve a pending refund |
+| PUT | `/refunds/:id/process` | Yes | Mark an approved refund as processed |
+| PUT | `/refunds/:id/complete` | Yes | Complete a refund (posts the accounting journal) |
+| PUT | `/refunds/:id/reject` | Yes | Reject a pending refund |
+| GET | `/refunds/policies` | Yes | List refund policies |
+| POST | `/refunds/policies` | Yes | Create a refund policy |
+| PUT | `/refunds/policies/:id` | Yes | Update a refund policy |
+| DELETE | `/refunds/policies/:id` | Yes | Delete a refund policy |
+
 ## Finance / Expenses
 
 | Method | Endpoint | Auth | Description |
