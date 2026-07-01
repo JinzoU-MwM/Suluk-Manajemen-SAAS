@@ -22,10 +22,10 @@ var (
 
 func (r *InvoiceRepo) CreateRefund(ctx context.Context, ref *model.Refund) error {
 	return r.pool.QueryRow(ctx, `
-		INSERT INTO refunds (org_id, invoice_id, amount, refund_pct, reason, notes, status)
-		VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+		INSERT INTO refunds (org_id, invoice_id, amount, refund_pct, reason, notes, payment_method, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
 		RETURNING id, created_at, updated_at
-	`, ref.OrgID, ref.InvoiceID, ref.Amount, ref.RefundPct, ref.Reason, ref.Notes).Scan(&ref.ID, &ref.CreatedAt, &ref.UpdatedAt)
+	`, ref.OrgID, ref.InvoiceID, ref.Amount, ref.RefundPct, ref.Reason, ref.Notes, ref.PaymentMethod).Scan(&ref.ID, &ref.CreatedAt, &ref.UpdatedAt)
 }
 
 func (r *InvoiceRepo) ListRefunds(ctx context.Context, orgID uuid.UUID, status string, page, limit int) ([]model.Refund, int64, error) {
@@ -124,8 +124,9 @@ func (r *InvoiceRepo) CompleteRefund(ctx context.Context, id, orgID uuid.UUID) e
 	// Confirm the refund is processed and capture its amount + invoice.
 	var invoiceID uuid.UUID
 	var amount int64
-	if err := tx.QueryRow(ctx, `SELECT invoice_id, amount FROM refunds WHERE id=$1 AND org_id=$2 AND status='processed' FOR UPDATE`,
-		id, orgID).Scan(&invoiceID, &amount); err != nil {
+	var paymentMethod string
+	if err := tx.QueryRow(ctx, `SELECT invoice_id, amount, payment_method FROM refunds WHERE id=$1 AND org_id=$2 AND status='processed' FOR UPDATE`,
+		id, orgID).Scan(&invoiceID, &amount, &paymentMethod); err != nil {
 		return fmt.Errorf("refund not in processed status")
 	}
 	if _, err := tx.Exec(ctx, `UPDATE refunds SET status='completed', updated_at=NOW() WHERE id=$1 AND org_id=$2`, id, orgID); err != nil {
@@ -162,7 +163,7 @@ func (r *InvoiceRepo) CompleteRefund(ctx context.Context, id, orgID uuid.UUID) e
 	}
 
 	// Emit refund.completed so accounting posts Dr Piutang / Cr Kas|Bank.
-	payload, _ := json.Marshal(map[string]any{"amount": amount, "invoice_number": invNumber})
+	payload, _ := json.Marshal(map[string]any{"amount": amount, "invoice_number": invNumber, "payment_method": paymentMethod})
 	if err := outbox.Insert(ctx, tx, outbox.Event{
 		OrgID:         orgID,
 		AggregateType: "invoice",

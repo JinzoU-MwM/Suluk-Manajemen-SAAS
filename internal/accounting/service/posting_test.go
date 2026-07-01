@@ -53,6 +53,22 @@ func TestBuildPostingBalanced(t *testing.T) {
 			},
 		},
 		{
+			name: "refund tunai -> kas",
+			env:  mk(events.EventRefundCompleted, map[string]any{"amount": 200000, "payment_method": "tunai", "invoice_number": "INV-3"}),
+			wantAcc: map[string][2]int64{
+				AccPiutangJemaah: {200000, 0},
+				AccKas:           {0, 200000},
+			},
+		},
+		{
+			name: "refund transfer -> bank",
+			env:  mk(events.EventRefundCompleted, map[string]any{"amount": 200000, "payment_method": "transfer_bank", "invoice_number": "INV-4"}),
+			wantAcc: map[string][2]int64{
+				AccPiutangJemaah: {200000, 0},
+				AccBank:          {0, 200000},
+			},
+		},
+		{
 			name: "payroll with tax",
 			env:  mk(events.EventPayrollPosted, map[string]any{"gross": 5000000, "tax": 500000, "net": 4500000}),
 			wantAcc: map[string][2]int64{

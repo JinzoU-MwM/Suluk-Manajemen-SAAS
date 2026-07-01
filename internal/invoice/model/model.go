@@ -223,12 +223,13 @@ type RefundPolicy struct {
 }
 
 type Refund struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	OrgID       uuid.UUID  `json:"org_id" db:"org_id"`
-	InvoiceID   uuid.UUID  `json:"invoice_id" db:"invoice_id"`
-	Amount      int64      `json:"amount" db:"amount"`
-	RefundPct   float64    `json:"refund_pct" db:"refund_pct"`
-	Reason      string     `json:"reason" db:"reason"`
+	ID            uuid.UUID  `json:"id" db:"id"`
+	OrgID         uuid.UUID  `json:"org_id" db:"org_id"`
+	InvoiceID     uuid.UUID  `json:"invoice_id" db:"invoice_id"`
+	Amount        int64      `json:"amount" db:"amount"`
+	RefundPct     float64    `json:"refund_pct" db:"refund_pct"`
+	PaymentMethod string     `json:"payment_method" db:"payment_method"`
+	Reason        string     `json:"reason" db:"reason"`
 	Status      string     `json:"status" db:"status"`
 	ApprovedBy  *uuid.UUID `json:"approved_by,omitempty" db:"approved_by"`
 	ApprovedAt  *time.Time `json:"approved_at,omitempty" db:"approved_at"`
