@@ -157,6 +157,9 @@ func (h *InvoiceHandler) CancelInvoice(c *fiber.Ctx) error {
 	}
 
 	if err := h.svc.CancelInvoice(c.Context(), id, claims.OrgID, req.Reason); err != nil {
+		if errors.Is(err, repository.ErrAlreadyCancelled) || errors.Is(err, repository.ErrAlreadyLunas) {
+			return response.BadRequest(c, err.Error())
+		}
 		return response.Internal(c, err)
 	}
 	return response.OK(c, fiber.Map{"message": "invoice cancelled"})

@@ -21,8 +21,8 @@
       const [rf, inv] = await Promise.all([ApiService.listRefunds({ limit: 50 }), ApiService.listInvoices({ pageSize: 50 }).catch(() => null)]);
       refunds = rf?.data || rf?.refunds || (Array.isArray(rf) ? rf : []) || [];
       const list = inv?.invoices || inv?.data || (Array.isArray(inv) ? inv : []) || [];
-      // refundable = not cancelled, has some value
-      invoices = list.filter((i) => i.status !== "batal");
+      // refundable = not cancelled, has something actually paid
+      invoices = list.filter((i) => i.status !== "batal" && (i.amount_paid ?? 0) > 0);
     } catch {
       refunds = [];
     } finally {
@@ -39,7 +39,8 @@
 
   async function submit(data) {
     const { invoice_id, reason } = data;
-    const body = { reason };
+    const inv = invoices.find((i) => i.id === invoice_id);
+    const body = { reason, amount: inv?.amount_paid ?? 0 };
     if (data.refund_pct !== "" && data.refund_pct != null) body.refund_pct = Number(data.refund_pct);
     await ApiService.initiateRefund(invoice_id, body);
     nav.toast("Pengajuan refund dibuat");

@@ -51,7 +51,7 @@ export const invoiceApi = {
 
     async cancelInvoice(invoiceId, reason) {
         const response = await apiFetch(`${API_URL}/invoices/${invoiceId}/cancel`, {
-            method: 'POST',
+            method: 'PATCH',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ reason }),
         });

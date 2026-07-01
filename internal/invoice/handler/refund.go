@@ -74,7 +74,7 @@ func (h *RefundHandler) InitiateRefund(c *fiber.Ctx) error {
 		if errors.Is(err, repository.ErrInvoiceNotFound) {
 			return c.Status(404).JSON(fiber.Map{"success": false, "error": "invoice not found"})
 		}
-		if errors.Is(err, repository.ErrRefundExceedsPaid) {
+		if errors.Is(err, repository.ErrRefundExceedsPaid) || errors.Is(err, repository.ErrRefundAlreadyOpen) {
 			return c.Status(400).JSON(fiber.Map{"success": false, "error": err.Error()})
 		}
 		return c.Status(500).JSON(fiber.Map{"success": false, "error": err.Error()})

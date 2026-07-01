@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -121,24 +122,47 @@ func (r *InvoiceRepo) RecordPaymentTx(ctx context.Context, p *model.Payment, inv
 	return tx.Commit(ctx)
 }
 
-// CancelInvoiceTx marks an invoice cancelled and, when evt is non-nil, emits a
-// GL reversal event in the same transaction.
-func (r *InvoiceRepo) CancelInvoiceTx(ctx context.Context, id, orgID uuid.UUID, reason string, evt *outbox.Event) error {
+// CancelInvoiceTx marks an invoice cancelled and, when the invoice still has
+// an uncollected balance, emits a GL reversal event in the same transaction.
+// The invoice is locked and re-read here rather than trusted from the caller,
+// so a concurrent payment landing between the caller's earlier read and this
+// call can't make the reversal amount stale. Cancelling a fully-paid (lunas)
+// invoice is rejected — collected money must go through the refund flow.
+func (r *InvoiceRepo) CancelInvoiceTx(ctx context.Context, id, orgID uuid.UUID, reason string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	tag, err := tx.Exec(ctx, `UPDATE invoices SET status='batal', cancelled_at=NOW(), cancelled_reason=$3, updated_at=NOW() WHERE id=$1 AND org_id=$2 AND status != 'batal'`, id, orgID, reason)
-	if err != nil {
-		return err
+	var status, invoiceNumber string
+	var amountRemaining int64
+	if err := tx.QueryRow(ctx, `SELECT status, amount_remaining, invoice_number FROM invoices WHERE id=$1 AND org_id=$2 FOR UPDATE`,
+		id, orgID).Scan(&status, &amountRemaining, &invoiceNumber); err != nil {
+		return ErrInvoiceNotFound
 	}
-	if tag.RowsAffected() == 0 {
+	if status == "batal" {
 		return ErrAlreadyCancelled
 	}
-	if evt != nil {
-		if err := outbox.Insert(ctx, tx, *evt); err != nil {
+	if status == "lunas" {
+		return ErrAlreadyLunas
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE invoices SET status='batal', cancelled_at=NOW(), cancelled_reason=$3, updated_at=NOW() WHERE id=$1 AND org_id=$2`,
+		id, orgID, reason); err != nil {
+		return err
+	}
+
+	if amountRemaining > 0 {
+		payload, _ := json.Marshal(map[string]any{"amount": amountRemaining, "invoice_number": invoiceNumber})
+		if err := outbox.Insert(ctx, tx, outbox.Event{
+			OrgID:         orgID,
+			AggregateType: "invoice",
+			AggregateID:   id,
+			EventType:     events.EventInvoiceCancelled,
+			Payload:       payload,
+			OccurredAt:    time.Now(),
+		}); err != nil {
 			return err
 		}
 	}
