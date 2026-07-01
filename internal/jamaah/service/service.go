@@ -380,6 +380,15 @@ func (s *JamaahService) GetRegistration(ctx context.Context, orgID, jamaahID, pa
 	return s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 }
 
+// LostReasonCodeGagalBerangkat is the lost-reason code that triggers the
+// gagal-berangkat cascade (cancel invoice + initiate refund). It MUST match
+// the `id` of the "Batal berangkat" entry in LOST_REASONS in
+// frontend-svelte/src/lib/pages/CRMPage.svelte — that array is the only other
+// place this value is defined, so renaming it on either side silently stops
+// the cascade from firing (no error, just a pipeline-status update with no
+// financial side effect).
+const LostReasonCodeGagalBerangkat = "tidak_jadi"
+
 // CascadeResult reports what the "jamaah gagal berangkat" cascade actually
 // did, so the CRM can tell staff whether finance still needs to act manually
 // (e.g. the caller lacked the finance role, or invoice-service errored).
@@ -432,7 +441,8 @@ func (s *JamaahService) cascadeGagalBerangkat(ctx context.Context, jamaahID, pac
 
 	if inv.AmountRemaining > 0 {
 		body := map[string]string{"reason": "Jamaah gagal berangkat"}
-		if err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/cancel", headers, body, nil); err != nil {
+		// invoice-service registers /invoices/:id/cancel as PATCH, not POST.
+		if err := s.httpc.PatchJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/cancel", headers, body, nil); err != nil {
 			if s.log != nil {
 				s.log.Warnw("cascade gagal berangkat: cancel invoice", "invoice_id", inv.ID, "err", err)
 			}
@@ -511,7 +521,7 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID,
 	s.recompute(ctx, orgID, jamaahID, packageID) // stage change moves the score
 
 	var cascade CascadeResult
-	if status == string(model.StatusBatal) && lostReasonCode == "tidak_jadi" {
+	if status == string(model.StatusBatal) && lostReasonCode == LostReasonCodeGagalBerangkat {
 		cascade = s.cascadeGagalBerangkat(ctx, jamaahID, packageID, authToken)
 	}
 

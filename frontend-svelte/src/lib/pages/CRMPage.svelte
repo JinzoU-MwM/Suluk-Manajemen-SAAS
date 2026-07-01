@@ -66,6 +66,10 @@
     { id: 'cold', label: 'Cold' },
   ];
 
+  // 'tidak_jadi' is matched by name in the backend (jamaah-service
+  // LostReasonCodeGagalBerangkat, internal/jamaah/service/service.go) to
+  // trigger the auto cancel-invoice + initiate-refund cascade — don't rename
+  // its id without updating that constant too.
   const LOST_REASONS = [
     { id: 'harga',      label: 'Harga terlalu mahal' },
     { id: 'jadwal',     label: 'Jadwal tidak cocok' },

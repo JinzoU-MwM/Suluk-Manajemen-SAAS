@@ -95,6 +95,16 @@ func (cl *Client) GetRaw(ctx context.Context, addr, path, authToken string) (jso
 // retries transient failures (network errors / 5xx), unwraps the `data` field,
 // and decodes it into out (out may be nil). Use for service-to-service writes.
 func (cl *Client) PostJSON(ctx context.Context, addr, path string, headers map[string]string, body, out any) error {
+	return cl.writeJSON(ctx, http.MethodPost, addr, path, headers, body, out)
+}
+
+// PatchJSON is PostJSON but issues an HTTP PATCH — use for service-to-service
+// calls to routes registered as PATCH (e.g. partial-update/cancel endpoints).
+func (cl *Client) PatchJSON(ctx context.Context, addr, path string, headers map[string]string, body, out any) error {
+	return cl.writeJSON(ctx, http.MethodPatch, addr, path, headers, body, out)
+}
+
+func (cl *Client) writeJSON(ctx context.Context, method, addr, path string, headers map[string]string, body, out any) error {
 	url := "http://" + addr + path
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -110,7 +120,7 @@ func (cl *Client) PostJSON(ctx context.Context, addr, path string, headers map[s
 			}
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(payload))
 		if err != nil {
 			return err
 		}

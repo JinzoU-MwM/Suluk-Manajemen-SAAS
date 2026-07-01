@@ -3,6 +3,7 @@ import { createAuthSubscriptionApi } from './apiDomains/authSubscriptionApi.js';
 import { createGroupOpsApi } from './apiDomains/groupOpsApi.js';
 import { createContentApi } from './apiDomains/contentApi.js';
 import { createPackageApi } from './apiDomains/packageApi.js';
+import { invoiceApi } from './apiDomains/invoiceApi.js';
 import { contractApi } from './apiDomains/contractApi.js';
 import { paymentApi } from './apiDomains/paymentApi.js';
 import { documentExcelApi } from './apiDomains/documentExcelApi.js';
@@ -75,6 +76,7 @@ Object.assign(
     createMutawwifApi(),
     createPortalApi(),
     exportLinks,
+    invoiceApi,
     contractApi,
     paymentApi,
     documentExcelApi,

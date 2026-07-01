@@ -166,7 +166,7 @@
     try {
       await ApiService.initiateRefund(refundForm.invoice_id, {
         amount: Number(refundForm.amount),
-        refund_pct: Number(refundForm.refund_pct) || 100,
+        refund_pct: refundForm.refund_pct === '' ? 100 : Number(refundForm.refund_pct),
         reason: refundForm.reason,
         notes: refundForm.notes,
       });

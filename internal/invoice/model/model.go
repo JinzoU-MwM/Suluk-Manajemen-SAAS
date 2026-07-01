@@ -86,16 +86,16 @@ type PaymentSchedule struct {
 }
 
 type Payment struct {
-	ID              uuid.UUID `json:"id" db:"id"`
-	OrgID           uuid.UUID `json:"org_id" db:"org_id"`
-	InvoiceID       uuid.UUID `json:"invoice_id" db:"invoice_id"`
-	Amount          int64     `json:"amount" db:"amount"`
-	PaymentMethod   string    `json:"payment_method" db:"payment_method"`
-	BankName        *string   `json:"bank_name,omitempty" db:"bank_name"`
-	AccountNumber   *string   `json:"account_number,omitempty" db:"account_number"`
-	ReferenceNumber *string   `json:"reference_number,omitempty" db:"reference_number"`
-	ProofURL        *string   `json:"proof_url,omitempty" db:"proof_url"`
-	Notes           string    `json:"notes,omitempty" db:"notes"`
+	ID              uuid.UUID  `json:"id" db:"id"`
+	OrgID           uuid.UUID  `json:"org_id" db:"org_id"`
+	InvoiceID       uuid.UUID  `json:"invoice_id" db:"invoice_id"`
+	Amount          int64      `json:"amount" db:"amount"`
+	PaymentMethod   string     `json:"payment_method" db:"payment_method"`
+	BankName        *string    `json:"bank_name,omitempty" db:"bank_name"`
+	AccountNumber   *string    `json:"account_number,omitempty" db:"account_number"`
+	ReferenceNumber *string    `json:"reference_number,omitempty" db:"reference_number"`
+	ProofURL        *string    `json:"proof_url,omitempty" db:"proof_url"`
+	Notes           string     `json:"notes,omitempty" db:"notes"`
 	ReceivedBy      uuid.UUID  `json:"received_by" db:"received_by"`
 	PaidAt          time.Time  `json:"paid_at" db:"paid_at"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
@@ -230,13 +230,13 @@ type Refund struct {
 	RefundPct     float64    `json:"refund_pct" db:"refund_pct"`
 	PaymentMethod string     `json:"payment_method" db:"payment_method"`
 	Reason        string     `json:"reason" db:"reason"`
-	Status      string     `json:"status" db:"status"`
-	ApprovedBy  *uuid.UUID `json:"approved_by,omitempty" db:"approved_by"`
-	ApprovedAt  *time.Time `json:"approved_at,omitempty" db:"approved_at"`
-	ProcessedAt *time.Time `json:"processed_at,omitempty" db:"processed_at"`
-	Notes       string     `json:"notes" db:"notes"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	Status        string     `json:"status" db:"status"`
+	ApprovedBy    *uuid.UUID `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt    *time.Time `json:"approved_at,omitempty" db:"approved_at"`
+	ProcessedAt   *time.Time `json:"processed_at,omitempty" db:"processed_at"`
+	Notes         string     `json:"notes" db:"notes"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 }
 
 type CreateRefundPolicyRequest struct {
