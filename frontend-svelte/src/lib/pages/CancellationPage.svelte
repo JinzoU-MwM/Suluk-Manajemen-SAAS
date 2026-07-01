@@ -20,6 +20,7 @@
   let refunds = $state([]);
   let total = $state(0);
   let policies = $state([]);
+  let invoices = $state([]);
   let loading = $state(true);
   let statusFilter = $state('all');
 
@@ -63,13 +64,16 @@
   async function loadData() {
     loading = true;
     try {
-      const [refundData, policyData] = await Promise.all([
+      const [refundData, policyData, invoiceData] = await Promise.all([
         ApiService.listRefunds({ status: statusFilter === 'all' ? '' : statusFilter }),
         ApiService.listPolicies(),
+        ApiService.listInvoices({ pageSize: 100 }).catch(() => null),
       ]);
       refunds = refundData.refunds || [];
       total = refundData.total || 0;
       policies = policyData.policies || [];
+      const invList = invoiceData?.invoices || invoiceData?.data || (Array.isArray(invoiceData) ? invoiceData : []) || [];
+      invoices = invList.filter((i) => i.status !== 'batal' && (i.amount_paid ?? 0) > 0);
     } catch (e) {
       showToast(e.message, 'error');
     } finally {
@@ -142,6 +146,40 @@
     showRefundDrawer = true;
   }
 
+  function openNewRefund() {
+    refundForm = { invoice_id: '', amount: 0, refund_pct: 100, reason: '', notes: '' };
+    showNewRefundDrawer = true;
+  }
+
+  function selectInvoiceForRefund(id) {
+    refundForm.invoice_id = id;
+    const inv = invoices.find((i) => i.id === id);
+    refundForm.amount = inv?.amount_paid ?? 0;
+  }
+
+  async function saveNewRefund() {
+    if (!refundForm.invoice_id || !refundForm.amount) {
+      showToast('Pilih invoice dan pastikan ada nominal yang dibayar', 'error');
+      return;
+    }
+    savingRefund = true;
+    try {
+      await ApiService.initiateRefund(refundForm.invoice_id, {
+        amount: Number(refundForm.amount),
+        refund_pct: Number(refundForm.refund_pct) || 100,
+        reason: refundForm.reason,
+        notes: refundForm.notes,
+      });
+      showToast('Pengajuan refund dibuat');
+      showNewRefundDrawer = false;
+      await loadData();
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      savingRefund = false;
+    }
+  }
+
   async function refundAction(id, action) {
     try {
       if (action === 'approve') await ApiService.approveRefund(id);
@@ -164,6 +202,7 @@
   >
     {#snippet actions()}
       <Button variant="ghost" icon={Plus} onclick={openNewPolicy}>Kebijakan</Button>
+      <Button variant="primary" icon={Plus} onclick={openNewRefund}>Ajukan Refund</Button>
     {/snippet}
   </PageHeader>
 
@@ -358,4 +397,41 @@
       </div>
     </div>
   {/if}
+</SlideDrawer>
+
+<!-- New Refund Drawer -->
+<SlideDrawer open={showNewRefundDrawer} onClose={() => showNewRefundDrawer = false} title="Ajukan Refund Baru" width="480px">
+  <div class="flex flex-col gap-4 p-4">
+    <div class="flex flex-col gap-1">
+      <label for="ref-invoice" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Invoice</label>
+      <select id="ref-invoice" value={refundForm.invoice_id} onchange={(e) => selectInvoiceForRefund(e.target.value)} class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)">
+        <option value="">Pilih invoice...</option>
+        {#each invoices as inv}
+          <option value={inv.id}>{(inv.jamaah_name || inv.invoice_number || inv.id)} · {formatIDR(inv.amount_paid)}</option>
+        {/each}
+      </select>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1">
+        <label for="ref-amount" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Jumlah Refund (Rp)</label>
+        <input id="ref-amount" type="number" bind:value={refundForm.amount} class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label for="ref-pct" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Persentase (%)</label>
+        <input id="ref-pct" type="number" bind:value={refundForm.refund_pct} min="0" max="100" step="0.01" class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)" />
+      </div>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="ref-reason" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Alasan</label>
+      <textarea id="ref-reason" bind:value={refundForm.reason} rows="2" placeholder="Contoh: Jamaah gagal berangkat" class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)"></textarea>
+    </div>
+    <div class="flex flex-col gap-1">
+      <label for="ref-notes" class="text-xs font-semibold" style="color:var(--c-ink-soft)">Catatan (opsional)</label>
+      <textarea id="ref-notes" bind:value={refundForm.notes} rows="2" class="rounded-xl px-3 py-2 text-sm outline-none focus:border-primary-400" style="border:1px solid var(--c-line)"></textarea>
+    </div>
+    <div class="flex gap-2 pt-2">
+      <Button variant="ghost" full onclick={() => showNewRefundDrawer = false}>Batal</Button>
+      <Button variant="primary" full disabled={savingRefund} onclick={saveNewRefund}>{savingRefund ? 'Menyimpan...' : 'Ajukan'}</Button>
+    </div>
+  </div>
 </SlideDrawer>
