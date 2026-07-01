@@ -380,15 +380,90 @@ func (s *JamaahService) GetRegistration(ctx context.Context, orgID, jamaahID, pa
 	return s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 }
 
-func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID, jamaahID, packageID uuid.UUID, status, reason, lostReason string) (*model.JamaahPackageRegistration, error) {
+// CascadeResult reports what the "jamaah gagal berangkat" cascade actually
+// did, so the CRM can tell staff whether finance still needs to act manually
+// (e.g. the caller lacked the finance role, or invoice-service errored).
+type CascadeResult struct {
+	InvoiceCancelled bool `json:"invoice_cancelled"`
+	RefundInitiated  bool `json:"refund_initiated"`
+	Attempted        bool `json:"attempted"`
+}
+
+// jamaahCascadeInvoice is the subset of invoice fields the cascade needs from
+// invoice-service's GET /api/v1/invoices/jamaah/:id response.
+type jamaahCascadeInvoice struct {
+	ID              uuid.UUID `json:"id"`
+	PackageID       uuid.UUID `json:"package_id"`
+	Status          string    `json:"status"`
+	AmountPaid      int64     `json:"amount_paid"`
+	AmountRemaining int64     `json:"amount_remaining"`
+}
+
+// cascadeGagalBerangkat runs when a registration is marked "batal" with lost
+// reason code "tidak_jadi" (jamaah gagal berangkat). It looks up the
+// registration's invoice and, best-effort, cancels the uncollected remainder
+// and files a pending refund request for whatever was already paid, so staff
+// no longer has to remember the separate manual cancel + refund steps. Every
+// step is best-effort and logged rather than returned as an error: a failure
+// here (e.g. the caller isn't owner/admin/finance, so invoice-service 403s)
+// must never fail the pipeline-status update that already succeeded.
+func (s *JamaahService) cascadeGagalBerangkat(ctx context.Context, jamaahID, packageID uuid.UUID, authToken string) CascadeResult {
+	var invoices []jamaahCascadeInvoice
+	if err := s.httpc.GetJSON(ctx, s.invoiceAddr, "/api/v1/invoices/jamaah/"+jamaahID.String(), authToken, &invoices); err != nil {
+		if s.log != nil {
+			s.log.Warnw("cascade gagal berangkat: list invoices", "jamaah_id", jamaahID, "err", err)
+		}
+		return CascadeResult{}
+	}
+
+	var inv *jamaahCascadeInvoice
+	for i := range invoices {
+		if invoices[i].PackageID == packageID && invoices[i].Status != "batal" {
+			inv = &invoices[i]
+			break
+		}
+	}
+	if inv == nil {
+		return CascadeResult{}
+	}
+
+	result := CascadeResult{Attempted: true}
+	headers := map[string]string{"Authorization": authToken}
+
+	if inv.AmountRemaining > 0 {
+		body := map[string]string{"reason": "Jamaah gagal berangkat"}
+		if err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/cancel", headers, body, nil); err != nil {
+			if s.log != nil {
+				s.log.Warnw("cascade gagal berangkat: cancel invoice", "invoice_id", inv.ID, "err", err)
+			}
+		} else {
+			result.InvoiceCancelled = true
+		}
+	}
+
+	if inv.AmountPaid > 0 {
+		body := map[string]any{"amount": inv.AmountPaid, "refund_pct": 100, "reason": "Jamaah gagal berangkat"}
+		if err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/refund", headers, body, nil); err != nil {
+			if s.log != nil {
+				s.log.Warnw("cascade gagal berangkat: initiate refund", "invoice_id", inv.ID, "err", err)
+			}
+		} else {
+			result.RefundInitiated = true
+		}
+	}
+
+	return result
+}
+
+func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID, jamaahID, packageID uuid.UUID, status, reason, lostReason, lostReasonCode, authToken string) (*model.JamaahPackageRegistration, CascadeResult, error) {
 	reg, err := s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 	if err != nil {
-		return nil, err
+		return nil, CascadeResult{}, err
 	}
 
 	// Gate advancing to lunas/berangkat on document completeness (+ mahram).
 	if err := s.checkTransitionGate(ctx, orgID, jamaahID, status, reg); err != nil {
-		return nil, err
+		return nil, CascadeResult{}, err
 	}
 
 	dpDate, lunasDate, berangkatDate := reg.DPDate, reg.LunasDate, reg.BerangkatDate
@@ -419,6 +494,7 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID,
 	// lost_reason is only meaningful when the lead is lost.
 	if status != string(model.StatusBatal) {
 		lostReason = ""
+		lostReasonCode = ""
 	}
 	if err := s.repo.UpdatePipelineStatus(ctx, orgID, jamaahID, packageID, repository.PipelineUpdate{
 		Status:        status,
@@ -430,10 +506,17 @@ func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID,
 		Reason:        reason,
 		ChangedBy:     userID,
 	}); err != nil {
-		return nil, err
+		return nil, CascadeResult{}, err
 	}
 	s.recompute(ctx, orgID, jamaahID, packageID) // stage change moves the score
-	return s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
+
+	var cascade CascadeResult
+	if status == string(model.StatusBatal) && lostReasonCode == "tidak_jadi" {
+		cascade = s.cascadeGagalBerangkat(ctx, jamaahID, packageID, authToken)
+	}
+
+	updated, err := s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
+	return updated, cascade, err
 }
 
 func (s *JamaahService) RemoveFromPackage(ctx context.Context, orgID, jamaahID, packageID uuid.UUID, authToken string) error {

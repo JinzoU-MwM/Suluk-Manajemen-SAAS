@@ -348,6 +348,7 @@ type UpdatePipelineStatusRequest struct {
 	PipelineStatus string `json:"pipeline_status" validate:"required,oneof=prospek survey booking dp cicilan lunas berangkat selesai batal"`
 	Reason         string `json:"reason,omitempty" validate:"max=255"`
 	LostReason     string `json:"lost_reason,omitempty" validate:"max=40"`
+	LostReasonCode string `json:"lost_reason_code,omitempty" validate:"max=20"`
 }
 
 type AddNoteRequest struct {

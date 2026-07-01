@@ -49,6 +49,7 @@
   // "Mark as lost" flow (prompts a reason when dropping into Batal)
   let showLostModal = $state(false);
   let lostReason = $state('');
+  let lostReasonCode = $state('');
   let pendingBatal = $state(null);
 
   // Portal credential provisioning (proper modal form; replaces the old prompt() flow)
@@ -318,18 +319,24 @@
       // Capture why the lead was lost before committing the move.
       pendingBatal = { id, idx, packageId: j.package_id, from };
       lostReason = '';
+      lostReasonCode = '';
       showLostModal = true;
       return;
     }
     persistStage(idx, j.package_id, toCol, '');
   }
 
-  async function persistStage(idx, packageId, toCol, lost_reason) {
+  async function persistStage(idx, packageId, toCol, lost_reason, lost_reason_code = '') {
     const prev = jamaah[idx];
     jamaah[idx] = { ...prev, pipeline_status: toCol }; // optimistic
     try {
-      await ApiService.updatePipelineStatus(prev.id, packageId, { pipeline_status: toCol, lost_reason });
+      const result = await ApiService.updatePipelineStatus(prev.id, packageId, { pipeline_status: toCol, lost_reason, lost_reason_code });
       showToast(`Lead dipindahkan ke ${stageLabel(toCol)}`, 'success');
+      if (result?.cascade?.invoice_cancelled || result?.cascade?.refund_initiated) {
+        showToast('Invoice dibatalkan & refund otomatis diajukan — cek menu Pembatalan', 'success');
+      } else if (result?.cascade?.attempted) {
+        showToast('Jamaah gagal berangkat: proses cancel & refund manual di menu Pembatalan', 'warning');
+      }
     } catch (e) {
       jamaah[idx] = prev; // rollback
       showToast(mapError(e.message), 'error');
@@ -340,7 +347,7 @@
     if (!pendingBatal) return;
     const { idx, packageId } = pendingBatal;
     showLostModal = false;
-    persistStage(idx, packageId, 'batal', lostReason || '');
+    persistStage(idx, packageId, 'batal', lostReason || '', lostReasonCode || '');
     pendingBatal = null;
   }
 
@@ -889,7 +896,7 @@
         {#each LOST_REASONS as r}
           <button
             type="button"
-            onclick={() => (lostReason = r.label)}
+            onclick={() => { lostReason = r.label; lostReasonCode = r.id; }}
             class="rounded-xl px-3 py-2 text-left text-sm transition-colors"
             style="border:1px solid {lostReason === r.label ? 'var(--c-primary)' : 'var(--c-line)'};background:{lostReason === r.label ? 'var(--c-primary-tint)' : 'transparent'};color:var(--c-ink)"
           >{r.label}</button>

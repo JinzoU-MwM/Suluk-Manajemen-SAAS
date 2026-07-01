@@ -34,12 +34,14 @@ export function createJamaahApi({ cacheInvalidate }) {
     },
 
     // Move a registration to a new pipeline stage. reason/lost_reason optional
-    // (lost_reason recorded when stage = 'batal').
-    async updatePipelineStatus(jamaahId, packageId, { pipeline_status, reason = '', lost_reason = '' }) {
+    // (lost_reason recorded when stage = 'batal'). lost_reason_code is the
+    // stable id (e.g. 'tidak_jadi') the backend matches on to cascade
+    // cancel+refund when a jamaah gagal berangkat.
+    async updatePipelineStatus(jamaahId, packageId, { pipeline_status, reason = '', lost_reason = '', lost_reason_code = '' }) {
       const response = await apiFetch(`${API_URL}/jamaah/${jamaahId}/registrations/${packageId}/status`, {
         method: 'PATCH',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ pipeline_status, reason, lost_reason }),
+        body: JSON.stringify({ pipeline_status, reason, lost_reason, lost_reason_code }),
       });
       if (!response.ok) throw new Error(await parseError(response));
       return unwrapData(await response.json());

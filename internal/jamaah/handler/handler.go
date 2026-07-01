@@ -193,14 +193,14 @@ func (h *JamaahHandler) UpdatePipelineStatus(c *fiber.Ctx) error {
 		return response.BadRequest(c, "status pipeline tidak valid")
 	}
 
-	reg, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, claims.UserID, jamaahID, packageID, req.PipelineStatus, req.Reason, req.LostReason)
+	reg, cascade, err := h.svc.UpdatePipelineStatus(c.Context(), claims.OrgID, claims.UserID, jamaahID, packageID, req.PipelineStatus, req.Reason, req.LostReason, req.LostReasonCode, c.Get("Authorization"))
 	if err != nil {
 		if errors.Is(err, service.ErrGate) {
 			return response.BadRequest(c, err.Error())
 		}
 		return response.Internal(c, err)
 	}
-	return response.OK(c, reg)
+	return response.OK(c, fiber.Map{"registration": reg, "cascade": cascade})
 }
 
 // SetMahram links/unlinks the mahram of a jamaah's package registration.
