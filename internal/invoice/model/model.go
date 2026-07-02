@@ -50,7 +50,9 @@ type Invoice struct {
 	OrgID           uuid.UUID  `json:"org_id" db:"org_id"`
 	InvoiceNumber   string     `json:"invoice_number" db:"invoice_number"`
 	JamaahID        uuid.UUID  `json:"jamaah_id" db:"jamaah_id"`
+	JamaahName      string     `json:"jamaah_name,omitempty" db:"jamaah_name"`
 	PackageID       uuid.UUID  `json:"package_id" db:"package_id"`
+	PackageName     string     `json:"package_name,omitempty" db:"package_name"`
 	RegistrationID  uuid.UUID  `json:"registration_id" db:"registration_id"`
 	RoomType        string     `json:"room_type" db:"room_type"`
 	PriceSnapshot   int64      `json:"price_snapshot" db:"price_snapshot"`
@@ -119,7 +121,9 @@ type CashSession struct {
 
 type CreateInvoiceRequest struct {
 	JamaahID        uuid.UUID `json:"jamaah_id" validate:"required"`
+	JamaahName      string    `json:"jamaah_name,omitempty"`
 	PackageID       uuid.UUID `json:"package_id" validate:"required"`
+	PackageName     string    `json:"package_name,omitempty"`
 	RegistrationID  uuid.UUID `json:"registration_id" validate:"required"`
 	RoomType        string    `json:"room_type" validate:"required,oneof=quad triple double single"`
 	PriceSnapshot   int64     `json:"price_snapshot" validate:"min=1"`

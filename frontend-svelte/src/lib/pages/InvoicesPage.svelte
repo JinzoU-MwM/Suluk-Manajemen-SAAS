@@ -117,7 +117,9 @@
       }
       await invoiceApi.createInvoice({
         jamaah_id: cJamaahId,
+        jamaah_name: allJamaah.find((j) => String(j.id) === String(cJamaahId))?.nama || '',
         package_id: cPackageId,
+        package_name: selectedPkg?.name || '',
         registration_id: reg.id,
         room_type: cRoomType,
         price_snapshot: cPrice,

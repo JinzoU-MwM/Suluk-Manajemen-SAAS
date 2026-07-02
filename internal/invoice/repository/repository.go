@@ -29,7 +29,7 @@ var (
 	ErrOverpayment      = fmt.Errorf("payment exceeds remaining balance")
 )
 
-var invoiceCols = `id, org_id, invoice_number, jamaah_id, package_id, registration_id, room_type,
+var invoiceCols = `id, org_id, invoice_number, jamaah_id, jamaah_name, package_id, package_name, registration_id, room_type,
 	price_snapshot, discount_amount, surcharge_amount, total_amount, amount_paid, amount_remaining,
 	payment_scheme, status, issued_at, due_date, cancelled_at, cancelled_reason, notes, created_at, updated_at`
 
@@ -37,7 +37,7 @@ func (r *InvoiceRepo) scanInvoice(scanner interface {
 	Scan(dest ...interface{}) error
 }) (*model.Invoice, error) {
 	inv := &model.Invoice{}
-	err := scanner.Scan(&inv.ID, &inv.OrgID, &inv.InvoiceNumber, &inv.JamaahID, &inv.PackageID, &inv.RegistrationID,
+	err := scanner.Scan(&inv.ID, &inv.OrgID, &inv.InvoiceNumber, &inv.JamaahID, &inv.JamaahName, &inv.PackageID, &inv.PackageName, &inv.RegistrationID,
 		&inv.RoomType, &inv.PriceSnapshot, &inv.DiscountAmount, &inv.SurchargeAmount, &inv.TotalAmount,
 		&inv.AmountPaid, &inv.AmountRemaining, &inv.PaymentScheme, &inv.Status, &inv.IssuedAt,
 		&inv.DueDate, &inv.CancelledAt, &inv.CancelledReason, &inv.Notes, &inv.CreatedAt, &inv.UpdatedAt)
@@ -45,13 +45,13 @@ func (r *InvoiceRepo) scanInvoice(scanner interface {
 }
 
 func (r *InvoiceRepo) CreateInvoice(ctx context.Context, inv *model.Invoice) error {
-	query := `INSERT INTO invoices (id, org_id, invoice_number, jamaah_id, package_id, registration_id,
+	query := `INSERT INTO invoices (id, org_id, invoice_number, jamaah_id, jamaah_name, package_id, package_name, registration_id,
 		room_type, price_snapshot, discount_amount, surcharge_amount, total_amount, amount_paid, amount_remaining,
 		payment_scheme, status, due_date, notes)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 		RETURNING issued_at, created_at, updated_at`
 	err := r.pool.QueryRow(ctx, query,
-		inv.ID, inv.OrgID, inv.InvoiceNumber, inv.JamaahID, inv.PackageID, inv.RegistrationID,
+		inv.ID, inv.OrgID, inv.InvoiceNumber, inv.JamaahID, inv.JamaahName, inv.PackageID, inv.PackageName, inv.RegistrationID,
 		inv.RoomType, inv.PriceSnapshot, inv.DiscountAmount, inv.SurchargeAmount, inv.TotalAmount,
 		inv.AmountPaid, inv.AmountRemaining, inv.PaymentScheme, inv.Status, inv.DueDate, inv.Notes,
 	).Scan(&inv.IssuedAt, &inv.CreatedAt, &inv.UpdatedAt)
