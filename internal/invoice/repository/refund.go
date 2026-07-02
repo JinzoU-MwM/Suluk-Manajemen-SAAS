@@ -312,25 +312,3 @@ func statusFilter(status string) (query string, args []interface{}) {
 	}
 	return " AND status = $2", []interface{}{status}
 }
-
-func (r *InvoiceRepo) CancelInvoiceWithRefund(ctx context.Context, invoiceID, orgID uuid.UUID, refundAmount int64) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	result, err := tx.Exec(ctx, `
-		UPDATE invoices SET status = 'batal', amount_paid = amount_paid - $3, amount_remaining = total_amount - (amount_paid - $3),
-		cancelled_at = NOW(), cancelled_reason = 'Pembatalan dengan refund', updated_at = NOW()
-		WHERE id = $1 AND org_id = $2 AND status != 'batal' AND status != 'lunas'
-	`, invoiceID, orgID, refundAmount)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() == 0 {
-		return ErrAlreadyCancelled
-	}
-
-	return tx.Commit(ctx)
-}

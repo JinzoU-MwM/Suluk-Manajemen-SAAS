@@ -95,28 +95,6 @@ func (r *InvoiceRepo) UpdateInvoice(ctx context.Context, inv *model.Invoice) err
 	return nil
 }
 
-func (r *InvoiceRepo) CancelInvoice(ctx context.Context, id, orgID uuid.UUID, reason string) error {
-	result, err := r.pool.Exec(ctx, `UPDATE invoices SET status = 'batal', cancelled_at = NOW(), cancelled_reason = $3, updated_at = NOW() WHERE id = $1 AND org_id = $2 AND status != 'batal'`, id, orgID, reason)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() == 0 {
-		return ErrAlreadyCancelled
-	}
-	return nil
-}
-
-func (r *InvoiceRepo) UpdateInvoiceStatus(ctx context.Context, id, orgID uuid.UUID, status string) error {
-	result, err := r.pool.Exec(ctx, `UPDATE invoices SET status = $3, updated_at = NOW() WHERE id = $1 AND org_id = $2`, id, orgID, status)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() == 0 {
-		return ErrInvoiceNotFound
-	}
-	return nil
-}
-
 func (r *InvoiceRepo) ListInvoices(ctx context.Context, orgID uuid.UUID, status string, offset, limit int) ([]model.Invoice, int, error) {
 	countQuery := `SELECT COUNT(*) FROM invoices WHERE org_id = $1`
 	query := fmt.Sprintf(`SELECT %s FROM invoices WHERE org_id = $1`, invoiceCols)
