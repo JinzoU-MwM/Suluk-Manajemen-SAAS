@@ -2,19 +2,77 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/invoice/model"
 	"github.com/jamaah-in/v2/internal/invoice/repository"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 )
 
 func NewRefundService(repo *repository.InvoiceRepo) *RefundService {
-	return &RefundService{repo: repo}
+	return &RefundService{repo: repo, httpc: httpclient.New()}
+}
+
+// WithPackageAddr enables best-effort refund-policy enforcement by letting
+// InitiateRefund ask package-service for a package's departure_date. Without
+// it (empty string, e.g. in unit tests), policy enforcement is silently
+// skipped — same "best-effort cross-service call" convention as
+// InvoiceService.WithPayments and jamaah-service's releaseSeat.
+func (s *RefundService) WithPackageAddr(addr string) *RefundService {
+	s.packageAddr = addr
+	return s
 }
 
 type RefundService struct {
-	repo *repository.InvoiceRepo
+	repo        *repository.InvoiceRepo
+	packageAddr string
+	httpc       *httpclient.Client
+}
+
+// packageDeparture is the subset of package-service's package fields this
+// lookup needs.
+type packageDeparture struct {
+	DepartureDate *time.Time `json:"departure_date"`
+}
+
+// daysUntilDeparture best-effort resolves how many days remain until a
+// package's departure. ok=false means "can't determine" (no package address
+// configured, no auth token, the call failed, or the package has no
+// departure_date) — callers must treat that as "skip policy enforcement,"
+// not as an error, since not every org uses refund policies.
+func (s *RefundService) daysUntilDeparture(ctx context.Context, packageID uuid.UUID, authToken string) (int, bool) {
+	if s.packageAddr == "" || authToken == "" {
+		return 0, false
+	}
+	var pkg packageDeparture
+	if err := s.httpc.GetJSON(ctx, s.packageAddr, "/api/v1/packages/"+packageID.String(), authToken, &pkg); err != nil || pkg.DepartureDate == nil {
+		return 0, false
+	}
+	days := int(time.Until(*pkg.DepartureDate).Hours() / 24)
+	if days < 0 {
+		days = 0
+	}
+	return days, true
+}
+
+// applicablePolicy returns the refund policy that applies to a package right
+// now, or (nil, nil) if none does (departure date unknown, or no policy
+// configured for that many days out) — distinct from a real lookup error.
+func (s *RefundService) applicablePolicy(ctx context.Context, orgID, packageID uuid.UUID, authToken string) (*model.RefundPolicy, error) {
+	days, ok := s.daysUntilDeparture(ctx, packageID, authToken)
+	if !ok {
+		return nil, nil
+	}
+	policy, err := s.repo.GetApplicablePolicy(ctx, orgID, days)
+	if err != nil {
+		if err == repository.ErrPolicyNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return policy, nil
 }
 
 func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest) (*model.Refund, error) {

@@ -71,7 +71,7 @@ func main() {
 	})
 	invoiceHandler := handler.NewInvoiceHandler(invoiceService)
 
-	refundSvc := service.NewRefundService(invoiceRepo)
+	refundSvc := service.NewRefundService(invoiceRepo).WithPackageAddr(os.Getenv("PACKAGE_SERVICE_ADDR"))
 	refundHandler := handler.NewRefundHandler(refundSvc)
 
 	// Integration Bus: start the outbox relay so domain events reach accounting.
