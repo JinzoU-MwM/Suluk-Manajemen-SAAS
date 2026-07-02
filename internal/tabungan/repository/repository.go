@@ -126,40 +126,102 @@ func (r *Repo) DepositTx(ctx context.Context, orgID, accountID uuid.UUID, d *mod
 	return r.GetAccount(ctx, orgID, accountID)
 }
 
-// ConvertTx decrements the balance by amount, records a 'konversi' out movement,
-// flips status to converted when balance hits 0, and writes a savings.converted
-// outbox event — atomically. The caller settles the invoice separately.
-func (r *Repo) ConvertTx(ctx context.Context, orgID, accountID uuid.UUID, amount int64, createdBy *uuid.UUID, ref string, evt outbox.Event) (*model.SavingsAccount, error) {
+// ReserveForConvert locks the account, validates it's active with sufficient
+// balance, and immediately decrements it by want, recording a 'konversi'
+// deposit-out row — durable BEFORE the invoice-service call happens, so a
+// concurrent second Convert() attempt sees the reduced balance instead of
+// racing on a stale read (finding T1/T7). ConfirmConvert or CompensateConvert
+// must be called afterward to finalize or reverse this reservation.
+func (r *Repo) ReserveForConvert(ctx context.Context, orgID, accountID uuid.UUID, want int64, createdBy *uuid.UUID) (uuid.UUID, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return uuid.Nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var balance int64
 	var status string
 	if err := tx.QueryRow(ctx, `SELECT balance, status FROM savings_accounts WHERE id=$1 AND org_id=$2 FOR UPDATE`, accountID, orgID).Scan(&balance, &status); err != nil {
-		return nil, ErrNotFound
+		return uuid.Nil, ErrNotFound
 	}
 	if status != model.StatusAktif {
-		return nil, ErrNotActive
+		return uuid.Nil, ErrNotActive
 	}
-	if amount > balance {
-		return nil, ErrInsufficient
+	if want > balance {
+		return uuid.Nil, ErrInsufficient
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO savings_deposits (account_id, org_id, amount, direction, type, method, reference, notes, created_by)
-		VALUES ($1,$2,$3,'out','konversi','tabungan',$4,'Konversi ke pelunasan invoice',$5)`,
-		accountID, orgID, amount, ref, createdBy); err != nil {
-		return nil, err
+	var depositID uuid.UUID
+	if err := tx.QueryRow(ctx, `INSERT INTO savings_deposits (account_id, org_id, amount, direction, type, method, reference, notes, created_by)
+		VALUES ($1,$2,$3,'out','konversi','tabungan','','Konversi ke pelunasan invoice (reserved)',$4) RETURNING id`,
+		accountID, orgID, want, createdBy).Scan(&depositID); err != nil {
+		return uuid.Nil, err
 	}
 	newStatus := status
-	if balance-amount == 0 {
+	if balance-want == 0 {
 		newStatus = model.StatusConverted
 	}
-	if _, err := tx.Exec(ctx, `UPDATE savings_accounts SET balance = balance - $3, status=$4, updated_at = NOW() WHERE id=$1 AND org_id=$2`, accountID, orgID, amount, newStatus); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE savings_accounts SET balance = balance - $3, status=$4, updated_at = NOW() WHERE id=$1 AND org_id=$2`, accountID, orgID, want, newStatus); err != nil {
+		return uuid.Nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+	return depositID, nil
+}
+
+// ConfirmConvert finalizes a reservation once invoice-service has confirmed
+// the applied amount. If applied < reserved (the invoice had less remaining
+// than requested), credits back the shortfall and corrects the deposit row
+// to the true applied amount, then emits the savings.converted outbox event.
+func (r *Repo) ConfirmConvert(ctx context.Context, orgID, accountID, depositID uuid.UUID, reserved, applied int64, invoiceID string, evt outbox.Event) (*model.SavingsAccount, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	shortfall := reserved - applied
+	if shortfall > 0 {
+		if _, err := tx.Exec(ctx, `UPDATE savings_accounts SET balance = balance + $3, status=$4, updated_at = NOW() WHERE id=$1 AND org_id=$2`,
+			accountID, orgID, shortfall, model.StatusAktif); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE savings_deposits SET amount=$3, notes='Konversi ke pelunasan invoice ' || $4 WHERE id=$1 AND org_id=$2`,
+			depositID, orgID, applied, invoiceID); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := tx.Exec(ctx, `UPDATE savings_deposits SET notes='Konversi ke pelunasan invoice ' || $3 WHERE id=$1 AND org_id=$2`,
+			depositID, orgID, invoiceID); err != nil {
+			return nil, err
+		}
+	}
 	if err := outbox.Insert(ctx, tx, evt); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return r.GetAccount(ctx, orgID, accountID)
+}
+
+// CompensateConvert fully reverses a reservation when invoice-service's
+// settle call failed outright (invoice not found, cancelled, jamaah
+// mismatch, or a non-retryable error) — credits the full reserved amount
+// back and deletes the reservation's deposit row, since no outbox event was
+// ever emitted for it (ConfirmConvert is the only path that emits one).
+func (r *Repo) CompensateConvert(ctx context.Context, orgID, accountID, depositID uuid.UUID, reserved int64) (*model.SavingsAccount, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `UPDATE savings_accounts SET balance = balance + $3, status=$4, updated_at = NOW() WHERE id=$1 AND org_id=$2`,
+		accountID, orgID, reserved, model.StatusAktif); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM savings_deposits WHERE id=$1 AND org_id=$2`, depositID, orgID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
