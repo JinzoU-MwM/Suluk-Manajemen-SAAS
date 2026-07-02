@@ -88,6 +88,13 @@
   let googleBtnEl = $state(null);
   let gisReady = $state(false);
 
+  // AUTH-1: when Google's email matches an existing password account, the
+  // backend rejects the silent auto-link and asks for that account's
+  // password. Hold the pending credential so we can resubmit once it's typed.
+  let googleNeedsPassword = $state(false);
+  let googlePendingCredential = $state(null);
+  let googleLinkPassword = $state("");
+
   async function handleGoogleCredential(response) {
     error = "";
     success = "";
@@ -103,10 +110,46 @@
       localStorage.setItem("user", JSON.stringify(result.user));
       onLoginSuccess(result.user);
     } catch (err) {
-      error = err.message || "Gagal masuk dengan Google";
+      const msg = err.message || "Gagal masuk dengan Google";
+      if (msg.includes("sudah terdaftar dengan password")) {
+        googleNeedsPassword = true;
+        googlePendingCredential = response.credential;
+      }
+      error = msg;
     } finally {
       isLoading = false;
     }
+  }
+
+  async function confirmGoogleLink(e) {
+    e.preventDefault();
+    error = "";
+    isLoading = true;
+    try {
+      const result = await ApiService.loginWithGoogle(googlePendingCredential, googleLinkPassword);
+      if (result.access_token) {
+        localStorage.setItem("access_token", result.access_token);
+      }
+      if (result.refresh_token) {
+        localStorage.setItem("refresh_token", result.refresh_token);
+      }
+      localStorage.setItem("user", JSON.stringify(result.user));
+      googleNeedsPassword = false;
+      googlePendingCredential = null;
+      googleLinkPassword = "";
+      onLoginSuccess(result.user);
+    } catch (err) {
+      error = err.message || "Password salah";
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function cancelGoogleLink() {
+    googleNeedsPassword = false;
+    googlePendingCredential = null;
+    googleLinkPassword = "";
+    error = "";
   }
 
   // Google Identity Services global (script-injected at runtime). Typed loose so
@@ -490,6 +533,37 @@
           <div class="h-px bg-slate-200 flex-1"></div>
         </div>
         <div class="flex justify-center" bind:this={googleBtnEl}></div>
+      {/if}
+
+      {#if googleNeedsPassword}
+        <form onsubmit={confirmGoogleLink} class="space-y-3 mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <p class="text-sm text-slate-600">
+            Email ini sudah terdaftar dengan password. Masukkan password akun Anda untuk menghubungkan Google.
+          </p>
+          <input
+            type="password"
+            bind:value={googleLinkPassword}
+            required
+            placeholder="Password akun Anda"
+            class="block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all text-sm"
+          />
+          <div class="flex gap-2">
+            <button
+              type="submit"
+              disabled={isLoading || !googleLinkPassword}
+              class="flex-1 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-semibold py-2 rounded-xl text-sm transition-all"
+            >
+              Hubungkan
+            </button>
+            <button
+              type="button"
+              onclick={cancelGoogleLink}
+              class="px-4 text-sm text-slate-500 hover:text-slate-700 font-medium"
+            >
+              Batal
+            </button>
+          </div>
+        </form>
       {/if}
 
       <!-- ═══════════════════════════════════════════════ -->

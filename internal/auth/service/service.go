@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -199,12 +200,37 @@ func (s *AuthService) Login(ctx context.Context, req model.LoginRequest) (*model
 	return user, org, tokens, nil
 }
 
+// ErrGoogleLinkPasswordRequired/ErrGoogleLinkPasswordIncorrect guard AUTH-1: a
+// Google id_token whose email matches an existing password account must not
+// silently link and log in (that would let anyone who controls a
+// Google-verified alias of a reused/reclaimed email take over the account).
+// The caller must additionally supply — and get right — that account's
+// current password before the accounts are linked.
+var (
+	ErrGoogleLinkPasswordRequired  = errors.New("akun dengan email ini sudah terdaftar dengan password. Masukkan password akun Anda untuk menghubungkan Google")
+	ErrGoogleLinkPasswordIncorrect = errors.New("password salah")
+)
+
+// evaluateGoogleLink decides whether a Google id_token login may link to an
+// existing password-protected account. Pure (no I/O) so it's unit-testable
+// without a database.
+func evaluateGoogleLink(existing *model.User, suppliedPassword string) error {
+	if suppliedPassword == "" {
+		return ErrGoogleLinkPasswordRequired
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(existing.PasswordHash), []byte(suppliedPassword)); err != nil {
+		return ErrGoogleLinkPasswordIncorrect
+	}
+	return nil
+}
+
 // GoogleLogin authenticates via a Google "Sign in with Google" id_token.
 // Resolution order: (1) a user already linked to this Google account, (2) an
-// existing email/password account with the same email — linked then logged in,
-// (3) a brand-new account — auto-provisioned as owner + org + 14-day reverse
-// trial, mirroring Register but with no password (Google is the sole credential).
-func (s *AuthService) GoogleLogin(ctx context.Context, idToken string) (*model.User, *model.Organization, *sharedAuth.TokenPair, error) {
+// existing email/password account with the same email — linked then logged in
+// after confirming the account's password (AUTH-1), (3) a brand-new account —
+// auto-provisioned as owner + org + 14-day reverse trial, mirroring Register
+// but with no password (Google is the sole credential).
+func (s *AuthService) GoogleLogin(ctx context.Context, idToken, password string) (*model.User, *model.Organization, *sharedAuth.TokenPair, error) {
 	gc, err := sharedAuth.VerifyGoogleIDToken(ctx, idToken, s.googleClientID)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("invalid Google credentials")
@@ -230,10 +256,14 @@ func (s *AuthService) GoogleLogin(ctx context.Context, idToken string) (*model.U
 		return user, org, tokens, nil
 	}
 
-	// (2) Existing email/password account → link Google, then log in.
+	// (2) Existing email/password account → require that account's current
+	// password before linking Google, then log in (AUTH-1).
 	if user, err := s.repo.GetUserByEmail(ctx, email); err == nil {
 		if !user.IsActive {
 			return nil, nil, nil, fmt.Errorf("account is deactivated")
+		}
+		if linkErr := evaluateGoogleLink(user, password); linkErr != nil {
+			return nil, nil, nil, linkErr
 		}
 		if err := s.repo.LinkGoogleSub(ctx, user.ID, gc.Subject); err != nil {
 			return nil, nil, nil, err

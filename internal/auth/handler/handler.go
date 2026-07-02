@@ -82,8 +82,11 @@ func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
 		return response.BadRequest(c, "id_token is required")
 	}
 
-	user, org, tokens, err := h.svc.GoogleLogin(c.Context(), req.IDToken)
+	user, org, tokens, err := h.svc.GoogleLogin(c.Context(), req.IDToken, req.Password)
 	if err != nil {
+		if errors.Is(err, service.ErrGoogleLinkPasswordRequired) {
+			return response.Conflict(c, err.Error())
+		}
 		return response.Unauthorized(c, err.Error())
 	}
 

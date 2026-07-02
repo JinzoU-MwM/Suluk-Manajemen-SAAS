@@ -208,6 +208,11 @@ type LoginRequest struct {
 // (the `credential` field from the Sign-in-with-Google callback).
 type GoogleLoginRequest struct {
 	IDToken string `json:"id_token" validate:"required"`
+	// Password confirms ownership of an existing password-protected account
+	// that shares this Google account's email (AUTH-1). Omitted on a normal
+	// login/registration; required only when the backend responds with
+	// ErrGoogleLinkPasswordRequired.
+	Password string `json:"password,omitempty"`
 }
 
 type Subscription struct {
