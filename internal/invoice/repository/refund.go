@@ -14,13 +14,14 @@ import (
 )
 
 var (
-	ErrRefundNotFound     = fmt.Errorf("refund not found")
-	ErrRefundNotPending   = fmt.Errorf("refund not in pending status")
-	ErrRefundNotApproved  = fmt.Errorf("refund not in approved status")
-	ErrRefundNotProcessed = fmt.Errorf("refund not in processed status")
-	ErrRefundExceedsPaid  = fmt.Errorf("refund amount exceeds invoice paid amount")
-	ErrRefundAlreadyOpen  = fmt.Errorf("invoice already has an open refund")
-	ErrPolicyNotFound     = fmt.Errorf("refund policy not found")
+	ErrRefundNotFound      = fmt.Errorf("refund not found")
+	ErrRefundNotPending    = fmt.Errorf("refund not in pending status")
+	ErrRefundNotApproved   = fmt.Errorf("refund not in approved status")
+	ErrRefundNotProcessed  = fmt.Errorf("refund not in processed status")
+	ErrRefundExceedsPaid   = fmt.Errorf("refund amount exceeds invoice paid amount")
+	ErrRefundAlreadyOpen   = fmt.Errorf("invoice already has an open refund")
+	ErrPolicyNotFound      = fmt.Errorf("refund policy not found")
+	ErrRefundExceedsPolicy = fmt.Errorf("refund amount exceeds the applicable policy's allowed percentage")
 )
 
 func (r *InvoiceRepo) CreateRefund(ctx context.Context, ref *model.Refund) error {
@@ -259,6 +260,27 @@ func (r *InvoiceRepo) GetRefundPolicy(ctx context.Context, id, orgID uuid.UUID) 
 		SELECT id, org_id, name, days_before, refund_pct, description, is_active, created_at, updated_at
 		FROM refund_policies WHERE id = $1 AND org_id = $2
 	`, id, orgID).Scan(&p.ID, &p.OrgID, &p.Name, &p.DaysBefore, &p.RefundPct, &p.Description, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, ErrPolicyNotFound
+	}
+	return &p, nil
+}
+
+// GetApplicablePolicy returns the org's best-matching active policy for a
+// refund happening daysBefore days ahead of departure — the policy with the
+// highest days_before threshold that's still <= daysBefore (e.g. a policy
+// list of "H-30: 50%, H-7: 20%" picks the 50% tier at 35 days out, the 20%
+// tier at 10 days out, and matches neither at 3 days out). Returns
+// ErrPolicyNotFound if none match, which callers should treat as "no policy
+// applies" rather than a hard failure.
+func (r *InvoiceRepo) GetApplicablePolicy(ctx context.Context, orgID uuid.UUID, daysBefore int) (*model.RefundPolicy, error) {
+	var p model.RefundPolicy
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, org_id, name, days_before, refund_pct, description, is_active, created_at, updated_at
+		FROM refund_policies
+		WHERE org_id = $1 AND is_active = TRUE AND days_before <= $2
+		ORDER BY days_before DESC LIMIT 1
+	`, orgID, daysBefore).Scan(&p.ID, &p.OrgID, &p.Name, &p.DaysBefore, &p.RefundPct, &p.Description, &p.IsActive, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, ErrPolicyNotFound
 	}
