@@ -4,7 +4,7 @@
 **Cakupan:** Bukan diff review — audit menyeluruh kode yang SUDAH ada (termasuk kode lama, di luar scope kerja hari ini). Modul yang dicakup: `internal/invoice/{repository,service,handler}/refund.go` + cancel-invoice path, `internal/jamaah/service/service.go` (cascade gagal-berangkat), `internal/jamaah/repository/group.go` (kloter/pembatalan grup), semua frontend API client (`frontend-svelte/src/lib/services/apiDomains/*.js`), dan layar mobile terkait invoice/refund/approval.
 **Status:** Dokumentasi temuan untuk sesi perbaikan berikutnya.
 
-**Update 2026-07-02:** C1, C2, C3, C4, C7, H1, M1, M9 sudah diperbaiki (commit `1b3cf66`) — lihat detail di masing-masing item di bawah, ditandai `[FIXED 2026-07-02]`. C1/C3/C4 diselesaikan sekaligus lewat satu fix akar masalah: partial unique index `uq_refunds_one_open_per_invoice` (maksimal satu refund aktif per invoice, ditegakkan di database, bukan cuma di kode aplikasi). C5 (kloter cancel) masih belum dikerjakan — itu fitur baru (cascade untuk grup), bukan bug, perlu spec+plan terpisah. C6 (mobile Pembatalan.svelte tidak kirim `amount`) juga sudah diperbaiki di commit yang sama walau nomornya bukan bagian dari daftar Critical/High di bawah. Sisanya (H2-H9, M2-M10, Low) masih backlog.
+**Update 2026-07-02:** C1, C2, C3, C4, C6, C7, H1, M1, M9 sudah diperbaiki (commit `1b3cf66`) — lihat detail di masing-masing item di bawah, ditandai `[FIXED 2026-07-02]`. C1/C3/C4 diselesaikan sekaligus lewat satu fix akar masalah: partial unique index `uq_refunds_one_open_per_invoice` (maksimal satu refund aktif per invoice, ditegakkan di database, bukan cuma di kode aplikasi). C5 (kloter cancel) juga sudah diperbaiki (commit `f26a912`, spec+plan di `docs/superpowers/{specs,plans}/2026-07-02-kloter-cancel-cascade*`) — semua 7 Critical sekarang selesai. Sisanya (H2-H9, M2-M10, Low) masih backlog.
 
 ---
 
@@ -40,7 +40,7 @@ Cuma cek `req.Amount <= inv.AmountPaid` — tidak menjumlahkan refund `pending`/
 **File:** `internal/jamaah/service/service.go:419-528`, `internal/jamaah/handler/handler.go:196-203`
 `cascadeGagalBerangkat` jalan setelah status pipeline commit. Kalau `GetRegistration` di akhir gagal (DB blip sesaat), handler return 500 dan `CascadeResult` yang sudah berhasil dibuang. Frontend rollback UI + toast error generik. Staff yang lihat "gagal" secara alami akan re-drag kartu yang sama → cascade jalan lagi → refund kedua terbuat untuk invoice yang (kalau `amount_remaining==0` di percobaan pertama) statusnya bahkan belum sempat jadi `batal`, jadi masih lolos filter cascade kedua.
 
-### C5. Pembatalan kloter/grup: TIDAK ADA cascade sama sekali, dan tidak ada jejak apa pun
+### C5. [FIXED 2026-07-02] Pembatalan kloter/grup: TIDAK ADA cascade sama sekali, dan tidak ada jejak apa pun
 **File:** `internal/jamaah/repository/group.go:125-157` (`TransitionDeparture`)
 Membatalkan satu kloter cuma `UPDATE groups SET departure_status='batal'`. Tidak ada event yang di-emit untuk transisi `batal` (beda dengan `siap`/`berangkat` yang emit event). Semua invoice jamaah dalam grup itu (bisa puluhan orang) tetap `unpaid`/`paid`, tidak ada satu pun yang otomatis di-cancel/direfund, dan **tidak ada worklist/sinyal apa pun** yang menunjukkan ada yang perlu ditindaklanjuti — ini lebih parah dari kasus per-jamaah (yang setidaknya menghasilkan refund `pending` yang terlihat di menu Pembatalan).
 
