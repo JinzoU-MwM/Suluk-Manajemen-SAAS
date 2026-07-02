@@ -328,8 +328,8 @@ func (s *InvoiceService) allocatePaymentsToSchedules(ctx context.Context, invoic
 
 // SettleFromCredit applies a non-cash credit (savings conversion) to an invoice.
 // The GL journal is posted by the originating module, so no event is emitted here.
-func (s *InvoiceService) SettleFromCredit(ctx context.Context, invoiceID, orgID uuid.UUID, amount int64) (int64, error) {
-	return s.repo.SettleFromCredit(ctx, invoiceID, orgID, amount)
+func (s *InvoiceService) SettleFromCredit(ctx context.Context, invoiceID, orgID, jamaahID uuid.UUID, amount int64, idempotencyKey string) (int64, error) {
+	return s.repo.SettleFromCredit(ctx, invoiceID, orgID, jamaahID, amount, idempotencyKey)
 }
 
 func (s *InvoiceService) GetPayments(ctx context.Context, orgID, invoiceID uuid.UUID) ([]model.Payment, error) {
