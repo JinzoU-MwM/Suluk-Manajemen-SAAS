@@ -14,11 +14,13 @@ import (
 )
 
 var (
-	ErrRefundNotFound    = fmt.Errorf("refund not found")
-	ErrRefundNotPending  = fmt.Errorf("refund not in pending status")
-	ErrRefundExceedsPaid = fmt.Errorf("refund amount exceeds invoice paid amount")
-	ErrRefundAlreadyOpen = fmt.Errorf("invoice already has an open refund")
-	ErrPolicyNotFound    = fmt.Errorf("refund policy not found")
+	ErrRefundNotFound     = fmt.Errorf("refund not found")
+	ErrRefundNotPending   = fmt.Errorf("refund not in pending status")
+	ErrRefundNotApproved  = fmt.Errorf("refund not in approved status")
+	ErrRefundNotProcessed = fmt.Errorf("refund not in processed status")
+	ErrRefundExceedsPaid  = fmt.Errorf("refund amount exceeds invoice paid amount")
+	ErrRefundAlreadyOpen  = fmt.Errorf("invoice already has an open refund")
+	ErrPolicyNotFound     = fmt.Errorf("refund policy not found")
 )
 
 func (r *InvoiceRepo) CreateRefund(ctx context.Context, ref *model.Refund) error {
@@ -114,7 +116,7 @@ func (r *InvoiceRepo) ProcessRefund(ctx context.Context, id, orgID uuid.UUID) er
 		return err
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("refund not in approved status")
+		return ErrRefundNotApproved
 	}
 	return nil
 }
@@ -132,7 +134,7 @@ func (r *InvoiceRepo) CompleteRefund(ctx context.Context, id, orgID uuid.UUID) e
 	var paymentMethod string
 	if err := tx.QueryRow(ctx, `SELECT invoice_id, amount, payment_method FROM refunds WHERE id=$1 AND org_id=$2 AND status='processed' FOR UPDATE`,
 		id, orgID).Scan(&invoiceID, &amount, &paymentMethod); err != nil {
-		return fmt.Errorf("refund not in processed status")
+		return ErrRefundNotProcessed
 	}
 	if _, err := tx.Exec(ctx, `UPDATE refunds SET status='completed', updated_at=NOW() WHERE id=$1 AND org_id=$2`, id, orgID); err != nil {
 		return err
