@@ -30,7 +30,7 @@
   let dNotes = $state("");
   let dIdempotencyKey = $state("");
 
-  const STATUS_LABEL = { active: "Aktif", converted: "Terkonversi", closed: "Ditutup" };
+  const STATUS_LABEL = { aktif: "Aktif", converted: "Terkonversi", closed: "Ditutup" };
   const METHODS = [
     { id: "cash", label: "Tunai" },
     { id: "transfer", label: "Transfer Bank" },
@@ -138,7 +138,7 @@
             <div>
               <div class="font-serif text-base font-bold">{a.jamaah_name || "—"}</div>
               <span class="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
-                style="background:{a.status === 'active' ? 'var(--c-primary-soft)' : 'var(--c-bg-2)'};color:{a.status === 'active' ? 'var(--c-primary-deep)' : 'var(--c-muted)'}">
+                style="background:{a.status === 'aktif' ? 'var(--c-primary-soft)' : 'var(--c-bg-2)'};color:{a.status === 'aktif' ? 'var(--c-primary-deep)' : 'var(--c-muted)'}">
                 {STATUS_LABEL[a.status] || a.status}
               </span>
             </div>
@@ -160,7 +160,7 @@
             {/if}
           </div>
 
-          {#if a.status === "active"}
+          {#if a.status === "aktif"}
             <div class="mt-4">
               <Button variant="soft" size="sm" icon={ArrowDownCircle} full onclick={() => openDeposit(a)}>Setor</Button>
             </div>
