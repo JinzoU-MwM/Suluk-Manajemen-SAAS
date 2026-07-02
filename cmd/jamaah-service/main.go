@@ -65,6 +65,7 @@ func main() {
 	jamaahRepo := repository.NewJamaahRepo(pool)
 	jamaahService := service.NewJamaahService(jamaahRepo, os.Getenv("INVOICE_SERVICE_ADDR"), os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("PACKAGE_SERVICE_ADDR"), os.Getenv("AGENT_SERVICE_ADDR")).
 		WithNotify(sharedNotify.New(os.Getenv("AUTH_SERVICE_ADDR"), os.Getenv("INTERNAL_API_KEY"))).
+		WithInternalKey(os.Getenv("INTERNAL_API_KEY")).
 		WithLogger(logger)
 	jamaahHandler := handler.NewJamaahHandler(jamaahService)
 

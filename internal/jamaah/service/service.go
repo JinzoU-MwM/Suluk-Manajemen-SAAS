@@ -22,6 +22,7 @@ type JamaahService struct {
 	authAddr    string
 	packageAddr string
 	agentAddr   string
+	internalKey string
 	httpc       *httpclient.Client
 	notifier    *notify.Client
 	log         *zap.SugaredLogger
@@ -31,6 +32,17 @@ type JamaahService struct {
 // WithNotify attaches a best-effort in-app notification client.
 func (s *JamaahService) WithNotify(n *notify.Client) *JamaahService {
 	s.notifier = n
+	return s
+}
+
+// WithInternalKey enables the batal-cascades (gagal berangkat, kloter cancel,
+// removed from package) to call invoice-service's internal refund endpoint,
+// which bypasses the staff-facing refund policy cap since these refunds
+// represent "give back what was paid," not a staff-typed amount. Without it
+// (empty string), the internal call is skipped and the cascade only logs a
+// warning — same best-effort convention as the other cross-service calls.
+func (s *JamaahService) WithInternalKey(key string) *JamaahService {
+	s.internalKey = key
 	return s
 }
 
@@ -402,10 +414,30 @@ type CascadeResult struct {
 // invoice-service's GET /api/v1/invoices/jamaah/:id response.
 type jamaahCascadeInvoice struct {
 	ID              uuid.UUID `json:"id"`
+	OrgID           uuid.UUID `json:"org_id"`
 	PackageID       uuid.UUID `json:"package_id"`
 	Status          string    `json:"status"`
 	AmountPaid      int64     `json:"amount_paid"`
 	AmountRemaining int64     `json:"amount_remaining"`
+}
+
+// refundInternal best-effort calls invoice-service's internal refund
+// endpoint (bypasses the staff refund-policy cap — see WithInternalKey) for
+// a cascade-initiated 100% refund. No-op (logged) if the internal key isn't
+// configured.
+func (s *JamaahService) refundInternal(ctx context.Context, orgID, invoiceID uuid.UUID, amount int64, reason string) error {
+	if s.internalKey == "" {
+		return fmt.Errorf("internal key not configured")
+	}
+	body := map[string]any{
+		"invoice_id": invoiceID.String(),
+		"org_id":     orgID.String(),
+		"amount":     amount,
+		"refund_pct": 100,
+		"reason":     reason,
+	}
+	return s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/internal/refund",
+		map[string]string{"X-Internal-Key": s.internalKey}, body, nil)
 }
 
 // cascadeGagalBerangkat runs when a registration is marked "batal" with lost
@@ -452,8 +484,7 @@ func (s *JamaahService) cascadeGagalBerangkat(ctx context.Context, jamaahID, pac
 	}
 
 	if inv.AmountPaid > 0 {
-		body := map[string]any{"amount": inv.AmountPaid, "refund_pct": 100, "reason": "Jamaah gagal berangkat"}
-		if err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/refund", headers, body, nil); err != nil {
+		if err := s.refundInternal(ctx, inv.OrgID, inv.ID, inv.AmountPaid, "Jamaah gagal berangkat"); err != nil {
 			if s.log != nil {
 				s.log.Warnw("cascade gagal berangkat: initiate refund", "invoice_id", inv.ID, "err", err)
 			}
@@ -624,8 +655,7 @@ func (s *JamaahService) cancelDanglingInvoices(ctx context.Context, jamaahID, pa
 			}
 		}
 		if inv.AmountPaid > 0 {
-			body := map[string]any{"amount": inv.AmountPaid, "refund_pct": 100, "reason": "Dikeluarkan dari paket"}
-			if err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/refund", headers, body, nil); err != nil && s.log != nil {
+			if err := s.refundInternal(ctx, inv.OrgID, inv.ID, inv.AmountPaid, "Dikeluarkan dari paket"); err != nil && s.log != nil {
 				s.log.Warnw("remove from package: initiate refund", "invoice_id", inv.ID, "err", err)
 			}
 		}

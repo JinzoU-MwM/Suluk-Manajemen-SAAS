@@ -96,6 +96,20 @@ func (s *RefundService) GetApplicablePolicyForInvoice(ctx context.Context, orgID
 }
 
 func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest, authToken string) (*model.Refund, error) {
+	return s.initiateRefund(ctx, orgID, invoiceID, req, authToken, true)
+}
+
+// InitiateRefundInternal is for service-to-service cascades (jamaah gagal
+// berangkat, kloter cancel, removed from package) that must return exactly
+// what the customer paid — they aren't at fault, so the early-cancellation
+// policy cap does not apply. Only reachable via RefundHandler.InitiateRefundInternal,
+// which is gated by the shared internal key, not by a staff JWT — never wire
+// this to any staff-facing route.
+func (s *RefundService) InitiateRefundInternal(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest) (*model.Refund, error) {
+	return s.initiateRefund(ctx, orgID, invoiceID, req, "", false)
+}
+
+func (s *RefundService) initiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest, authToken string, enforcePolicy bool) (*model.Refund, error) {
 	inv, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
 	if err != nil {
 		return nil, err
@@ -120,14 +134,16 @@ func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, inv
 		Status:        "pending",
 	}
 
-	if policy, err := s.applicablePolicy(ctx, orgID, inv.PackageID, authToken); err != nil {
-		return nil, err
-	} else if policy != nil {
-		maxAllowed := int64(math.Round(float64(inv.AmountPaid) * policy.RefundPct / 100))
-		if req.Amount > maxAllowed {
-			return nil, repository.ErrRefundExceedsPolicy
+	if enforcePolicy {
+		if policy, err := s.applicablePolicy(ctx, orgID, inv.PackageID, authToken); err != nil {
+			return nil, err
+		} else if policy != nil {
+			maxAllowed := int64(math.Round(float64(inv.AmountPaid) * policy.RefundPct / 100))
+			if req.Amount > maxAllowed {
+				return nil, repository.ErrRefundExceedsPolicy
+			}
+			ref.PolicyID = &policy.ID
 		}
-		ref.PolicyID = &policy.ID
 	}
 
 	if err := s.repo.CreateRefund(ctx, ref); err != nil {

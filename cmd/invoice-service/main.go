@@ -100,6 +100,10 @@ func main() {
 	// BEFORE the authenticated /api/v1/invoices group, otherwise that group's
 	// AuthMiddleware (mounted on the prefix) intercepts it and returns 401.
 	app.Post("/api/v1/invoices/internal/settle", invoiceHandler.SettleInternal)
+	// Internal-only: cascades (gagal berangkat, kloter cancel, removed from
+	// package) refund exactly what was paid, bypassing the policy percentage
+	// cap meant for staff-initiated requests. Same guard/placement as above.
+	app.Post("/api/v1/invoices/internal/refund", refundHandler.InitiateRefundInternal)
 
 	authMW := sharedMW.AuthMiddleware(jwtManager)
 	// Money writes are restricted to owner/admin/finance; reads stay open to any

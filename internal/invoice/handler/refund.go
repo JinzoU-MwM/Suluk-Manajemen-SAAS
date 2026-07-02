@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"errors"
+	"os"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -79,6 +81,62 @@ func (h *RefundHandler) InitiateRefund(c *fiber.Ctx) error {
 			return response.NotFound(c, "invoice not found")
 		}
 		if errors.Is(err, repository.ErrRefundExceedsPaid) || errors.Is(err, repository.ErrRefundAlreadyOpen) || errors.Is(err, repository.ErrRefundExceedsPolicy) {
+			return response.BadRequest(c, err.Error())
+		}
+		return response.Internal(c, err)
+	}
+	return response.Created(c, ref)
+}
+
+type internalRefundRequest struct {
+	InvoiceID string  `json:"invoice_id"`
+	OrgID     string  `json:"org_id"`
+	Amount    int64   `json:"amount"`
+	RefundPct float64 `json:"refund_pct"`
+	Reason    string  `json:"reason"`
+	Notes     string  `json:"notes"`
+}
+
+// InitiateRefundInternal is for service-to-service cascades (jamaah gagal
+// berangkat, kloter cancel, removed from package) that must return exactly
+// what the customer paid — they aren't at fault, so the early-cancellation
+// policy cap (which exists to stop a manual refund request from overriding
+// the tiered penalty schedule) does not apply here. Service-to-service only:
+// guarded by the shared INTERNAL_API_KEY in the X-Internal-Key header
+// (constant-time compared), same pattern as SettleInternal. No JWT.
+func (h *RefundHandler) InitiateRefundInternal(c *fiber.Ctx) error {
+	want := os.Getenv("INTERNAL_API_KEY")
+	got := c.Get("X-Internal-Key")
+	if want == "" || subtle.ConstantTimeCompare([]byte(want), []byte(got)) != 1 {
+		return response.Unauthorized(c, "invalid internal key")
+	}
+	var req internalRefundRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.BadRequest(c, "invalid request body")
+	}
+	invoiceID, err := uuid.Parse(req.InvoiceID)
+	if err != nil {
+		return response.BadRequest(c, "invalid invoice_id")
+	}
+	orgID, err := uuid.Parse(req.OrgID)
+	if err != nil {
+		return response.BadRequest(c, "invalid org_id")
+	}
+	if req.Amount <= 0 {
+		return response.BadRequest(c, "amount must be greater than 0")
+	}
+
+	ref, err := h.svc.InitiateRefundInternal(c.Context(), orgID, invoiceID, model.InitiateRefundRequest{
+		Amount:    req.Amount,
+		RefundPct: req.RefundPct,
+		Reason:    req.Reason,
+		Notes:     req.Notes,
+	})
+	if err != nil {
+		if errors.Is(err, repository.ErrInvoiceNotFound) {
+			return response.NotFound(c, "invoice not found")
+		}
+		if errors.Is(err, repository.ErrRefundExceedsPaid) || errors.Is(err, repository.ErrRefundAlreadyOpen) {
 			return response.BadRequest(c, err.Error())
 		}
 		return response.Internal(c, err)

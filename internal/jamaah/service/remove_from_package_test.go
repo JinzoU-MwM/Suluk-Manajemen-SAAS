@@ -15,24 +15,27 @@ import (
 
 func TestCancelDanglingInvoicesCancelsAndRefundsMatchingInvoice(t *testing.T) {
 	jamaahID := uuid.New()
+	orgID := uuid.New()
 	packageID := uuid.New()
 	invoiceID := uuid.New()
 	var sawCancel, sawRefund bool
+	var sawInternalKey string
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/invoices/jamaah/"+jamaahID.String():
 			list, _ := json.Marshal([]map[string]any{{
-				"id": invoiceID, "package_id": packageID, "status": "belum_bayar",
+				"id": invoiceID, "org_id": orgID, "package_id": packageID, "status": "belum_bayar",
 				"amount_paid": 200000, "amount_remaining": 800000,
 			}})
 			_, _ = w.Write([]byte(`{"success":true,"data":` + string(list) + `}`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/api/v1/invoices/"+invoiceID.String()+"/cancel":
 			sawCancel = true
 			_, _ = w.Write([]byte(`{"success":true,"data":null}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/invoices/"+invoiceID.String()+"/refund":
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/invoices/internal/refund":
 			sawRefund = true
+			sawInternalKey = r.Header.Get("X-Internal-Key")
 			_, _ = w.Write([]byte(`{"success":true,"data":null}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -40,7 +43,7 @@ func TestCancelDanglingInvoicesCancelsAndRefundsMatchingInvoice(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	s := &JamaahService{httpc: httpclient.New(), invoiceAddr: strings.TrimPrefix(ts.URL, "http://")}
+	s := &JamaahService{httpc: httpclient.New(), invoiceAddr: strings.TrimPrefix(ts.URL, "http://"), internalKey: "test-internal-key"}
 	s.cancelDanglingInvoices(context.Background(), jamaahID, packageID, "Bearer x")
 
 	if !sawCancel {
@@ -48,6 +51,9 @@ func TestCancelDanglingInvoicesCancelsAndRefundsMatchingInvoice(t *testing.T) {
 	}
 	if !sawRefund {
 		t.Error("expected a refund to be initiated for the amount already paid")
+	}
+	if sawInternalKey != "test-internal-key" {
+		t.Errorf("expected the internal refund call to carry X-Internal-Key, got %q", sawInternalKey)
 	}
 }
 
