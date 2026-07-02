@@ -9,7 +9,7 @@
 
   let { nav } = $props();
 
-  const STATUS_LABEL = { active: "Aktif", converted: "Terkonversi", closed: "Ditutup" };
+  const STATUS_LABEL = { aktif: "Aktif", converted: "Terkonversi", closed: "Ditutup" };
 
   let loading = $state(true);
   let accounts = $state([]);
@@ -95,7 +95,7 @@
       <div style="display:flex;flex-direction:column;gap:11px">
         {#each accounts as a}
           <button type="button" class="m-card m-card-pad" style="text-align:left;width:100%"
-            onclick={() => a.status === "active" && openDeposit(a)}>
+            onclick={() => a.status === "aktif" && openDeposit(a)}>
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <span style="font-weight:700;font-size:14px">{a.jamaah_name || "—"}</span>
               <span style="font-size:11px;font-weight:700;color:var(--c-ink-soft)">{STATUS_LABEL[a.status] || a.status}</span>
