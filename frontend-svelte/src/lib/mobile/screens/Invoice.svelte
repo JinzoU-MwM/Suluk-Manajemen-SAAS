@@ -31,7 +31,16 @@
 
   let totalTagih = $derived(all.reduce((s, i) => s + Number(i.total_amount ?? i.jumlah ?? 0), 0));
   let totalBayar = $derived(all.reduce((s, i) => s + Number(i.amount_paid ?? i.dibayar ?? 0), 0));
-  let rows = $derived(all.filter((iv) => tab === "Semua" || label(iv.status) === tab));
+  function isOverdue(iv) {
+    return (iv.status === "belum_bayar" || iv.status === "sebagian") && iv.due_date && new Date(iv.due_date) < new Date();
+  }
+  let rows = $derived(
+    all.filter((iv) => {
+      if (tab === "Semua") return true;
+      if (tab === "Jatuh Tempo") return isOverdue(iv);
+      return label(iv.status) === tab;
+    })
+  );
 </script>
 
 <MScreen title="Invoice" onBack={nav.back}>
