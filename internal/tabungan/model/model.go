@@ -29,17 +29,18 @@ type SavingsAccount struct {
 }
 
 type Deposit struct {
-	ID        uuid.UUID  `json:"id"`
-	AccountID uuid.UUID  `json:"account_id"`
-	OrgID     uuid.UUID  `json:"org_id"`
-	Amount    int64      `json:"amount"`
-	Direction string     `json:"direction"` // in | out
-	Type      string     `json:"type"`      // setor | konversi | tarik
-	Method    string     `json:"method"`
-	Reference string     `json:"reference"`
-	Notes     string     `json:"notes"`
-	CreatedBy *uuid.UUID `json:"created_by,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID             uuid.UUID  `json:"id"`
+	AccountID      uuid.UUID  `json:"account_id"`
+	OrgID          uuid.UUID  `json:"org_id"`
+	Amount         int64      `json:"amount"`
+	Direction      string     `json:"direction"` // in | out
+	Type           string     `json:"type"`      // setor | konversi | tarik
+	Method         string     `json:"method"`
+	Reference      string     `json:"reference"`
+	Notes          string     `json:"notes"`
+	IdempotencyKey string     `json:"idempotency_key,omitempty"`
+	CreatedBy      *uuid.UUID `json:"created_by,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type CreateAccountRequest struct {
@@ -51,10 +52,11 @@ type CreateAccountRequest struct {
 }
 
 type DepositRequest struct {
-	Amount    int64  `json:"amount" validate:"min=1"`
-	Method    string `json:"method"`
-	Reference string `json:"reference"`
-	Notes     string `json:"notes"`
+	Amount         int64  `json:"amount" validate:"min=1"`
+	Method         string `json:"method"`
+	Reference      string `json:"reference"`
+	Notes          string `json:"notes"`
+	IdempotencyKey string `json:"idempotency_key,omitempty"`
 }
 
 type ConvertRequest struct {

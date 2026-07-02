@@ -109,9 +109,25 @@ func (r *Repo) DepositTx(ctx context.Context, orgID, accountID uuid.UUID, d *mod
 	if status != model.StatusAktif {
 		return nil, ErrNotActive
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO savings_deposits (account_id, org_id, amount, direction, type, method, reference, notes, created_by)
-		VALUES ($1,$2,$3,'in','setor',$4,$5,$6,$7)`,
-		accountID, orgID, d.Amount, d.Method, d.Reference, d.Notes, d.CreatedBy); err != nil {
+
+	if d.IdempotencyKey != "" {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM savings_deposits WHERE account_id=$1 AND idempotency_key=$2)`,
+			accountID, d.IdempotencyKey).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if exists {
+			return r.GetAccount(ctx, orgID, accountID)
+		}
+	}
+
+	var idemKey any
+	if d.IdempotencyKey != "" {
+		idemKey = d.IdempotencyKey
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO savings_deposits (account_id, org_id, amount, direction, type, method, reference, notes, created_by, idempotency_key)
+		VALUES ($1,$2,$3,'in','setor',$4,$5,$6,$7,$8)`,
+		accountID, orgID, d.Amount, d.Method, d.Reference, d.Notes, d.CreatedBy, idemKey); err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE savings_accounts SET balance = balance + $3, updated_at = NOW() WHERE id=$1 AND org_id=$2`, accountID, orgID, d.Amount); err != nil {

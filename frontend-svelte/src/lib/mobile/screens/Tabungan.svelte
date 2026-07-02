@@ -18,6 +18,7 @@
   let showCreate = $state(false);
   let showDeposit = $state(false);
   let active = $state(null);
+  let dIdempotencyKey = $state("");
 
   function progress(a) {
     if (!a.target_amount || a.target_amount <= 0) return 0;
@@ -61,6 +62,7 @@
 
   function openDeposit(a) {
     active = a;
+    dIdempotencyKey = crypto.randomUUID();
     showDeposit = true;
   }
 
@@ -68,7 +70,7 @@
     const amount = parseInt(v.amount || "0", 10) || 0;
     if (amount < 1) throw new Error("Jumlah setoran minimal Rp 1");
     await ApiService.depositTabungan(active.id, {
-      amount, method: v.method || "cash", reference: v.reference || "", notes: v.notes || "",
+      amount, method: v.method || "cash", reference: v.reference || "", notes: v.notes || "", idempotency_key: dIdempotencyKey,
     });
     nav.toast?.("Setoran tercatat", "success");
     await load();

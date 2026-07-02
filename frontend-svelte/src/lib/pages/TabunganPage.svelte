@@ -28,6 +28,7 @@
   let dMethod = $state("cash");
   let dRef = $state("");
   let dNotes = $state("");
+  let dIdempotencyKey = $state("");
 
   const STATUS_LABEL = { active: "Aktif", converted: "Terkonversi", closed: "Ditutup" };
   const METHODS = [
@@ -90,6 +91,7 @@
   function openDeposit(a) {
     active = a;
     dAmount = 0; dMethod = "cash"; dRef = ""; dNotes = "";
+    dIdempotencyKey = crypto.randomUUID();
     showDeposit = true;
   }
 
@@ -98,7 +100,7 @@
     saving = true;
     try {
       await ApiService.depositTabungan(active.id, {
-        amount: dAmount, method: dMethod, reference: dRef, notes: dNotes,
+        amount: dAmount, method: dMethod, reference: dRef, notes: dNotes, idempotency_key: dIdempotencyKey,
       });
       showToast("Setoran tercatat", "success");
       showDeposit = false;

@@ -71,7 +71,7 @@ func (s *Service) Deposit(ctx context.Context, orgID, userID, accountID uuid.UUI
 	if method == "" {
 		method = "tunai"
 	}
-	d := &model.Deposit{Amount: req.Amount, Method: method, Reference: req.Reference, Notes: req.Notes, CreatedBy: &userID}
+	d := &model.Deposit{Amount: req.Amount, Method: method, Reference: req.Reference, Notes: req.Notes, CreatedBy: &userID, IdempotencyKey: req.IdempotencyKey}
 	payload, _ := json.Marshal(map[string]any{"amount": req.Amount, "payment_method": method})
 	evt := outbox.Event{
 		OrgID:         orgID,
