@@ -44,26 +44,6 @@ func (r *InvoiceRepo) scanInvoice(scanner interface {
 	return inv, err
 }
 
-func (r *InvoiceRepo) CreateInvoice(ctx context.Context, inv *model.Invoice) error {
-	query := `INSERT INTO invoices (id, org_id, invoice_number, jamaah_id, jamaah_name, package_id, package_name, registration_id,
-		room_type, price_snapshot, discount_amount, surcharge_amount, total_amount, amount_paid, amount_remaining,
-		payment_scheme, status, due_date, notes)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-		RETURNING issued_at, created_at, updated_at`
-	err := r.pool.QueryRow(ctx, query,
-		inv.ID, inv.OrgID, inv.InvoiceNumber, inv.JamaahID, inv.JamaahName, inv.PackageID, inv.PackageName, inv.RegistrationID,
-		inv.RoomType, inv.PriceSnapshot, inv.DiscountAmount, inv.SurchargeAmount, inv.TotalAmount,
-		inv.AmountPaid, inv.AmountRemaining, inv.PaymentScheme, inv.Status, inv.DueDate, inv.Notes,
-	).Scan(&inv.IssuedAt, &inv.CreatedAt, &inv.UpdatedAt)
-	if err != nil {
-		if isDuplicate(err) {
-			return ErrDuplicateNumber
-		}
-		return fmt.Errorf("create invoice: %w", err)
-	}
-	return nil
-}
-
 func (r *InvoiceRepo) GetInvoiceByID(ctx context.Context, id, orgID uuid.UUID) (*model.Invoice, error) {
 	inv, err := r.scanInvoice(r.pool.QueryRow(ctx, fmt.Sprintf(`SELECT %s FROM invoices WHERE id = $1 AND org_id = $2`, invoiceCols), id, orgID))
 	if err != nil {
