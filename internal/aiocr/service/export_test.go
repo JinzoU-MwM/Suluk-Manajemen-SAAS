@@ -94,3 +94,47 @@ func TestExportFillsInsuranceColumns(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeCellValue(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"", ""},
+		{"Ahmad Yani", "Ahmad Yani"},
+		{"=cmd|'/c calc.exe'!A1", "'=cmd|'/c calc.exe'!A1"},
+		{"+62812345678", "'+62812345678"},
+		{"-1234", "'-1234"},
+		{"@SUM(A1:A9)", "'@SUM(A1:A9)"},
+		{"Jl. Sudirman No.1-2", "Jl. Sudirman No.1-2"},
+	}
+	for _, c := range cases {
+		if got := sanitizeCellValue(c.in); got != c.want {
+			t.Errorf("sanitizeCellValue(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestExportNeutralizesFormulaInjection is the AIOCR-2 regression: an OCR
+// result crafted to look like a spreadsheet formula must come out of a real
+// generated .xlsx as literal text, not something Excel would execute.
+func TestExportNeutralizesFormulaInjection(t *testing.T) {
+	records := []map[string]any{{
+		"nama":      "=cmd|'/c calc.exe'!A1",
+		"no_paspor": "X1234567",
+		"alamat":    "+62812345678 injected",
+	}}
+	data, err := generateInlineSiskopatuhExcel(records)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("open xlsx: %v", err)
+	}
+	cell := func(c string) string { v, _ := f.GetCellValue("Sheet1", c); return v }
+
+	if got := cell("B2"); got != "'=cmd|'/c calc.exe'!A1" {
+		t.Errorf("Nama B2 = %q, want a literal-text-escaped formula", got)
+	}
+	if got := cell("L2"); got != "'+62812345678 injected" {
+		t.Errorf("Alamat L2 = %q, want a literal-text-escaped leading '+'", got)
+	}
+}

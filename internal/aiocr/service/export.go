@@ -83,6 +83,23 @@ func (g fieldGetter) first(keys ...string) string {
 	return ""
 }
 
+// sanitizeCellValue neutralizes spreadsheet formula injection (AIOCR-2):
+// Excel/Sheets treats a cell value starting with =, +, -, or @ as a formula
+// regardless of how the OOXML cell is typed, so a leading apostrophe forces
+// literal-text interpretation without changing what a human sees. OCR text
+// is attacker-influenced (a crafted document image), so every cell write
+// must pass through this.
+func sanitizeCellValue(v string) string {
+	if v == "" {
+		return v
+	}
+	switch v[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + v
+	}
+	return v
+}
+
 // writeSiskopatuhTemplate writes the records as the template jamaah.xlsm format.
 func writeSiskopatuhTemplate(rows []fieldGetter) ([]byte, error) {
 	f := excelize.NewFile()
@@ -101,7 +118,7 @@ func writeSiskopatuhTemplate(rows []fieldGetter) ([]byte, error) {
 	for r, g := range rows {
 		for i, c := range templateColumns {
 			if v := c.value(g); v != "" {
-				_ = f.SetCellValue(sheet, fmt.Sprintf("%s%d", columnLetter(i+1), r+2), v)
+				_ = f.SetCellValue(sheet, fmt.Sprintf("%s%d", columnLetter(i+1), r+2), sanitizeCellValue(v))
 			}
 		}
 	}
