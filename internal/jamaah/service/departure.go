@@ -43,13 +43,16 @@ func (s *JamaahService) SetDeparture(ctx context.Context, groupID, orgID uuid.UU
 
 // TransitionDeparture advances a kloter through its status workflow with gates:
 // going "siap" requires a package, a departure date, and at least one member.
-func (s *JamaahService) TransitionDeparture(ctx context.Context, groupID, orgID uuid.UUID, status string) (*model.Group, error) {
+// Cancelling a kloter (→ "batal") that has a package and members cascades
+// cancel+refund to every member via cascadeGagalBerangkat, so a cancelled
+// kloter is never a silent gap — see GroupCascadeSummary.
+func (s *JamaahService) TransitionDeparture(ctx context.Context, groupID, orgID uuid.UUID, status, authToken string) (*model.Group, GroupCascadeSummary, error) {
 	g, err := s.repo.GetGroup(ctx, groupID, orgID)
 	if err != nil {
-		return nil, err
+		return nil, GroupCascadeSummary{}, err
 	}
 	if g == nil {
-		return nil, fmt.Errorf("group not found")
+		return nil, GroupCascadeSummary{}, fmt.Errorf("group not found")
 	}
 	from := model.DepartureStatus(g.DepartureStatus)
 	if from == "" {
@@ -57,7 +60,7 @@ func (s *JamaahService) TransitionDeparture(ctx context.Context, groupID, orgID 
 	}
 	to := model.DepartureStatus(status)
 	if !model.CanTransitionDeparture(from, to) {
-		return nil, fmt.Errorf("%w: %s → %s tidak valid", ErrDepartureGate, from, to)
+		return nil, GroupCascadeSummary{}, fmt.Errorf("%w: %s → %s tidak valid", ErrDepartureGate, from, to)
 	}
 
 	var manifestFinalizedAt, departedAt *time.Time
@@ -67,10 +70,10 @@ func (s *JamaahService) TransitionDeparture(ctx context.Context, groupID, orgID 
 	switch to {
 	case model.DepartureSiap:
 		if g.PackageID == nil || g.DepartureDate == nil {
-			return nil, fmt.Errorf("%w: paket dan tanggal keberangkatan wajib diisi sebelum manifest difinalkan", ErrDepartureGate)
+			return nil, GroupCascadeSummary{}, fmt.Errorf("%w: paket dan tanggal keberangkatan wajib diisi sebelum manifest difinalkan", ErrDepartureGate)
 		}
 		if g.MemberCount < 1 {
-			return nil, fmt.Errorf("%w: kloter belum punya jamaah", ErrDepartureGate)
+			return nil, GroupCascadeSummary{}, fmt.Errorf("%w: kloter belum punya jamaah", ErrDepartureGate)
 		}
 		manifestFinalizedAt = &now
 		eventType = events.EventGroupReady
@@ -81,9 +84,23 @@ func (s *JamaahService) TransitionDeparture(ctx context.Context, groupID, orgID 
 
 	payload := departureEventPayload(groupID, g.PackageID, status, g.MemberCount)
 	if err := s.repo.TransitionDeparture(ctx, groupID, orgID, status, manifestFinalizedAt, departedAt, eventType, payload); err != nil {
-		return nil, err
+		return nil, GroupCascadeSummary{}, err
 	}
-	return s.repo.GetGroup(ctx, groupID, orgID)
+
+	var summary GroupCascadeSummary
+	if to == model.DepartureBatal && g.PackageID != nil && g.MemberCount > 0 {
+		members, err := s.repo.ListGroupMembers(ctx, groupID)
+		if err != nil {
+			if s.log != nil {
+				s.log.Warnw("kloter cancel cascade: list members", "group_id", groupID, "err", err)
+			}
+		} else {
+			summary = s.cascadeGroupCancelled(ctx, members, *g.PackageID, authToken)
+		}
+	}
+
+	updated, err := s.repo.GetGroup(ctx, groupID, orgID)
+	return updated, summary, err
 }
 
 // GetDepartureManifest returns the kloter + its members for the boarding view.

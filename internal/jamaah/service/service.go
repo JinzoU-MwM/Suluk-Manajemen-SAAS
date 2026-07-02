@@ -465,6 +465,49 @@ func (s *JamaahService) cascadeGagalBerangkat(ctx context.Context, jamaahID, pac
 	return result
 }
 
+// GroupCascadeSummary aggregates the per-member cascade outcome when a whole
+// kloter is cancelled, so the caller can show a one-line summary instead of
+// nothing — the whole point of this cascade is that a cancelled kloter is no
+// longer a silent gap with zero signal that finance needs to act.
+type GroupCascadeSummary struct {
+	MembersProcessed  int `json:"members_processed"`
+	InvoicesCancelled int `json:"invoices_cancelled"`
+	RefundsInitiated  int `json:"refunds_initiated"`
+}
+
+// cascadeGroupCancelled runs cascadeGagalBerangkat for every member of a
+// cancelled kloter, bounded to a small worker pool so a large group doesn't
+// turn one HTTP request into a long sequential chain of per-member calls.
+// Reuses cascadeGagalBerangkat verbatim — no cancel/refund logic lives here.
+func (s *JamaahService) cascadeGroupCancelled(ctx context.Context, members []model.GroupMember, packageID uuid.UUID, authToken string) GroupCascadeSummary {
+	const maxConcurrent = 5
+	sem := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	summary := GroupCascadeSummary{}
+
+	for _, m := range members {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(jamaahID uuid.UUID) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			result := s.cascadeGagalBerangkat(ctx, jamaahID, packageID, authToken)
+			mu.Lock()
+			summary.MembersProcessed++
+			if result.InvoiceCancelled {
+				summary.InvoicesCancelled++
+			}
+			if result.RefundInitiated {
+				summary.RefundsInitiated++
+			}
+			mu.Unlock()
+		}(m.MemberID)
+	}
+	wg.Wait()
+	return summary
+}
+
 func (s *JamaahService) UpdatePipelineStatus(ctx context.Context, orgID, userID, jamaahID, packageID uuid.UUID, status, reason, lostReason, lostReasonCode, authToken string) (*model.JamaahPackageRegistration, CascadeResult, error) {
 	reg, err := s.repo.GetRegistration(ctx, orgID, jamaahID, packageID)
 	if err != nil {

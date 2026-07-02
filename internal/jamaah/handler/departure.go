@@ -41,14 +41,14 @@ func (h *JamaahHandler) TransitionDeparture(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.BadRequest(c, "invalid request body")
 	}
-	g, err := h.svc.TransitionDeparture(c.Context(), groupID, claims.OrgID, req.Status)
+	g, cascade, err := h.svc.TransitionDeparture(c.Context(), groupID, claims.OrgID, req.Status, c.Get("Authorization"))
 	if errors.Is(err, service.ErrDepartureGate) {
 		return response.BadRequest(c, err.Error())
 	}
 	if err != nil {
 		return response.Internal(c, err)
 	}
-	return response.OK(c, g)
+	return response.OK(c, fiber.Map{"group": g, "cascade": cascade})
 }
 
 // GetDepartureManifest returns the kloter + members for boarding.

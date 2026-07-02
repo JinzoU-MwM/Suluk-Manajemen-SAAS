@@ -105,11 +105,19 @@
   }
 
   async function transitionDep(status) {
+    if (status === "batal" && !confirm(`Batalkan kloter ini beserta ${depGroup.member_count} jamaah di dalamnya? Invoice yang belum lunas akan dibatalkan dan refund untuk yang sudah dibayar akan diajukan otomatis.`)) {
+      return;
+    }
     try {
-      const g = await ApiService.transitionGroupDeparture(depGroup.id, status);
+      const result = await ApiService.transitionGroupDeparture(depGroup.id, status);
+      const g = result?.group || result;
       patchGroup(g);
       depGroup = g;
       showToast(`Status: ${depMeta(g.departure_status).label}`, "success");
+      const cascade = result?.cascade;
+      if (cascade?.members_processed) {
+        showToast(`${cascade.invoices_cancelled} invoice dibatalkan, ${cascade.refunds_initiated} refund diajukan — cek menu Pembatalan`, "success");
+      }
     } catch (e) { showToast(mapError(e.message), "error"); }
   }
 
