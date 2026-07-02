@@ -199,9 +199,9 @@ func (r *InvoiceRepo) CreatePayment(ctx context.Context, p *model.Payment) error
 		p.ReferenceNumber, p.ProofURL, p.Notes, p.ReceivedBy, p.PaidAt).Scan(&p.CreatedAt)
 }
 
-func (r *InvoiceRepo) GetPayments(ctx context.Context, invoiceID uuid.UUID) ([]model.Payment, error) {
+func (r *InvoiceRepo) GetPayments(ctx context.Context, invoiceID, orgID uuid.UUID) ([]model.Payment, error) {
 	rows, err := r.pool.Query(ctx, `SELECT id, org_id, invoice_id, amount, payment_method, bank_name, account_number, reference_number, proof_url, notes, received_by, paid_at, created_at, cash_session_id
-		FROM payments WHERE invoice_id = $1 ORDER BY paid_at DESC`, invoiceID)
+		FROM payments WHERE invoice_id = $1 AND org_id = $2 ORDER BY paid_at DESC`, invoiceID, orgID)
 	if err != nil {
 		return nil, err
 	}

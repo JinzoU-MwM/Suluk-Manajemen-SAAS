@@ -110,7 +110,7 @@ func (s *InvoiceService) GetInvoice(ctx context.Context, id, orgID uuid.UUID) (*
 		return nil, err
 	}
 	schedules, _ := s.repo.GetPaymentSchedules(ctx, id)
-	payments, _ := s.repo.GetPayments(ctx, id)
+	payments, _ := s.repo.GetPayments(ctx, id, orgID)
 	inv.PaymentSchedules = schedules
 	inv.Payments = payments
 	return inv, nil
@@ -122,7 +122,7 @@ func (s *InvoiceService) GetInvoiceByNumber(ctx context.Context, orgID uuid.UUID
 		return nil, err
 	}
 	schedules, _ := s.repo.GetPaymentSchedules(ctx, inv.ID)
-	payments, _ := s.repo.GetPayments(ctx, inv.ID)
+	payments, _ := s.repo.GetPayments(ctx, inv.ID, orgID)
 	inv.PaymentSchedules = schedules
 	inv.Payments = payments
 	return inv, nil
@@ -335,7 +335,7 @@ func (s *InvoiceService) GetPayments(ctx context.Context, orgID, invoiceID uuid.
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetPayments(ctx, invoiceID)
+	return s.repo.GetPayments(ctx, invoiceID, orgID)
 }
 
 func (s *InvoiceService) GetSummary(ctx context.Context, orgID uuid.UUID) (*model.InvoiceSummary, error) {

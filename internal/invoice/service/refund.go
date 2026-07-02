@@ -28,7 +28,7 @@ func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, inv
 	// GetPayments orders by paid_at DESC, so [0] is the most recent payment —
 	// that's the account the refund should come back out of.
 	paymentMethod := "transfer_bank"
-	if payments, err := s.repo.GetPayments(ctx, invoiceID); err == nil && len(payments) > 0 {
+	if payments, err := s.repo.GetPayments(ctx, invoiceID, orgID); err == nil && len(payments) > 0 {
 		paymentMethod = payments[0].PaymentMethod
 	}
 	ref := &model.Refund{
