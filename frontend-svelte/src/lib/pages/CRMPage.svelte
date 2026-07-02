@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import {
     Plus, Search, LayoutGrid, List,
     Phone, ChevronRight, UserCircle, Loader2,
@@ -38,6 +39,7 @@
   let dragId = $state(null);
   let dragFrom = $state(null);
   let overCol = $state(null);
+  let pendingIds = new SvelteSet(); // jamaah IDs with an in-flight pipeline-status PATCH
 
   // Lead-temperature filter + score sort (server-side) and funnel analytics
   let tempFilter = $state(''); // '' | 'hot' | 'warm' | 'cold'
@@ -332,9 +334,12 @@
 
   async function persistStage(idx, packageId, toCol, lost_reason, lost_reason_code = '') {
     const prev = jamaah[idx];
+    const id = prev.id;
+    if (pendingIds.has(id)) return; // already has an in-flight PATCH for this lead
+    pendingIds.add(id);
     jamaah[idx] = { ...prev, pipeline_status: toCol }; // optimistic
     try {
-      const result = await ApiService.updatePipelineStatus(prev.id, packageId, { pipeline_status: toCol, lost_reason, lost_reason_code });
+      const result = await ApiService.updatePipelineStatus(id, packageId, { pipeline_status: toCol, lost_reason, lost_reason_code });
       showToast(`Lead dipindahkan ke ${stageLabel(toCol)}`, 'success');
       if (result?.cascade?.invoice_cancelled || result?.cascade?.refund_initiated) {
         showToast('Invoice dibatalkan & refund otomatis diajukan — cek menu Pembatalan', 'success');
@@ -342,8 +347,17 @@
         showToast('Jamaah gagal berangkat: proses cancel & refund manual di menu Pembatalan', 'warning');
       }
     } catch (e) {
-      jamaah[idx] = prev; // rollback
+      if (e.message?.toLowerCase().includes('changed concurrently')) {
+        // Someone else moved this lead in the meantime — resync with the
+        // server instead of rolling back to our own possibly-stale snapshot.
+        await loadJamaah();
+      } else {
+        const i = jamaah.findIndex((r) => r.id === id);
+        if (i !== -1) jamaah[i] = prev; // rollback by id, not by (possibly stale) idx
+      }
       showToast(mapError(e.message), 'error');
+    } finally {
+      pendingIds.delete(id);
     }
   }
 
@@ -533,13 +547,13 @@
                 <div
                   role="button"
                   tabindex="0"
-                  draggable="true"
+                  draggable={!pendingIds.has(j.id)}
                   ondragstart={() => onDragStart(j)}
                   ondragend={onDragEnd}
                   onclick={() => openDetail(j)}
                   onkeydown={(e) => { if (e.key === 'Enter') openDetail(j); }}
                   class="cursor-grab rounded-xl p-3 text-left transition-shadow active:cursor-grabbing"
-                  style="background:var(--c-surface);border:1px solid var(--c-line);border-left:3px solid {col.color};box-shadow:var(--shadow-sm);opacity:{dragId === j.id ? 0.4 : 1}"
+                  style="background:var(--c-surface);border:1px solid var(--c-line);border-left:3px solid {col.color};box-shadow:var(--shadow-sm);opacity:{dragId === j.id || pendingIds.has(j.id) ? 0.4 : 1}"
                 >
                   <div class="mb-2 flex items-center gap-2.5">
                     <Avatar name={j.name} size={30} />

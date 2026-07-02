@@ -28,6 +28,7 @@ const ERROR_MAP = {
     'file too large': 'Ukuran file terlalu besar. Maksimal 10MB.',
     'Excel generation failed': 'Gagal membuat file Excel. Coba lagi.',
     'corrupted': 'File yang diunduh tampaknya rusak. Coba lagi.',
+    'changed concurrently': 'Tahap sudah diubah di tempat lain — data dimuat ulang.',
 };
 
 /**

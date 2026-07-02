@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jamaah-in/v2/internal/jamaah/model"
+	"github.com/jamaah-in/v2/internal/jamaah/repository"
 	"github.com/jamaah-in/v2/internal/jamaah/service"
 	sharedAuth "github.com/jamaah-in/v2/internal/shared/auth"
 	"github.com/jamaah-in/v2/internal/shared/response"
@@ -197,6 +198,9 @@ func (h *JamaahHandler) UpdatePipelineStatus(c *fiber.Ctx) error {
 	if err != nil {
 		if errors.Is(err, service.ErrGate) {
 			return response.BadRequest(c, err.Error())
+		}
+		if errors.Is(err, repository.ErrStageConflict) {
+			return response.Conflict(c, err.Error())
 		}
 		return response.Internal(c, err)
 	}

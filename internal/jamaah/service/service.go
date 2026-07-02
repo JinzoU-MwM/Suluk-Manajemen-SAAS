@@ -584,7 +584,52 @@ func (s *JamaahService) RemoveFromPackage(ctx context.Context, orgID, jamaahID, 
 	}
 	// Free the seat (best-effort; never block the unregister on this).
 	s.releaseSeat(ctx, packageID, roomType, authToken)
+	// Cancel any invoice left dangling by the removed registration (best-effort;
+	// never block the unregister on this) — otherwise a later re-registration to
+	// the same package creates a second non-cancelled invoice, and the "gagal
+	// berangkat" cascade can only ever act on the newest one (ORDER BY
+	// created_at DESC), permanently orphaning whatever was paid against the
+	// old one (finding H4).
+	s.cancelDanglingInvoices(ctx, jamaahID, packageID, authToken)
 	return nil
+}
+
+// cancelDanglingInvoices best-effort cancels the uncollected remainder and
+// initiates a refund for whatever was already paid, for every non-cancelled
+// invoice still open for this jamaah+package after its registration was
+// removed. Unlike cascadeGagalBerangkat (which picks a single "the" invoice),
+// this acts on every match — once the registration is gone, ANY remaining
+// invoice for this exact package is by definition dangling.
+func (s *JamaahService) cancelDanglingInvoices(ctx context.Context, jamaahID, packageID uuid.UUID, authToken string) {
+	if authToken == "" {
+		return
+	}
+	var invoices []jamaahCascadeInvoice
+	if err := s.httpc.GetJSON(ctx, s.invoiceAddr, "/api/v1/invoices/jamaah/"+jamaahID.String(), authToken, &invoices); err != nil {
+		if s.log != nil {
+			s.log.Warnw("remove from package: list invoices", "jamaah_id", jamaahID, "err", err)
+		}
+		return
+	}
+	headers := map[string]string{"Authorization": authToken}
+	for i := range invoices {
+		inv := invoices[i]
+		if inv.PackageID != packageID || inv.Status == "batal" {
+			continue
+		}
+		if inv.AmountRemaining > 0 {
+			body := map[string]string{"reason": "Dikeluarkan dari paket"}
+			if err := s.httpc.PatchJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/cancel", headers, body, nil); err != nil && s.log != nil {
+				s.log.Warnw("remove from package: cancel invoice", "invoice_id", inv.ID, "err", err)
+			}
+		}
+		if inv.AmountPaid > 0 {
+			body := map[string]any{"amount": inv.AmountPaid, "refund_pct": 100, "reason": "Dikeluarkan dari paket"}
+			if err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/"+inv.ID.String()+"/refund", headers, body, nil); err != nil && s.log != nil {
+				s.log.Warnw("remove from package: initiate refund", "invoice_id", inv.ID, "err", err)
+			}
+		}
+	}
 }
 
 func (s *JamaahService) ListByPackage(ctx context.Context, orgID, packageID uuid.UUID, status string, page, limit int) ([]model.JamaahProfile, int, error) {
