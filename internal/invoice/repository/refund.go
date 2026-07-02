@@ -25,10 +25,10 @@ var (
 
 func (r *InvoiceRepo) CreateRefund(ctx context.Context, ref *model.Refund) error {
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO refunds (org_id, invoice_id, amount, refund_pct, reason, notes, payment_method, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+		INSERT INTO refunds (org_id, invoice_id, amount, refund_pct, reason, notes, payment_method, policy_id, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
 		RETURNING id, created_at, updated_at
-	`, ref.OrgID, ref.InvoiceID, ref.Amount, ref.RefundPct, ref.Reason, ref.Notes, ref.PaymentMethod).Scan(&ref.ID, &ref.CreatedAt, &ref.UpdatedAt)
+	`, ref.OrgID, ref.InvoiceID, ref.Amount, ref.RefundPct, ref.Reason, ref.Notes, ref.PaymentMethod, ref.PolicyID).Scan(&ref.ID, &ref.CreatedAt, &ref.UpdatedAt)
 	if isDuplicate(err) {
 		return ErrRefundAlreadyOpen
 	}
@@ -49,7 +49,7 @@ func (r *InvoiceRepo) ListRefunds(ctx context.Context, orgID uuid.UUID, status s
 	baseArgs := append([]interface{}{orgID}, filterArgs...)
 	baseArgCount := len(baseArgs)
 
-	selectQuery := fmt.Sprintf(`SELECT id, org_id, invoice_id, amount, refund_pct, payment_method, reason, status,
+	selectQuery := fmt.Sprintf(`SELECT id, org_id, invoice_id, amount, refund_pct, payment_method, policy_id, reason, status,
 		approved_by, approved_at, processed_at, notes, created_at, updated_at
 		FROM refunds WHERE org_id = $1%s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
 		filterSQL, baseArgCount+1, baseArgCount+2)
@@ -65,7 +65,7 @@ func (r *InvoiceRepo) ListRefunds(ctx context.Context, orgID uuid.UUID, status s
 	for rows.Next() {
 		var ref model.Refund
 		if err := rows.Scan(
-			&ref.ID, &ref.OrgID, &ref.InvoiceID, &ref.Amount, &ref.RefundPct, &ref.PaymentMethod,
+			&ref.ID, &ref.OrgID, &ref.InvoiceID, &ref.Amount, &ref.RefundPct, &ref.PaymentMethod, &ref.PolicyID,
 			&ref.Reason, &ref.Status, &ref.ApprovedBy, &ref.ApprovedAt,
 			&ref.ProcessedAt, &ref.Notes, &ref.CreatedAt, &ref.UpdatedAt,
 		); err != nil {
@@ -79,11 +79,11 @@ func (r *InvoiceRepo) ListRefunds(ctx context.Context, orgID uuid.UUID, status s
 func (r *InvoiceRepo) GetRefund(ctx context.Context, id, orgID uuid.UUID) (*model.Refund, error) {
 	var ref model.Refund
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, org_id, invoice_id, amount, refund_pct, payment_method, reason, status,
+		SELECT id, org_id, invoice_id, amount, refund_pct, payment_method, policy_id, reason, status,
 		       approved_by, approved_at, processed_at, notes, created_at, updated_at
 		FROM refunds WHERE id = $1 AND org_id = $2
 	`, id, orgID).Scan(
-		&ref.ID, &ref.OrgID, &ref.InvoiceID, &ref.Amount, &ref.RefundPct, &ref.PaymentMethod,
+		&ref.ID, &ref.OrgID, &ref.InvoiceID, &ref.Amount, &ref.RefundPct, &ref.PaymentMethod, &ref.PolicyID,
 		&ref.Reason, &ref.Status, &ref.ApprovedBy, &ref.ApprovedAt,
 		&ref.ProcessedAt, &ref.Notes, &ref.CreatedAt, &ref.UpdatedAt,
 	)
@@ -200,7 +200,7 @@ func (r *InvoiceRepo) RejectRefund(ctx context.Context, id, orgID uuid.UUID) err
 
 func (r *InvoiceRepo) GetRefundsByInvoice(ctx context.Context, invoiceID, orgID uuid.UUID) ([]model.Refund, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, org_id, invoice_id, amount, refund_pct, payment_method, reason, status,
+		SELECT id, org_id, invoice_id, amount, refund_pct, payment_method, policy_id, reason, status,
 		       approved_by, approved_at, processed_at, notes, created_at, updated_at
 		FROM refunds WHERE invoice_id = $1 AND org_id = $2 ORDER BY created_at DESC
 	`, invoiceID, orgID)
@@ -213,7 +213,7 @@ func (r *InvoiceRepo) GetRefundsByInvoice(ctx context.Context, invoiceID, orgID 
 	for rows.Next() {
 		var ref model.Refund
 		if err := rows.Scan(
-			&ref.ID, &ref.OrgID, &ref.InvoiceID, &ref.Amount, &ref.RefundPct, &ref.PaymentMethod,
+			&ref.ID, &ref.OrgID, &ref.InvoiceID, &ref.Amount, &ref.RefundPct, &ref.PaymentMethod, &ref.PolicyID,
 			&ref.Reason, &ref.Status, &ref.ApprovedBy, &ref.ApprovedAt,
 			&ref.ProcessedAt, &ref.Notes, &ref.CreatedAt, &ref.UpdatedAt,
 		); err != nil {

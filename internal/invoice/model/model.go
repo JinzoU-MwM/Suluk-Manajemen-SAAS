@@ -228,6 +228,7 @@ type Refund struct {
 	InvoiceID     uuid.UUID  `json:"invoice_id" db:"invoice_id"`
 	Amount        int64      `json:"amount" db:"amount"`
 	RefundPct     float64    `json:"refund_pct" db:"refund_pct"`
+	PolicyID      *uuid.UUID `json:"policy_id,omitempty" db:"policy_id"`
 	PaymentMethod string     `json:"payment_method" db:"payment_method"`
 	Reason        string     `json:"reason" db:"reason"`
 	Status        string     `json:"status" db:"status"`
