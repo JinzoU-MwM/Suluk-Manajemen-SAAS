@@ -176,6 +176,17 @@ func (h *AuthHandler) GetOrganization(c *fiber.Ctx) error {
 	return response.OK(c, org)
 }
 
+// GetTeam serves GET /api/v1/team/ — {organization, members, my_role}, the
+// shape TeamPage.svelte has always expected (AUTH-3).
+func (h *AuthHandler) GetTeam(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	team, err := h.svc.GetTeam(c.Context(), claims.OrgID, claims.Role)
+	if err != nil {
+		return response.NotFound(c, "organization not found")
+	}
+	return response.OK(c, team)
+}
+
 func (h *AuthHandler) UpdateOrganization(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	var req model.UpdateOrgRequest

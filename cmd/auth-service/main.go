@@ -189,7 +189,7 @@ func main() {
 	tickets.Post("/:id/messages", authHandler.AddTicketMessage)
 
 	team := app.Group("/api/v1/team", sharedMW.AuthMiddleware(jwtManager), sharedMW.RequireStaff)
-	team.Get("/", authHandler.GetOrganization)
+	team.Get("/", authHandler.GetTeam)
 	team.Post("/create", authHandler.CreateOrganization)
 	team.Post("/invite", adminRole, authHandler.InviteMember)
 	team.Patch("/members/:userId", adminRole, authHandler.UpdateMemberRole)

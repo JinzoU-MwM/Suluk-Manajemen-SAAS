@@ -303,6 +303,32 @@ func (r *AuthRepo) ListTeamMembers(ctx context.Context, orgID uuid.UUID) ([]mode
 	return members, nil
 }
 
+// ListTeamMembersInfo returns each member's profile joined with their
+// org-scoped role, for the Team page (AUTH-3). Mirrors ListUsersByOrg's join
+// but keeps every status (not just 'active') and returns the role too.
+func (r *AuthRepo) ListTeamMembersInfo(ctx context.Context, orgID uuid.UUID) ([]model.TeamMemberInfo, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT u.id, u.name, u.email, tm.role
+		FROM team_members tm
+		JOIN users u ON u.id = tm.user_id
+		WHERE tm.org_id = $1
+		ORDER BY tm.joined_at`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("list team members info: %w", err)
+	}
+	defer rows.Close()
+
+	members := []model.TeamMemberInfo{}
+	for rows.Next() {
+		var m model.TeamMemberInfo
+		if err := rows.Scan(&m.ID, &m.Name, &m.Email, &m.Role); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, nil
+}
+
 func (r *AuthRepo) GetOrgByUserID(ctx context.Context, userID uuid.UUID) (*model.Organization, error) {
 	o := &model.Organization{}
 	query := `

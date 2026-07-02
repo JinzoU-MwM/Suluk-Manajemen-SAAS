@@ -543,6 +543,20 @@ func (s *AuthService) GetOrganization(ctx context.Context, orgID uuid.UUID) (*mo
 	return s.repo.GetOrganizationByID(ctx, orgID)
 }
 
+// GetTeam assembles the Team page payload: the org profile, every member's
+// name/email/role, and the caller's own role (AUTH-3).
+func (s *AuthService) GetTeam(ctx context.Context, orgID uuid.UUID, myRole string) (*model.TeamResponse, error) {
+	org, err := s.repo.GetOrganizationByID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	members, err := s.repo.ListTeamMembersInfo(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.TeamResponse{Organization: org, Members: members, MyRole: myRole}, nil
+}
+
 // UpdateOrganization patches the org profile and returns the fresh record.
 func (s *AuthService) UpdateOrganization(ctx context.Context, orgID uuid.UUID, req model.UpdateOrgRequest) (*model.Organization, error) {
 	if err := s.repo.UpdateOrganization(ctx, orgID, req); err != nil {

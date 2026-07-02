@@ -106,6 +106,25 @@ type TeamMember struct {
 	JoinedAt  time.Time  `json:"joined_at" db:"joined_at"`
 }
 
+// TeamMemberInfo is the Team page's view of one member: profile fields
+// joined with their org-scoped role. ID is the USER id (not the
+// team_members row id) because /orgs/members/:userId routes key on it.
+type TeamMemberInfo struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Email string    `json:"email"`
+	Role  string    `json:"role"`
+}
+
+// TeamResponse is what GET /api/v1/team/ returns (AUTH-3) — TeamPage.svelte
+// was already written against this exact shape (team.organization.name,
+// team.members.length, team?.my_role) before any backend ever produced it.
+type TeamResponse struct {
+	Organization *Organization    `json:"organization"`
+	Members      []TeamMemberInfo `json:"members"`
+	MyRole       string           `json:"my_role"`
+}
+
 type TeamInvite struct {
 	ID        uuid.UUID `json:"id" db:"id"`
 	OrgID     uuid.UUID `json:"org_id" db:"org_id"`
