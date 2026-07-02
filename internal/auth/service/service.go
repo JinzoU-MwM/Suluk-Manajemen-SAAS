@@ -815,6 +815,12 @@ func (s *AuthService) DeleteAccount(ctx context.Context, userID uuid.UUID, passw
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return fmt.Errorf("password is incorrect")
 	}
+	// AUTH-4: "owner" is never an assignable role (see IsAssignableRole), so an
+	// org has exactly one owner for its whole lifetime with no transfer
+	// mechanism — deleting that account would orphan the org permanently.
+	if _, member, err := s.getUserOrgAndRole(ctx, userID); err == nil && member != nil && member.Role == "owner" {
+		return fmt.Errorf("pemilik organisasi tidak dapat menghapus akunnya sendiri (belum ada fitur transfer kepemilikan) — hubungi dukungan jika organisasi perlu ditutup")
+	}
 	_ = s.repo.DeleteRefreshTokensByUser(ctx, userID)
 	return s.repo.DeleteUser(ctx, userID)
 }
