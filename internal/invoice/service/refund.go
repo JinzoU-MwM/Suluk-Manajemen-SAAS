@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,7 +76,7 @@ func (s *RefundService) applicablePolicy(ctx context.Context, orgID, packageID u
 	return policy, nil
 }
 
-func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest) (*model.Refund, error) {
+func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest, authToken string) (*model.Refund, error) {
 	inv, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
 	if err != nil {
 		return nil, err
@@ -99,6 +100,17 @@ func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, inv
 		PaymentMethod: paymentMethod,
 		Status:        "pending",
 	}
+
+	if policy, err := s.applicablePolicy(ctx, orgID, inv.PackageID, authToken); err != nil {
+		return nil, err
+	} else if policy != nil {
+		maxAllowed := int64(math.Round(float64(inv.AmountPaid) * policy.RefundPct / 100))
+		if req.Amount > maxAllowed {
+			return nil, repository.ErrRefundExceedsPolicy
+		}
+		ref.PolicyID = &policy.ID
+	}
+
 	if err := s.repo.CreateRefund(ctx, ref); err != nil {
 		return nil, err
 	}

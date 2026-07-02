@@ -73,12 +73,12 @@ func (h *RefundHandler) InitiateRefund(c *fiber.Ctx) error {
 		return response.BadRequest(c, "amount must be greater than 0")
 	}
 
-	ref, err := h.svc.InitiateRefund(c.Context(), claims.OrgID, invoiceID, req)
+	ref, err := h.svc.InitiateRefund(c.Context(), claims.OrgID, invoiceID, req, c.Get("Authorization"))
 	if err != nil {
 		if errors.Is(err, repository.ErrInvoiceNotFound) {
 			return response.NotFound(c, "invoice not found")
 		}
-		if errors.Is(err, repository.ErrRefundExceedsPaid) || errors.Is(err, repository.ErrRefundAlreadyOpen) {
+		if errors.Is(err, repository.ErrRefundExceedsPaid) || errors.Is(err, repository.ErrRefundAlreadyOpen) || errors.Is(err, repository.ErrRefundExceedsPolicy) {
 			return response.BadRequest(c, err.Error())
 		}
 		return response.Internal(c, err)
