@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -44,9 +45,15 @@ type ProcessDocumentsResult struct {
 //
 // cacheMode is accepted for forward-compat with the UI's cache selector but is
 // not yet wired to the OCR cache table (every file is processed fresh).
-func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, orgID uuid.UUID, files []SyncFile, cacheMode string) (*ProcessDocumentsResult, error) {
+//
+// authToken is the caller's own bearer token, forwarded to auth-service so the
+// quota pre-check below (AIOCR-1) can look up the org's plan limits.
+func (s *AIOCRService) ProcessDocumentsSync(ctx context.Context, orgID uuid.UUID, files []SyncFile, cacheMode string, authToken string) (*ProcessDocumentsResult, error) {
 	if s.analyzer == nil {
 		return nil, ErrOCRUnavailable
+	}
+	if used, limit := s.fetchQuota(ctx, orgID, authToken); limit != plan.Unlimited && used >= limit {
+		return nil, fmt.Errorf("%w: kuota %d dokumen/bulan sudah terpakai semua — upgrade paket atau beli top-up scan untuk melanjutkan", ErrScanQuotaExceeded, limit)
 	}
 
 	res := &ProcessDocumentsResult{

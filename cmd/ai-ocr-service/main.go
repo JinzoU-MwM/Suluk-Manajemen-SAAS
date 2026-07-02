@@ -62,7 +62,8 @@ func main() {
 	aiocrRepo := repository.NewAIOCRRepo(pool)
 	analyzer := service.NewAnalyzer(cfg)
 	aiocrService := service.NewAIOCRService(aiocrRepo, analyzer, logger).
-		WithPolicy(service.NewPolicyExtractor(cfg))
+		WithPolicy(service.NewPolicyExtractor(cfg)).
+		WithAuthAddr(os.Getenv("AUTH_SERVICE_ADDR"))
 	aiocrHandler := handler.NewAIOCRHandler(aiocrService)
 
 	app := fiber.New(fiber.Config{

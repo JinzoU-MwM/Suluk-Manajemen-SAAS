@@ -321,6 +321,9 @@ services:
       # Guards the internal scan-usage / scan-topup endpoints, which auth and
       # invoice call with X-Internal-Key (Phase 4a/4b). MUST match those services.
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      # Read the org's plan/scan quota before spending money on the AI
+      # provider (AIOCR-1). Empty/unreachable = quota checks fail open.
+      AUTH_SERVICE_ADDR: auth-service:50051
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_USER: jamaah

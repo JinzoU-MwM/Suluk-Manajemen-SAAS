@@ -5,12 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/jamaah-in/v2/internal/aiocr/model"
 	"github.com/jamaah-in/v2/internal/aiocr/repository"
+	"github.com/jamaah-in/v2/internal/shared/httpclient"
 	"github.com/jamaah-in/v2/internal/shared/plan"
 )
 
@@ -22,6 +24,12 @@ type AIOCRService struct {
 	analyzer DocumentAnalyzer
 	policy   PolicyExtractor
 	logger   *zap.SugaredLogger
+	// authAddr/httpc/quotaCache let ProcessDocumentsSync check the org's
+	// monthly scan quota against auth-service before spending money on the AI
+	// provider (AIOCR-1). Empty authAddr = quota checks fail open.
+	authAddr   string
+	httpc      *httpclient.Client
+	quotaCache sync.Map // orgID -> quotaCacheEntry
 }
 
 func NewAIOCRService(repo *repository.AIOCRRepo, analyzer DocumentAnalyzer, logger *zap.SugaredLogger) *AIOCRService {
@@ -29,6 +37,7 @@ func NewAIOCRService(repo *repository.AIOCRRepo, analyzer DocumentAnalyzer, logg
 		repo:     repo,
 		analyzer: analyzer,
 		logger:   logger,
+		httpc:    httpclient.New(),
 	}
 }
 
@@ -36,6 +45,12 @@ func NewAIOCRService(repo *repository.AIOCRRepo, analyzer DocumentAnalyzer, logg
 // enrichment). Returns the receiver for chaining from main().
 func (s *AIOCRService) WithPolicy(p PolicyExtractor) *AIOCRService {
 	s.policy = p
+	return s
+}
+
+// WithAuthAddr wires the auth-service address used for AIOCR-1's quota check.
+func (s *AIOCRService) WithAuthAddr(addr string) *AIOCRService {
+	s.authAddr = addr
 	return s
 }
 

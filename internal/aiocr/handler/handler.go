@@ -166,10 +166,14 @@ func (h *AIOCRHandler) ProcessDocuments(c *fiber.Ctx) error {
 	}
 
 	claims := c.Locals("claims").(*sharedAuth.Claims)
-	result, err := h.svc.ProcessDocumentsSync(c.Context(), claims.OrgID, files, c.Query("cache_mode", "default"))
+	authToken := c.Get("Authorization")
+	result, err := h.svc.ProcessDocumentsSync(c.Context(), claims.OrgID, files, c.Query("cache_mode", "default"), authToken)
 	if err != nil {
 		if errors.Is(err, service.ErrOCRUnavailable) {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"success": false, "error": err.Error()})
+		}
+		if errors.Is(err, service.ErrScanQuotaExceeded) {
+			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{"success": false, "error": err.Error()})
 		}
 		return response.Internal(c, err)
 	}

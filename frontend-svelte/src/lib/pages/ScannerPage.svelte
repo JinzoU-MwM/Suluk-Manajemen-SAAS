@@ -495,7 +495,7 @@
           <Button
             variant="primary"
             icon={ScanLine}
-            disabled={files.length === 0 || isProcessing}
+            disabled={files.length === 0 || isProcessing || (remaining !== null && remaining <= 0)}
             onclick={() => processDocuments()}
           >
             {scanLabel}
