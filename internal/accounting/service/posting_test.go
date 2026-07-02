@@ -69,6 +69,22 @@ func TestBuildPostingBalanced(t *testing.T) {
 			},
 		},
 		{
+			name: "savings deposit tunai -> kas",
+			env:  mk(events.EventSavingsDeposited, map[string]any{"amount": 500000, "payment_method": "tunai"}),
+			wantAcc: map[string][2]int64{
+				AccKas:            {500000, 0},
+				AccHutangTabungan: {0, 500000},
+			},
+		},
+		{
+			name: "savings deposit transfer -> bank",
+			env:  mk(events.EventSavingsDeposited, map[string]any{"amount": 500000, "payment_method": "transfer_bank"}),
+			wantAcc: map[string][2]int64{
+				AccBank:           {500000, 0},
+				AccHutangTabungan: {0, 500000},
+			},
+		},
+		{
 			name: "payroll with tax",
 			env:  mk(events.EventPayrollPosted, map[string]any{"gross": 5000000, "tax": 500000, "net": 4500000}),
 			wantAcc: map[string][2]int64{
@@ -95,7 +111,7 @@ func TestBuildPostingBalanced(t *testing.T) {
 		},
 		{
 			name: "savings deposit",
-			env:  mk(events.EventSavingsDeposited, map[string]any{"amount": 750000}),
+			env:  mk(events.EventSavingsDeposited, map[string]any{"amount": 750000, "payment_method": "tunai"}),
 			wantAcc: map[string][2]int64{
 				AccKas:            {750000, 0},
 				AccHutangTabungan: {0, 750000},

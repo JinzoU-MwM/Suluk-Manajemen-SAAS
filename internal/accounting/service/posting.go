@@ -50,7 +50,8 @@ type commissionPayload struct {
 }
 
 type savingsPayload struct {
-	Amount int64 `json:"amount"`
+	Amount        int64  `json:"amount"`
+	PaymentMethod string `json:"payment_method"`
 }
 
 type cashSessionPayload struct {
@@ -231,12 +232,16 @@ func buildPosting(env *events.Envelope) (*posting, error) {
 		if p.Amount <= 0 {
 			return nil, fmt.Errorf("savings amount must be > 0")
 		}
+		cashAcc := AccBank
+		if p.PaymentMethod == "tunai" || p.PaymentMethod == "cash" {
+			cashAcc = AccKas
+		}
 		memo := "Setoran tabungan jemaah"
 		return &posting{
 			module:      "tabungan",
 			description: memo,
 			lines: []model.PostingLine{
-				{AccountCode: AccKas, Debit: p.Amount, Memo: memo},
+				{AccountCode: cashAcc, Debit: p.Amount, Memo: memo},
 				{AccountCode: AccHutangTabungan, Credit: p.Amount, Memo: memo},
 			},
 		}, nil
