@@ -16,7 +16,7 @@ function getToken() {
     }
 }
 
-function getRefreshToken() {
+export function getRefreshToken() {
     if (typeof window === 'undefined') return null;
     try {
         return localStorage.getItem('refresh_token');

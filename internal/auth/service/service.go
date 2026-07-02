@@ -779,7 +779,14 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	if err != nil {
 		return fmt.Errorf("hash password: %w", err)
 	}
-	return s.repo.UpdatePassword(ctx, userID, string(hashed))
+	if err := s.repo.UpdatePassword(ctx, userID, string(hashed)); err != nil {
+		return err
+	}
+	// Revoke every existing session (AUTH-2): a password change is often made
+	// because the account may be compromised — a refresh token an attacker
+	// already holds must stop working immediately, not up to 7 days later.
+	_ = s.repo.DeleteRefreshTokensByUser(ctx, userID)
+	return nil
 }
 
 func (s *AuthService) GetActivity(ctx context.Context, userID uuid.UUID) ([]model.AuditLog, error) {

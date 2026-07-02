@@ -1,4 +1,4 @@
-import { API_URL, authHeaders, parseError, apiFetch } from '../apiCore.js';
+import { API_URL, authHeaders, parseError, apiFetch, getRefreshToken } from '../apiCore.js';
 
 function unwrapData(json) {
     if (json && typeof json === 'object' && json.success === true && json.data !== undefined) {
@@ -44,9 +44,12 @@ export function createAuthSubscriptionApi({ cacheGet, cacheSet }) {
         },
 
         async logout() {
+            const headers = authHeaders();
+            const rt = getRefreshToken();
+            if (rt) headers['X-Refresh-Token'] = rt;
             const response = await apiFetch(`${API_URL}/auth/logout`, {
                 method: 'POST',
-                headers: authHeaders(),
+                headers,
             });
             if (!response.ok) throw new Error(await parseError(response));
             return unwrapData(await response.json());
