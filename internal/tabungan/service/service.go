@@ -83,10 +83,16 @@ func (s *Service) Deposit(ctx context.Context, orgID, userID, accountID uuid.UUI
 	return s.repo.DepositTx(ctx, orgID, accountID, d, evt)
 }
 
-// Convert applies savings balance to settle an invoice: it first settles the
-// invoice via the invoice-service internal endpoint (no cash event), then
-// records the conversion + emits savings.converted (Dr Hutang Tabungan, Cr
-// Piutang). The applied amount is min(requested|balance, invoice remaining).
+// Convert applies savings balance to settle an invoice. Order matters: it
+// reserves (locks + decrements) the tabungan balance FIRST, so a concurrent
+// second Convert() attempt sees the reduced balance instead of racing on a
+// stale read (T1/T7) — only then does it call invoice-service, with an
+// idempotency key tied to the reservation so a lost-response retry (the
+// shared httpclient retries automatically on 5xx) replays safely instead of
+// double-applying (T2). If the invoice-service call fails outright, the
+// reservation is fully compensated (credited back); if it applies less than
+// reserved (invoice had less remaining than requested), the shortfall is
+// credited back. The applied amount is min(requested|balance, invoice remaining).
 func (s *Service) Convert(ctx context.Context, orgID, userID, accountID uuid.UUID, req model.ConvertRequest) (*model.SavingsAccount, error) {
 	acct, err := s.repo.GetAccount(ctx, orgID, accountID)
 	if err != nil {
@@ -94,6 +100,10 @@ func (s *Service) Convert(ctx context.Context, orgID, userID, accountID uuid.UUI
 	}
 	if acct.Status != model.StatusAktif {
 		return nil, repository.ErrNotActive
+	}
+	invoiceID, err := uuid.Parse(req.InvoiceID)
+	if err != nil {
+		return nil, fmt.Errorf("invoice_id tidak valid")
 	}
 	want := req.Amount
 	if want <= 0 || want > acct.Balance {
@@ -103,16 +113,24 @@ func (s *Service) Convert(ctx context.Context, orgID, userID, accountID uuid.UUI
 		return nil, repository.ErrInsufficient
 	}
 
-	// 1) Settle the invoice (idempotent-ish, returns the actually applied amount).
-	applied, err := s.settleInvoice(ctx, orgID, req.InvoiceID, want)
+	depositID, err := s.repo.ReserveForConvert(ctx, orgID, accountID, want, &userID)
 	if err != nil {
-		return nil, fmt.Errorf("settle invoice: %w", err)
+		return nil, err
 	}
-	if applied <= 0 {
-		return nil, fmt.Errorf("invoice sudah lunas / tidak ada sisa untuk dilunasi")
+	idempotencyKey := depositID.String()
+
+	applied, settleErr := s.settleInvoice(ctx, orgID, acct.JamaahID, invoiceID, want, idempotencyKey)
+	if settleErr == nil && applied <= 0 {
+		settleErr = fmt.Errorf("invoice sudah lunas / tidak ada sisa untuk dilunasi")
+	}
+	if settleErr != nil {
+		if _, compErr := s.repo.CompensateConvert(ctx, orgID, accountID, depositID, want); compErr != nil {
+			s.log.Errorw("CONVERSION INCONSISTENCY: reserved but neither settled nor compensated",
+				"org_id", orgID, "account_id", accountID, "deposit_id", depositID, "invoice_id", req.InvoiceID, "err", compErr)
+		}
+		return nil, settleErr
 	}
 
-	// 2) Reduce savings + emit savings.converted for the applied amount.
 	payload, _ := json.Marshal(map[string]any{"amount": applied})
 	evt := outbox.Event{
 		OrgID:         orgID,
@@ -121,33 +139,34 @@ func (s *Service) Convert(ctx context.Context, orgID, userID, accountID uuid.UUI
 		EventType:     events.EventSavingsConverted,
 		Payload:       payload,
 	}
-	acct, err = s.repo.ConvertTx(ctx, orgID, accountID, applied, &userID, req.InvoiceID, evt)
+	acct, err = s.repo.ConfirmConvert(ctx, orgID, accountID, depositID, want, applied, req.InvoiceID, evt)
 	if err != nil {
-		// Invoice already settled but tabungan tx failed — surface for manual fix.
-		s.log.Errorw("CONVERSION INCONSISTENCY: invoice settled but savings not reduced",
-			"org_id", orgID, "account_id", accountID, "invoice_id", req.InvoiceID, "applied", applied, "err", err)
+		s.log.Errorw("CONVERSION INCONSISTENCY: invoice settled but savings confirm failed",
+			"org_id", orgID, "account_id", accountID, "deposit_id", depositID, "invoice_id", req.InvoiceID, "applied", applied, "err", err)
 		return nil, err
 	}
 	return acct, nil
 }
 
 type settleReq struct {
-	InvoiceID string `json:"invoice_id"`
-	OrgID     string `json:"org_id"`
-	Amount    int64  `json:"amount"`
+	InvoiceID      string `json:"invoice_id"`
+	OrgID          string `json:"org_id"`
+	JamaahID       string `json:"jamaah_id"`
+	Amount         int64  `json:"amount"`
+	IdempotencyKey string `json:"idempotency_key"`
 }
 type settleResp struct {
 	Applied int64 `json:"applied"`
 }
 
-func (s *Service) settleInvoice(ctx context.Context, orgID uuid.UUID, invoiceID string, amount int64) (int64, error) {
+func (s *Service) settleInvoice(ctx context.Context, orgID, jamaahID, invoiceID uuid.UUID, amount int64, idempotencyKey string) (int64, error) {
 	if s.invoiceAddr == "" || s.internalKey == "" {
 		return 0, fmt.Errorf("invoice service / internal key not configured")
 	}
 	var out settleResp
 	err := s.httpc.PostJSON(ctx, s.invoiceAddr, "/api/v1/invoices/internal/settle",
 		map[string]string{"X-Internal-Key": s.internalKey},
-		settleReq{InvoiceID: invoiceID, OrgID: orgID.String(), Amount: amount}, &out)
+		settleReq{InvoiceID: invoiceID.String(), OrgID: orgID.String(), JamaahID: jamaahID.String(), Amount: amount, IdempotencyKey: idempotencyKey}, &out)
 	if err != nil {
 		return 0, err
 	}
