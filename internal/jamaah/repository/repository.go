@@ -243,6 +243,22 @@ func (r *JamaahRepo) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Lock the row and re-check its status under the lock before writing —
+	// closes the race where two concurrent PATCHes both read the same
+	// FromStatus snapshot (e.g. two drags of the same card before the first
+	// PATCH resolves, or two staff members acting on the same lead from
+	// different tabs) and would otherwise both succeed, potentially firing an
+	// irreversible batal-cascade twice.
+	var current string
+	if err := tx.QueryRow(ctx, `SELECT pipeline_status FROM jamaah_package_registrations
+		WHERE org_id = $1 AND jamaah_id = $2 AND package_id = $3 FOR UPDATE`,
+		orgID, jamaahID, packageID).Scan(&current); err != nil {
+		return ErrRegistrationNotFound
+	}
+	if current != u.FromStatus {
+		return ErrStageConflict
+	}
+
 	query := `UPDATE jamaah_package_registrations
 		SET pipeline_status = $4, dp_date = $5, lunas_date = $6, berangkat_date = $7,
 			lost_reason = NULLIF($8, ''), updated_at = NOW()`
@@ -250,12 +266,8 @@ func (r *JamaahRepo) UpdatePipelineStatus(ctx context.Context, orgID, jamaahID, 
 		query += `, stage_entered_at = NOW()`
 	}
 	query += ` WHERE org_id = $1 AND jamaah_id = $2 AND package_id = $3`
-	result, err := tx.Exec(ctx, query, orgID, jamaahID, packageID, u.Status, u.DPDate, u.LunasDate, u.BerangkatDate, u.LostReason)
-	if err != nil {
+	if _, err := tx.Exec(ctx, query, orgID, jamaahID, packageID, u.Status, u.DPDate, u.LunasDate, u.BerangkatDate, u.LostReason); err != nil {
 		return err
-	}
-	if result.RowsAffected() == 0 {
-		return ErrRegistrationNotFound
 	}
 
 	if changed {
@@ -465,4 +477,5 @@ var (
 	ErrRegistrationNotFound = fmt.Errorf("registration not found")
 	ErrFollowUpNotFound     = fmt.Errorf("follow-up not found")
 	ErrDocumentNotFound     = fmt.Errorf("document not found")
+	ErrStageConflict        = fmt.Errorf("registration stage changed concurrently, please retry")
 )
