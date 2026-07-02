@@ -66,7 +66,7 @@ func (r *Repo) GetAccount(ctx context.Context, orgID, id uuid.UUID) (*model.Savi
 	if err != nil {
 		return nil, ErrNotFound
 	}
-	deps, err := r.listDeposits(ctx, id)
+	deps, err := r.listDeposits(ctx, orgID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -74,9 +74,9 @@ func (r *Repo) GetAccount(ctx context.Context, orgID, id uuid.UUID) (*model.Savi
 	return a, nil
 }
 
-func (r *Repo) listDeposits(ctx context.Context, accountID uuid.UUID) ([]model.Deposit, error) {
+func (r *Repo) listDeposits(ctx context.Context, orgID, accountID uuid.UUID) ([]model.Deposit, error) {
 	rows, err := r.pool.Query(ctx, `SELECT id, account_id, org_id, amount, direction, type, method, reference, notes, created_by, created_at
-		FROM savings_deposits WHERE account_id=$1 ORDER BY created_at DESC`, accountID)
+		FROM savings_deposits WHERE account_id=$1 AND org_id=$2 ORDER BY created_at DESC`, accountID, orgID)
 	if err != nil {
 		return nil, err
 	}
