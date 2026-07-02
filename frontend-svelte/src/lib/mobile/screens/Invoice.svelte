@@ -12,6 +12,8 @@
   let all = $state([]);
   let loading = $state(true);
   let tab = $state("Semua");
+  let totalTagih = $state(0);
+  let totalBayar = $state(0);
   const tabs = ["Semua", "Lunas", "Sebagian", "Belum Bayar", "Jatuh Tempo"];
 
   // backend status -> display label
@@ -20,17 +22,26 @@
 
   onMount(async () => {
     try {
-      const res = await ApiService.listInvoices({ pageSize: 50 });
+      const [res, summary] = await Promise.all([
+        ApiService.listInvoices({ pageSize: 50 }),
+        ApiService.getInvoiceSummary().catch(() => null),
+      ]);
       all = res?.invoices || res?.data || (Array.isArray(res) ? res : []) || [];
+      if (summary) {
+        totalTagih = Number(summary.total_amount ?? 0);
+        totalBayar = Number(summary.total_paid ?? 0);
+      } else {
+        // Summary endpoint unreachable — fall back to the old (capped-at-50) sum
+        // rather than showing blank KPI tiles.
+        totalTagih = all.reduce((s, i) => s + Number(i.total_amount ?? i.jumlah ?? 0), 0);
+        totalBayar = all.reduce((s, i) => s + Number(i.amount_paid ?? i.dibayar ?? 0), 0);
+      }
     } catch {
       all = [];
     } finally {
       loading = false;
     }
   });
-
-  let totalTagih = $derived(all.reduce((s, i) => s + Number(i.total_amount ?? i.jumlah ?? 0), 0));
-  let totalBayar = $derived(all.reduce((s, i) => s + Number(i.amount_paid ?? i.dibayar ?? 0), 0));
   function isOverdue(iv) {
     return (iv.status === "belum_bayar" || iv.status === "sebagian") && iv.due_date && new Date(iv.due_date) < new Date();
   }
