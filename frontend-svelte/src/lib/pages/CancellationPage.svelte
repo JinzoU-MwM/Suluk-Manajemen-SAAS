@@ -151,10 +151,12 @@
     showNewRefundDrawer = true;
   }
 
-  function selectInvoiceForRefund(id) {
+  async function selectInvoiceForRefund(id) {
     refundForm.invoice_id = id;
     const inv = invoices.find((i) => i.id === id);
     refundForm.amount = inv?.amount_paid ?? 0;
+    const policy = await ApiService.getApplicablePolicy(id);
+    refundForm.refund_pct = policy?.refund_pct ?? 100;
   }
 
   async function saveNewRefund() {

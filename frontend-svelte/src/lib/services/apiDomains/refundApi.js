@@ -72,6 +72,12 @@ export function createRefundApi({ cacheInvalidate } = /** @type {{cacheInvalidat
             return unwrapData(await res.json());
         },
 
+        async getApplicablePolicy(invoiceId) {
+            const res = await apiFetch(`${API_URL}/invoices/${invoiceId}/refund-policy`, { headers: authHeaders() });
+            if (!res.ok) return null; // 404 = no policy applies; not an error the caller needs to handle
+            return unwrapData(await res.json());
+        },
+
         async approveRefund(id) {
             const res = await apiFetch(`${BASE}/${id}/approve`, {
                 method: 'PUT',

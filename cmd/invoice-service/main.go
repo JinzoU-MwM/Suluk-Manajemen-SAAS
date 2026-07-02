@@ -160,6 +160,7 @@ func main() {
 	refunds.Put("/:id/complete", finRole, refundHandler.CompleteRefund)
 	refunds.Put("/:id/reject", finRole, refundHandler.RejectRefund)
 	invoices.Post("/:id/refund", finRole, refundHandler.InitiateRefund)
+	invoices.Get("/:id/refund-policy", refundHandler.GetApplicablePolicy)
 
 	go func() {
 		if err := app.Listen(":" + strconv.Itoa(cfg.Server.Port)); err != nil {

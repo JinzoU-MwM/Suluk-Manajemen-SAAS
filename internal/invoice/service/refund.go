@@ -76,6 +76,25 @@ func (s *RefundService) applicablePolicy(ctx context.Context, orgID, packageID u
 	return policy, nil
 }
 
+// GetApplicablePolicyForInvoice is the read-only preview the web "Ajukan
+// Refund" form uses to auto-fill refund_pct before the staff submits —
+// InitiateRefund independently re-derives and enforces this at submit time,
+// so this endpoint is advisory only and never itself creates or blocks a refund.
+func (s *RefundService) GetApplicablePolicyForInvoice(ctx context.Context, orgID, invoiceID uuid.UUID, authToken string) (*model.RefundPolicy, error) {
+	inv, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	policy, err := s.applicablePolicy(ctx, orgID, inv.PackageID, authToken)
+	if err != nil {
+		return nil, err
+	}
+	if policy == nil {
+		return nil, repository.ErrPolicyNotFound
+	}
+	return policy, nil
+}
+
 func (s *RefundService) InitiateRefund(ctx context.Context, orgID uuid.UUID, invoiceID uuid.UUID, req model.InitiateRefundRequest, authToken string) (*model.Refund, error) {
 	inv, err := s.repo.GetInvoiceByID(ctx, invoiceID, orgID)
 	if err != nil {

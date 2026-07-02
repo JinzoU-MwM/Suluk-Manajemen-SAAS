@@ -86,6 +86,23 @@ func (h *RefundHandler) InitiateRefund(c *fiber.Ctx) error {
 	return response.Created(c, ref)
 }
 
+func (h *RefundHandler) GetApplicablePolicy(c *fiber.Ctx) error {
+	claims := c.Locals("claims").(*sharedAuth.Claims)
+	invoiceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return response.BadRequest(c, "invalid invoice id")
+	}
+
+	policy, err := h.svc.GetApplicablePolicyForInvoice(c.Context(), claims.OrgID, invoiceID, c.Get("Authorization"))
+	if err != nil {
+		if errors.Is(err, repository.ErrInvoiceNotFound) || errors.Is(err, repository.ErrPolicyNotFound) {
+			return response.NotFound(c, "no applicable refund policy")
+		}
+		return response.Internal(c, err)
+	}
+	return response.OK(c, policy)
+}
+
 func (h *RefundHandler) ApproveRefund(c *fiber.Ctx) error {
 	claims := c.Locals("claims").(*sharedAuth.Claims)
 	id, err := uuid.Parse(c.Params("id"))
